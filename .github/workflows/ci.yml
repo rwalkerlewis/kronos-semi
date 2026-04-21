@@ -107,6 +107,15 @@ jobs:
             kronos-semi:ci \
             python scripts/run_benchmark.py pn_1d_bias
 
+      - name: Run pn_1d_bias_reverse benchmark
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
+            -w /workspaces/kronos-semi \
+            -e MPLBACKEND=Agg \
+            kronos-semi:ci \
+            python scripts/run_benchmark.py pn_1d_bias_reverse
+
       - name: Upload benchmark plots
         if: always()
         uses: actions/upload-artifact@v4

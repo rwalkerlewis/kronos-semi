@@ -139,7 +139,70 @@ $L_0$.
 > $L_D^2 = \lambda^2 L_0^2$. Any future scaled forms must follow the
 > same convention.
 
-### 2.4 Scaled continuity (for Day 2)
+### 2.4 Bias continuation strategy
+
+The coupled (psi, phi_n, phi_p) system is stiff at applied bias. The
+Slotboom carrier expression $n = n_i \exp(\hat\psi - \hat\Phi_n)$ can
+underflow in deep depletion and overflow in heavy accumulation (see
+`docs/adr/0004-slotboom-variables-for-dd.md`). Newton applied directly
+to a high-bias problem from a zero initial guess does not converge.
+The driver (`semi.run.run_bias_sweep`) solves this by ramping the
+applied bias from equilibrium through a sequence of intermediate
+targets, using the previous converged solution as the initial guess at
+each step.
+
+**Coordinate convention reminder.** The mesh stays in physical meters,
+so the scaled Poisson stiffness coefficient is $L_D^2 \varepsilon_r =
+\lambda^2 L_0^2 \varepsilon_r$, not $\lambda^2 \varepsilon_r$. Any new
+scaled form added to the DD block must follow the same convention (see
+Section 2.3).
+
+**Adaptive step control.** The continuation stepper is a signed
+step-size controller (`semi.continuation.AdaptiveStepController`) with
+three knobs:
+
+- On SNES convergence with iteration count strictly below
+  `easy_iter_threshold` (default 4), an easy-solve counter is
+  incremented. Once the counter reaches the threshold, the step is
+  multiplied by `grow_factor` (default 1.5) and the counter resets.
+- On SNES divergence (including line-search failure), the step is
+  halved and the counter resets. Before halving, the block unknowns
+  are restored to the last converged state.
+- The step is bounded above by `solver.continuation.max_step`
+  (default: the voltage_sweep spacing) and below by
+  `solver.continuation.min_step` (default 1e-4 V). Halving below
+  `min_step` aborts the run; growing above `max_step` clamps.
+
+The controller is signed: negative `initial_step` drives a reverse
+sweep. `clamp_to_endpoint` ensures the final step exactly lands on
+the sweep endpoint instead of overshooting.
+
+**Why bias ramping is necessary.** At V = 0.6 V on the Day 2 pn
+junction, the peak electric field is roughly $2 \times 10^5$ V/cm and
+the minority carrier density at the depletion edge jumps by a factor
+$\exp(0.6/V_t) \approx 10^{10}$ above its equilibrium value. A Newton
+step from an equilibrium initial guess to this state crosses the
+domain where carrier densities underflow to zero, the Jacobian loses
+rank, and line search fails to find an improvement. Marching in
+increments of $V_t$ (or smaller) keeps the updates within the radius
+of quadratic convergence.
+
+**When to override defaults.**
+
+- If a sweep halts on "Bias ramp failed after N halvings," first
+  increase `continuation.max_halvings` (default 6). If halving to
+  `min_step` still fails, the regime is genuinely outside what
+  constant-mobility Boltzmann DD can resolve (high injection,
+  breakdown); tighten the sweep range rather than forcing the solver.
+- If the sweep succeeds but spends too many Newton iterations per
+  step, raise `continuation.max_step` above the sweep spacing to let
+  growth skip over redundant record points.
+- For deep reverse bias, lower `easy_iter_threshold` or
+  `grow_factor` to keep the step conservative; the Slotboom
+  formulation becomes stiff as minority carrier densities underflow
+  and larger jumps lose Newton convergence.
+
+### 2.5 Scaled continuity (for Day 2)
 
 Under the same scaling, with the time scale $t_0 = L_0^2 / D_0$ and
 $D_0 = V_t \mu_0$ (Einstein for the reference mobility), the steady-state

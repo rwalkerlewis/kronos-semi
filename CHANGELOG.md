@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.3.0] - Day 3
+
+### Added
+- Adaptive step-size controller for bias continuation
+  (`semi.continuation.AdaptiveStepController`): grows the step by
+  `grow_factor` after `easy_iter_threshold` consecutive easy SNES
+  solves, halves on failure, clamps to the sweep endpoint.
+- Pure-Python diode analytical helpers (`semi.diode_analytical`):
+  Shockley long-diode saturation, depletion width, Sah-Noyce-Shockley
+  forward total reference, SRH generation reference.
+- Reverse-bias benchmark `benchmarks/pn_1d_bias_reverse/` with a
+  verifier that compares |J| against the net SRH generation current
+  `(q n_i / 2 tau_eff)(W(V) - W(0))` within 20% on [-2, -0.5] V.
+- CI `docker-fem` job now runs the reverse benchmark on every push.
+- Schema fields `solver.continuation.{max_step, easy_iter_threshold,
+  grow_factor}`.
+- New "Bias continuation strategy" subsection in `docs/PHYSICS.md`.
+- 26 new pytest tests (continuation controller, diode analytical
+  helpers, schema fields); total test count 96.
+
+### Changed
+- `pn_1d_bias` forward verifier now demands J_sim within 15% of the
+  SNS reference J_diff + J_rec (with Sze f = 2 V_t/(V_bi - V)
+  correction) over V in [0.15, 0.55] V, and within 10% of Shockley
+  diffusion at V = 0.6 V. Day 2 "qualitative below 0.5 V" caveat is
+  removed.
+- `run_bias_sweep` walks the ramp adaptively instead of recording at
+  every `voltage_sweep.step` point. Total SNES iterations on the
+  Day 2 sweep (0 to 0.6 V) dropped from 42 to 31 (26.2% reduction).
+
+## [0.2.0] - Day 2
+
+### Added
+- Coupled Slotboom drift-diffusion with SRH recombination
+  (`semi.physics.slotboom`, `recombination`, `drift_diffusion`).
+- Blocked NonlinearProblem wrapper `solve_nonlinear_block` and
+  `run_bias_sweep` with halving-based voltage continuation.
+- `pn_1d_bias` benchmark and Shockley long-diode verifier.
+- CI hardening: `docker-fem` job runs pytest plus benchmark verifiers
+  inside the dolfinx container; `branches` glob fixed to match
+  `dev/**`, `ci/**`, `docs/**`.
+- Schema fields `recombination.{tau_n, tau_p, E_t}`, per-contact
+  `voltage_sweep`, `solver.type in {drift_diffusion, bias_sweep}`,
+  and `continuation.{min_step, max_halvings}`.
+
 ## [0.1.0] - Day 1
 
 ### Added

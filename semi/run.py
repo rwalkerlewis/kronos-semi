@@ -149,6 +149,8 @@ def run_bias_sweep(cfg: dict[str, Any]) -> SimulationResult:
     cont = cfg.get("solver", {}).get("continuation", {})
     max_halvings = int(cont.get("max_halvings", 6))
     min_step = float(cont.get("min_step", 1.0e-4))
+    easy_iter_threshold = int(cont.get("easy_iter_threshold", 4))
+    grow_factor = float(cont.get("grow_factor", 1.5))
 
     F_list = build_dd_block_residual(
         spaces, N_hat_fn, sc, ref_mat.epsilon_r,
@@ -176,6 +178,15 @@ def run_bias_sweep(cfg: dict[str, Any]) -> SimulationResult:
         v_sweep_list = list(sweep_values)
         if not v_sweep_list or v_sweep_list[0] != 0.0:
             v_sweep_list = [0.0] + [v for v in v_sweep_list if v != 0.0]
+
+    # Nominal step size from the sweep spacing (e.g., voltage_sweep.step).
+    # continuation.max_step defaults to this, which preserves the Day 2
+    # halving-only behaviour when growth cannot exceed the initial step.
+    if len(v_sweep_list) >= 2:
+        nominal_step_abs = abs(v_sweep_list[1] - v_sweep_list[0])
+    else:
+        nominal_step_abs = 0.0
+    max_step_abs = float(cont.get("max_step", nominal_step_abs))
 
     def snapshot():
         return (
@@ -225,29 +236,46 @@ def run_bias_sweep(cfg: dict[str, Any]) -> SimulationResult:
 
     iv_rows: list[dict[str, float]] = []
     last_info: dict[str, Any] = {}
-    V_prev = None
 
-    for V_target in v_sweep_list:
-        if V_prev is None:
-            voltages = dict(static_voltages)
-            if sweep_contact is not None:
-                voltages[sweep_contact] = V_target
-            snap = snapshot()
-            info = solve_at(voltages, _fmt_tag(V_target))
-            if not info["converged"]:
-                restore(snap)
-                raise RuntimeError(
-                    f"SNES failed at seed bias V={V_target:+.4f} V"
-                )
-            last_info = info
-            V_prev = V_target
-            _record_iv(iv_rows, V_target, spaces, sc, ref_mat,
-                       sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI)
-            continue
+    from .continuation import AdaptiveStepController, StepTooSmall
 
-        step = V_target - V_prev
+    # Seed solve at the first sweep entry (V=0 by construction above).
+    V_seed = float(v_sweep_list[0])
+    voltages = dict(static_voltages)
+    if sweep_contact is not None:
+        voltages[sweep_contact] = V_seed
+    snap = snapshot()
+    info = solve_at(voltages, _fmt_tag(V_seed))
+    if not info["converged"]:
+        restore(snap)
+        raise RuntimeError(f"SNES failed at seed bias V={V_seed:+.4f} V")
+    last_info = info
+    V_prev = V_seed
+    _record_iv(iv_rows, V_seed, spaces, sc, ref_mat,
+               sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI)
+
+    V_end = float(v_sweep_list[-1])
+    if abs(V_end - V_seed) > 0.0 and max_step_abs > 0.0:
+        sign = 1.0 if V_end > V_seed else -1.0
+        # Start at the nominal sweep spacing (voltage_sweep.step); the
+        # adaptive controller grows toward max_step_abs on consecutive
+        # easy solves and halves on failure.
+        initial_abs = nominal_step_abs if nominal_step_abs > 0.0 else max_step_abs
+        initial_abs = min(initial_abs, max_step_abs)
+        initial_step = sign * initial_abs
+
+        controller = AdaptiveStepController(
+            initial_step=initial_step,
+            max_step_abs=max_step_abs,
+            min_step_abs=min_step,
+            easy_iter_threshold=easy_iter_threshold,
+            grow_factor=grow_factor,
+        )
+
         halvings = 0
-        while True:
+        while abs(V_end - V_prev) > 1.0e-12:
+            remaining = V_end - V_prev
+            step = controller.clamp_to_endpoint(remaining)
             V_try = V_prev + step
             voltages = dict(static_voltages)
             if sweep_contact is not None:
@@ -265,17 +293,19 @@ def run_bias_sweep(cfg: dict[str, Any]) -> SimulationResult:
                 V_prev = V_try
                 _record_iv(iv_rows, V_try, spaces, sc, ref_mat,
                            sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI)
-                if abs(V_try - V_target) < 1.0e-12:
-                    break
-                remaining = V_target - V_prev
-                if step != 0.0 and abs(remaining) < abs(step):
-                    step = remaining
+                halvings = 0
+                controller.on_success(int(info.get("iterations", 0)))
                 continue
 
             restore(snap)
             halvings += 1
-            step *= 0.5
-            if halvings > max_halvings or abs(step) < min_step:
+            try:
+                controller.on_failure()
+            except StepTooSmall as exc:
+                raise RuntimeError(
+                    f"Bias ramp failed near V={V_try:+.4f} V: {exc}"
+                ) from exc
+            if halvings > max_halvings:
                 raise RuntimeError(
                     f"Bias ramp failed near V={V_try:+.4f} V after "
                     f"{halvings} halvings (min_step={min_step})."

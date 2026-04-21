@@ -126,6 +126,42 @@ def test_continuation_defaults(minimal_cfg):
     cont = result["solver"]["continuation"]
     assert cont["max_halvings"] >= 0
     assert cont["min_step"] > 0.0
+    assert cont["easy_iter_threshold"] >= 1
+    assert cont["grow_factor"] > 1.0
+
+
+def test_continuation_adaptive_overrides(minimal_cfg):
+    minimal_cfg["solver"] = {
+        "type": "bias_sweep",
+        "continuation": {
+            "max_step": 0.2,
+            "easy_iter_threshold": 3,
+            "grow_factor": 2.0,
+        },
+    }
+    result = schema.validate(minimal_cfg)
+    cont = result["solver"]["continuation"]
+    assert cont["max_step"] == pytest.approx(0.2)
+    assert cont["easy_iter_threshold"] == 3
+    assert cont["grow_factor"] == pytest.approx(2.0)
+
+
+def test_continuation_rejects_bad_grow_factor(minimal_cfg):
+    minimal_cfg["solver"] = {
+        "type": "bias_sweep",
+        "continuation": {"grow_factor": 1.0},
+    }
+    with pytest.raises(schema.SchemaError):
+        schema.validate(minimal_cfg)
+
+
+def test_continuation_rejects_nonpositive_max_step(minimal_cfg):
+    minimal_cfg["solver"] = {
+        "type": "bias_sweep",
+        "continuation": {"max_step": 0.0},
+    }
+    with pytest.raises(schema.SchemaError):
+        schema.validate(minimal_cfg)
 
 
 def test_doping_gaussian_schema():

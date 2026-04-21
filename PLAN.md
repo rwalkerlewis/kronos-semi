@@ -30,49 +30,50 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `dev/day2-drift-diffusion` (Day 2 complete, PR open)
+- Active dev branch: `dev/day4-refactor` (Day 4 to be cut after Day 3 PR merges)
 
 ## Current state
 
-Day 1 is merged into `main`. Day 2 (Slotboom drift-diffusion, coupled
-block Newton, forward-bias sweep) is in flight on
-`dev/day2-drift-diffusion`.
+Day 1 and Day 2 are merged into `main`. CI hardening (branch glob plus
+Dockerized FEM job) merged on `ci/docker-benchmark-matrix`. Day 3
+(adaptive bias continuation, Sah-Noyce-Shockley verifier, reverse-bias
+check) is in flight on `dev/day3-bias-hardening`.
 
 ### What works (verified in Docker on current `main`)
 
 - Docker dev environment on `ghcr.io/fenics/dolfinx/dolfinx:stable`
-  (dolfinx 0.10). `docker compose run --rm test` runs 36/36 pytest.
+  (dolfinx 0.10). `docker compose run --rm test` runs 70/70 pytest.
 - Pure-Python core: constants, materials (Si, Ge, GaAs, SiO2, HfO2, Si3N4),
   nondimensional scaling, doping profiles (uniform/step/gaussian), JSON
-  schema with validate/load. 36/36 pytest passing.
-- JSON input schema (jsonschema Draft-07) with defaults.
+  schema with validate/load.
+- JSON input schema (jsonschema Draft-07) with defaults, including
+  `recombination.E_t`, per-contact `voltage_sweep`, and
+  `solver.continuation.{min_step, max_halvings}`.
 - Builtin mesh generation (interval/rectangle/box) with region and facet
   tagging from axis-aligned boxes and planes.
 - Equilibrium Poisson under Boltzmann statistics, solved via PETSc SNES
   through `dolfinx.fem.petsc.NonlinearProblem`. Quadratic Newton
-  convergence observed (5 iterations, residual 1.5e-6 to 8.1e-15).
+  convergence (5 iterations, residual 1.5e-6 to 8.1e-15).
+- Coupled Slotboom drift-diffusion with SRH recombination. Three-block
+  (psi, phi_n, phi_p) residual with `L_D^2 * eps_r` on Poisson and
+  `L_0^2 * mu_hat` on continuity. Forward-bias sweep with snapshot/
+  restore adaptive halving continuation; UFL facet-integral current
+  evaluation.
 - Benchmark runner CLI (`scripts/run_benchmark.py`) producing plots and
-  running registered physical verifiers. `pn_1d` benchmark passes all
-  six checks:
-
-  | Check                                      | Sim                 | Theory             | Rel err |
-  |--------------------------------------------|--------------------:|-------------------:|--------:|
-  | Built-in voltage V_bi                      | 0.8334 V            | 0.8334 V           | 0.00%   |
-  | Peak \|E\|                                 | 104.84 kV/cm        | 113.53 kV/cm       | 7.65%   |
-  | p-side bulk hole density                   | 1.00e23 m^-3        | N_A = 1.00e23      | ratio 1.00 |
-  | n-side bulk electron density               | 1.00e23 m^-3        | N_D = 1.00e23      | ratio 1.00 |
-  | Mass action n*p in p-side bulk             | 1.000e32            | n_i^2 = 1.000e32   | 0.00%   |
-  | Mass action n*p in n-side bulk             | 1.000e32            | n_i^2 = 1.000e32   | 0.00%   |
+  running registered verifiers.
+- `pn_1d` benchmark (equilibrium): V_bi, peak |E|, bulk densities, mass
+  action, all within 5-10% of depletion-approximation theory.
+- `pn_1d_bias` benchmark (forward bias): J at V = 0.6 V within 10% of
+  Shockley long-diode theory. Low-bias behaviour is qualitative in Day 2
+  because depletion-region SRH recombination raises ideality toward 2;
+  Day 3 will make that regime quantitative by adding the Sah-Noyce-
+  Shockley term.
+- GitHub Actions runs pure-Python tests on 3.10/3.11/3.12, ruff, and a
+  Dockerized FEM job that runs pytest plus both benchmark verifiers on
+  every push to `main`, `dev/**`, `ci/**`, `docs/**`.
 
 ### What does not work / not yet built
 
-- Drift-diffusion under applied bias (Day 2 target).
-- Slotboom variable formulation (Day 2).
-- SRH recombination kernel (Day 2).
-- Coupled block Newton for (psi, Phi_n, Phi_p) (Day 2).
-- Bias ramping continuation (Day 3).
-- Forward-bias IV curve verification against Shockley diode equation
-  (Day 3).
 - 2D MOS capacitor benchmark (Day 5).
 - 3D doped resistor benchmark (Day 6).
 - Gmsh `.msh` mesh loader (stubbed, raises `NotImplementedError`).
@@ -82,65 +83,25 @@ block Newton, forward-bias sweep) is in flight on
 
 ## Next task
 
-**Day 3: Bias ramping continuation, IV verifier hardening, ideality-
-factor diagnostics.** Planned.
+**Day 4: Refactor, expanded test coverage, physics docs updates.**
+Planned.
 
-- **Branch:** `dev/day3-bias-hardening` (to be cut from `main` after the
-  Day 2 PR merges).
-- **Scope, in:**
-  - Add explicit Sah-Noyce-Shockley recombination-current term to the
-    `pn_1d_bias` verifier so low-bias checks become quantitative.
-  - Automatic continuation step-size tuning based on Newton iteration
-    count.
-  - Optional reverse-bias (saturation region) check.
-  - Consider Scharfetter-Gummel box-scheme discretization as an ADR if
-    the current Galerkin Slotboom residual shows further accuracy
-    issues at high doping or wider bias ranges.
-- **Preconditions:** Day 2 PR merged into `main`.
-
-**Day 2: Slotboom drift-diffusion and bias support.** Merged in PR
-`dev/day2-drift-diffusion` on 2026-04-20. See "Completed work log".
-
-Historical scope for Day 2, kept here for context while the PR is open:
-
-- **Branch:** `dev/day2-drift-diffusion` (created off `main` at
-  commit 32dcafd, the Day 1 merge).
-- **Preconditions (satisfied):**
-  - `dev/docker-day1-fix` merged to `main` (PR #2).
-  - `docker compose run --rm benchmark pn_1d` exits 0 on `main`.
-  - `docker compose run --rm test` is 36/36 green on `main`.
-- **Scope, in:**
-  - Implement Slotboom quasi-Fermi variables (Phi_n, Phi_p) with
-    Boltzmann carrier expressions `n = n_i exp((psi - Phi_n) / V_t)`,
-    `p = n_i exp((Phi_p - psi) / V_t)`.
-  - Add SRH recombination term with tau_n, tau_p from JSON.
-  - Build a coupled (psi, Phi_n, Phi_p) block residual using dolfinx
-    0.10 blocked function space support
-    (`NonlinearProblem(..., kind="nest")` or equivalent).
-  - Extend the schema with optional `recombination` (SRH parameters) and
-    per-contact applied bias sweeps.
-  - Add a bias ramping driver that reuses the previous solution as the
-    initial guess.
-  - New benchmark `benchmarks/pn_1d_bias/` with a forward-bias IV sweep.
-  - New verifier: Shockley diode equation `J = J_0 (exp(V/V_t) - 1)`
-    matched within 10% over V in [0.2, 0.6] V at 0.05 V steps.
-  - Unit tests for Slotboom math and the SRH kernel.
+- **Branch:** `dev/day4-refactor` (to be cut from `main` after the
+  Day 3 PR merges).
+- **Scope, in (per `docs/ROADMAP.md` Day 4):**
+  - Break `semi/run.py` into `run_equilibrium` and `run_bias_sweep`
+    modules with a thin `run(cfg)` dispatcher (partially done; extract
+    BC construction into `semi/bcs.py`).
+  - Raise pure-Python coverage to 95%+; add in-memory integration
+    tests for `run` itself.
+  - Update `docs/PHYSICS.md` with the scaled drift-diffusion
+    derivation now that all Day 2/3 terms are implemented.
+  - Add `docs/adr/0006-bc-construction-interface.md` if the BC refactor
+    introduces a new decision.
 - **Scope, out:**
-  - Reverse bias / breakdown.
-  - Field-dependent mobility or Caughey-Thomas.
-  - AC small-signal.
-  - 2D and higher (stays Day 5+).
-  - Notebook updates (deferred to after the code runs clean in Docker).
-- **Acceptance criteria:**
-  - `docker compose run --rm benchmark pn_1d` still green (no
-    regression on Day 1).
-  - `docker compose run --rm benchmark pn_1d_bias` exits 0 with IV
-    curve within 10% of Shockley across the specified bias range.
-  - pytest green with new Slotboom and SRH tests (target: at least 10
-    new tests).
-  - No em dashes in any new prose.
-  - No new non-dolfinx imports in the pure-Python core.
-- **Estimated effort:** one focused work day in Docker.
+  - 2D or 3D benchmarks (Days 5-6).
+  - Colab notebook updates.
+- **Preconditions:** Day 3 PR merged into `main`.
 
 ## Roadmap
 
@@ -148,7 +109,7 @@ Historical scope for Day 2, kept here for context while the PR is open:
 |----:|--------------------------------------------------------------|---------|-----------------------------------------------------------------------|
 | 1   | Equilibrium Poisson, 1D pn junction, Docker env              | Done    | 6/6 verifier checks pass; PR `dev/docker-day1-fix`                    |
 | 2   | Slotboom drift-diffusion, coupled Newton, bias sweep         | Done    | 6/6 `pn_1d_bias` checks pass; PR `dev/day2-drift-diffusion`           |
-| 3   | Bias ramping continuation, Shockley IV verifier hardening    | Planned | Tighten tolerance, add reverse bias (saturation region)               |
+| 3   | Bias ramping continuation, Shockley IV verifier hardening    | Done    | Adaptive ramp (-26.2% iters), SNS verifier, reverse-bias gen check    |
 | 4   | Refactor pass, expanded test coverage, physics docs updates  | Planned | Ruff-clean, coverage target, ADR review                               |
 | 5   | 2D MOS capacitor (oxide + silicon multi-region)              | Planned | Uses submesh for carriers; verify C-V curve                           |
 | 6   | 3D doped resistor                                            | Planned | Framework extension; verify Ohmic V-I linearity                       |
@@ -213,6 +174,30 @@ They may be added after submission as stretch goals (see
 
 Append-only. Newest entries on top.
 
+- **Day 3 (2026-04-21):** adaptive bias continuation, Sah-Noyce-
+  Shockley recombination in the forward verifier, and a dedicated
+  reverse-bias benchmark. Added `semi/continuation.py`
+  (`AdaptiveStepController`: grow on easy_iter_threshold easy solves,
+  halve on failure, clamp to sweep endpoint) and rewrote
+  `run_bias_sweep` to drive it, cutting `pn_1d_bias` forward (0 to
+  0.6 V) from 42 SNES iterations to 31 (26.2% reduction). Extracted
+  Shockley, depletion-width, SNS, and SRH-generation reference curves
+  into `semi/diode_analytical.py` (pure-Python, testable). The
+  `pn_1d_bias` verifier now matches J_sim to the SNS total
+  (J_diff + J_rec with Sze f = 2 V_t/(V_bi - V) correction) within
+  15% on [0.15, 0.55] V and to Shockley diffusion within 10% at
+  V = 0.6 V. New `pn_1d_bias_reverse` benchmark sweeps the anode 0 to
+  -2 V and demands |J| within 20% of
+  (q n_i / 2 tau_eff)(W(V) - W(0)) on [-2, -0.5] V; this replaces the
+  originally-proposed "|J| saturates to J_0" acceptance criterion,
+  which does not hold for tau = 1e-8 s devices where SRH thermal
+  generation dominates reverse current over Shockley diffusion by
+  ~5 orders of magnitude. Schema extended with
+  `continuation.{max_step, easy_iter_threshold, grow_factor}`; docs
+  add a "Bias continuation strategy" subsection to `PHYSICS.md`; CI
+  now also runs `pn_1d_bias_reverse`. 26 new tests (continuation
+  controller, diode analytical helpers, schema fields). PR:
+  `dev/day3-bias-hardening`.
 - **Day 2 (2026-04-20):** coupled Slotboom drift-diffusion with SRH
   recombination and forward-bias sweep. Added `semi/physics/slotboom.py`
   (n/p from (psi, phi_n, phi_p), UFL and NumPy),

@@ -234,6 +234,17 @@ SCHEMA: dict[str, Any] = {
                         "adaptive": {"type": "boolean"},
                         "min_step": {"type": "number", "exclusiveMinimum": 0.0},
                         "max_halvings": {"type": "integer", "minimum": 0},
+                        "max_step": {"type": "number", "exclusiveMinimum": 0.0},
+                        "easy_iter_threshold": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "SNES converging in strictly fewer than this many iterations counts as easy.",
+                        },
+                        "grow_factor": {
+                            "type": "number",
+                            "exclusiveMinimum": 1.0,
+                            "description": "Multiplier on the continuation step after easy_iter_threshold consecutive easy solves.",
+                        },
                     },
                 },
             },
@@ -324,6 +335,8 @@ def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     cont.setdefault("adaptive", True)
     cont.setdefault("min_step", 1.0e-4)
     cont.setdefault("max_halvings", 6)
+    cont.setdefault("easy_iter_threshold", 4)
+    cont.setdefault("grow_factor", 1.5)
 
     out = cfg.setdefault("output", {})
     out.setdefault("directory", "./results")
