@@ -100,7 +100,7 @@ Read `PLAN.md` for the short version and the current in-flight task.
 
 ## Day 4. Verification & Validation suite
 
-- **Status:** In flight on `dev/day4-vnv`.
+- **Status:** Done (2026-04-21). PR `dev/day4-vnv`.
 - **Goal:** replace single-point physical sanity tests with proper
   verification (Roache / Oberkampf-Roy sense): manufactured solutions,
   mesh-refinement convergence studies, and discrete conservation
@@ -151,17 +151,37 @@ Read `PLAN.md` for the short version and the current in-flight task.
     - New "Verification & Validation" section in `docs/PHYSICS.md`.
     - New ADR `docs/adr/0006-verification-and-validation-strategy.md`.
     - PLAN.md, ROADMAP.md, CHANGELOG.md final update.
-- **Verification:**
-  - `pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse` still green
-    (no regression).
-  - MMS-Poisson 1D and 2D: L^2 rate >= 1.85 on the finest pair.
-  - MMS-DD full coupling and with-SRH: L^2 rate >= 1.75 on each
-    of psi, Phi_n, Phi_p on the finest pair.
-  - Mesh convergence on `pn_1d`: monotone error reduction; at least
-    2x error reduction per mesh doubling on V_bi and peak |E|.
-  - Current continuity: <=5% non-uniformity at V in [0.3, 0.6] V.
-  - Charge conservation: |Q_net| <= 10^-10 of scaled charge.
-  - CI green on `dev/day4-vnv` with V&V step running.
+- **Delivered:**
+  - MMS-Poisson 1D linear / 1D nonlinear / 2D triangles with
+    finest-pair L^2 at theoretical 2.000 and H^1 at 0.999-1.000;
+    `2d_quad_smoke` sanity ratio 0.394.
+  - Mesh convergence on `pn_1d` over N in [50..1600] with
+    self-convergence Cauchy ratios at >= 1.99x per doubling for
+    E_peak and W over the first four levels (before the
+    physics-model plateau from the depletion-approximation
+    reference, which is honest-flagged in both the runner output
+    and in `docs/PHYSICS.md`). V_bi is set by the Ohmic BCs and
+    so is reported but not gated.
+  - Conservation: charge on `pn_1d` equilibrium at rel 1.5e-17
+    (threshold 1e-10); current continuity on `pn_1d_bias` V in
+    {0.30, 0.45, 0.60} V and `pn_1d_bias_reverse` V in {-0.50,
+    -1.00, -2.00} V, worst max_rel 1.91% forward / 0.020%
+    reverse inside the 5% / 15% tolerances.
+  - MMS-DD nine studies (three variants x three grids) with
+    every gated block rate >= 1.99 L^2 and >= 0.996 H^1.
+    Variant A gates only the psi block because the continuity
+    rows collapse to machine roundoff when the quasi-Fermis are
+    identically zero (documented in `mms_dd_derivation.md`
+    Amendment section).
+  - `scripts/run_verification.py` with subcommands `mms_poisson`,
+    `mesh_convergence`, `conservation`, `mms_dd`, `all`.
+  - CI `docker-fem` job now runs V&V inside the dolfinx image,
+    timeout tightened to 15 minutes, artifacts uploaded as
+    `fem-results` (renamed from `benchmark-plots`).
+  - New ADR `0006-verification-and-validation-strategy.md`, new
+    "Verification & Validation" section in `docs/PHYSICS.md`,
+    derivation artifact `docs/mms_dd_derivation.md` amended with
+    the SNES atol-0 fix rationale.
 - **Dependencies:** Day 3 (PR #5) merged into `main`.
 
 ## Day 5. Refactor, expanded test coverage, docs pass

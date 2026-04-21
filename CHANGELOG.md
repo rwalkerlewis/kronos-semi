@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.4.0] - Day 4
+
+### Added
+- Verification & Validation suite under `semi/verification/`, driven
+  by `scripts/run_verification.py` with subcommands `mms_poisson`,
+  `mesh_convergence`, `conservation`, `mms_dd`, and `all`:
+  - `mms_poisson`: 1D linear, 1D nonlinear, 2D triangles + 2D quad
+    smoke. Finest-pair rates at theoretical L^2 = 2.000,
+    H^1 = 0.999-1.000; quad/triangle ratio 0.394.
+  - `mesh_convergence`: `pn_1d` sweep over
+    N in [50, 100, 200, 400, 800, 1600] with Cauchy self-convergence
+    reported as the primary convergence metric (depletion-approximation
+    errors plateau because the reference is itself approximate; this
+    is honest-flagged in runner output and in `docs/PHYSICS.md`).
+    Cauchy ratios >= 1.99x per doubling on E_peak and W over the
+    first four levels.
+  - `conservation`: charge conservation on `pn_1d` equilibrium
+    (|Q_net|/Q_ref = 1.5e-17 vs. 1e-10 threshold) and current
+    continuity on `pn_1d_bias` forward (5% tol) and
+    `pn_1d_bias_reverse` (15% tol); worst max_rel 1.91% / 0.020%.
+  - `mms_dd`: three variants (psi-only, full coupling no R, full
+    coupling with SRH) x three grids (1D default, 1D nonlinear, 2D).
+    Every gated block rate >= 1.99 L^2 and >= 0.996 H^1.
+- Derivation artifact `docs/mms_dd_derivation.md` (gate-first:
+  approved before any MMS-DD code landed). Amended with the
+  implementation-time SNES tolerance fix: `atol = 0.0` with
+  `stol = 1e-12` (the originally-proposed `atol = 1e-16` was below
+  the 2D continuity-block initial residual and terminated Newton
+  prematurely).
+- New ADR `docs/adr/0006-verification-and-validation-strategy.md`
+  recording the four-phase V&V choice and rejected alternatives
+  (devsim code-to-code, single-MMS-for-everything).
+- New "Verification & Validation" section in `docs/PHYSICS.md`
+  (Section 5) with current finest-pair rates and honest flags.
+- CI `docker-fem` job now runs
+  `python scripts/run_verification.py all` inside the dolfinx
+  container; timeout tightened from 30 to 15 minutes.
+
+### Changed
+- `benchmark-plots` CI artifact renamed to `fem-results`; path
+  stays `results/` and now covers benchmarks + V&V together.
+- Day-4 scope re-purposed: the originally-planned refactor pass is
+  pushed to Day 5 to make room for the V&V work (see
+  `docs/adr/0006-*.md` context).
+
 ## [0.3.0] - Day 3
 
 ### Added

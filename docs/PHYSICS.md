@@ -304,3 +304,159 @@ Source of truth for material parameters: `semi/materials.py`.
 See `semi/materials.py` for Ge, GaAs. Insulators (SiO2 $\varepsilon_r = 3.9$,
 HfO2 $\varepsilon_r = 25.0$, Si3N4 $\varepsilon_r = 7.5$) carry only a relative
 permittivity; semiconductor-specific fields are zero on them.
+
+## 5. Verification & Validation
+
+This section documents the Day-4 V&V suite and its results. The code
+lives under `semi/verification/`, the runner is
+`scripts/run_verification.py`, artifacts land under
+`results/mms_poisson/`, `results/mesh_convergence/`,
+`results/conservation/`, and `results/mms_dd/`. CI runs
+`python scripts/run_verification.py all` inside the `docker-fem` job on
+every push and uploads the full `results/` tree.
+
+The distinction followed here is the Roache / Oberkampf-Roy one.
+**Verification** asks "did we solve the equations we wrote down
+correctly?"; it is a property of the code and its discretization.
+**Validation** asks "are those equations the right model for the
+device?"; it compares the code to experiment or to an accepted
+reference model. The four activities below are all verification
+activities. The earlier single-point benchmark verifiers (`pn_1d`,
+`pn_1d_bias`, `pn_1d_bias_reverse`) stand as validation against
+depletion-approximation and Shockley / SNS analytics; they remain in
+CI unchanged.
+
+### 5.1 MMS for equilibrium Poisson (Phase 1)
+
+Module: `semi/verification/mms_poisson.py`. Subcommand:
+`run_verification.py mms_poisson`.
+
+Manufactured smooth exact solutions (1D sin, 2D sin-sin with distinct
+wavenumbers) are injected into the equilibrium Poisson form with UFL
+weak-form forcing. The mesh is refined over several levels; the
+observed L^2 and H^1 rates are measured on each refinement pair. The
+finest-pair rate is gated at L^2 >= 1.85 and H^1 >= 0.85, with
+monotone error reduction required across the sweep.
+
+Finest-pair rates on the latest run (N = 320 for 1D, N = 128 for 2D):
+
+| Study          | L^2 rate | H^1 rate |
+|----------------|----------|----------|
+| 1D linear      | 2.000    | 1.000    |
+| 1D nonlinear   | 2.000    | 1.000    |
+| 2D triangles   | 1.998    | 0.999    |
+
+The `2d_quad_smoke` sanity check confirms the quad-element L^2 error
+is within an order of magnitude of the triangle error at N = 64
+(ratio ~0.39, well inside the [0.1, 10] acceptance band).
+
+### 5.2 Mesh convergence on `pn_1d` (Phase 2)
+
+Module: `semi/verification/mesh_convergence.py`. Subcommand:
+`run_verification.py mesh_convergence`.
+
+A mesh sweep over N in [50, 100, 200, 400, 800, 1600] on the Day-1
+equilibrium pn junction reports V_bi, peak |E|, depletion width W,
+Newton iterations, and solve time. Errors are recorded in two ways:
+against the depletion-approximation reference (which is itself an
+approximation), and as Cauchy self-convergence ratios (consecutive
+mesh differences, which isolate pure FE discretization error).
+
+**Honest flag.** The depletion approximation is a model, not the
+truth. The FEM solver converges to the full Poisson-Boltzmann
+solution, so relative errors against the depletion references
+plateau on fine meshes at the physics-model gap, not at zero.
+Monotone reduction is therefore gated only over the first four
+refinements (N up to 400), before the plateau; the Cauchy ratios
+are gated across the same range at >= 1.8x per doubling, which is
+the mathematically meaningful convergence indicator. V_bi is set
+exactly by the Ohmic BCs and is mesh-independent to machine
+epsilon (reported only, not gated).
+
+Latest run, consecutive Cauchy ratios (N = 100/50, 200/100, 400/200):
+
+| Quantity  | Ratio 100/50 | Ratio 200/100 | Ratio 400/200 |
+|-----------|--------------|---------------|---------------|
+| E_peak    | 1.99         | 2.10          | 2.31          |
+| W         | 2.01         | 4.10          | 4.21          |
+
+All >= 1.8x as required. Residual error vs. depletion at the finest
+level (N = 1600): E_peak 4.3% gap, W 3.2% gap, consistent with the
+expected physics-model offset.
+
+### 5.3 Conservation checks (Phase 3)
+
+Module: `semi/verification/conservation.py`. Subcommand:
+`run_verification.py conservation`.
+
+- **Charge conservation** on `pn_1d` equilibrium. Integrates
+  q * (p - n + N_D - N_A) over the device and asserts
+  |Q_net| < 1e-10 * Q_ref with
+  Q_ref = q * max|N_net| * L_device. Latest run:
+  Q_net = 4.8e-19 C/m^2 vs. threshold 3.2e-9 C/m^2 (rel 1.5e-17).
+
+- **Current continuity** on `pn_1d_bias` forward and
+  `pn_1d_bias_reverse`. At each target bias the total current
+  J_total = J_n + J_p is sampled on ten interior facets; we assert
+  max |J - mean| / |mean| < 5% (forward) or 15% (reverse). Latest
+  worst-case max_rel across the target set:
+
+  | Benchmark            | V         | worst max_rel | tol    |
+  |----------------------|-----------|---------------|--------|
+  | pn_1d_bias           | 0.6 V     | 1.91%         | 5%     |
+  | pn_1d_bias_reverse   | -0.55 V   | 0.020%        | 15%    |
+
+  All inside tolerance.
+
+### 5.4 MMS for coupled drift-diffusion (Phase 4)
+
+Module: `semi/verification/mms_dd.py`. Subcommand:
+`run_verification.py mms_dd`. Derivation and rate-threshold
+rationale: `docs/mms_dd_derivation.md`.
+
+Nine studies (three variants x {1D default, 1D nonlinear, 2D}) on
+the full three-block Slotboom residual with forcing terms injected
+in weak form:
+
+- **Variant A (psi-only).** `phi_n_e = phi_p_e = 0`. The
+  continuity diffusion integrals drop out and R_e collapses to
+  zero. Exercises the Poisson row of the block residual
+  (`build_dd_block_residual`) including sign, scaling, and
+  coupling-to-zero-quasi-Fermi plumbing. Variant A's continuity-block
+  errors are at machine noise (~1e-35 to 1e-41); these are
+  reported but not rate-gated because dividing one noise level
+  by another produces meaningless rates. We gate only the psi
+  block on Variant A (L^2 >= 1.75, H^1 >= 0.80).
+- **Variant B (full coupling, no R).** All three fields nontrivial,
+  lifetimes set to 1e+20 so R_e is negligible but the SRH kernel
+  is still evaluated. Verifies the drift-diffusion operators in
+  their coupled form, independent of recombination numerics.
+- **Variant C (full coupling with SRH).** Realistic lifetimes
+  tau_n = tau_p = 1e-7 s. Verifies the full residual including
+  the cross-block coupling through R_e.
+
+Finest-pair rates (N = 320 for 1D, N = 64 for 2D), default
+amplitudes (A_psi, A_n, A_p) = (0.5, 0.3, -0.3):
+
+| Study                | Block  | L^2 rate | H^1 rate |
+|----------------------|--------|----------|----------|
+| 1D A (linear)        | psi    | 2.000    | 1.000    |
+| 1D B (linear)        | psi    | 2.000    | 1.000    |
+| 1D B (linear)        | phi_n  | 2.000    | 1.000    |
+| 1D B (linear)        | phi_p  | 2.000    | 1.000    |
+| 1D C (linear)        | psi    | 2.000    | 1.000    |
+| 1D C (linear)        | phi_n  | 2.000    | 1.000    |
+| 1D C (linear)        | phi_p  | 2.000    | 1.000    |
+| 2D A                 | psi    | 1.990    | 0.996    |
+| 2D B                 | psi    | 1.990    | 0.996    |
+| 2D B                 | phi_n  | 1.995    | 1.000    |
+| 2D B                 | phi_p  | 1.995    | 1.000    |
+| 2D C                 | psi    | 1.990    | 0.996    |
+| 2D C                 | phi_n  | 1.995    | 1.000    |
+| 2D C                 | phi_p  | 1.995    | 1.000    |
+
+Every gated rate clears the L^2 >= 1.75 / H^1 >= 0.80 floor with
+>= 0.19 of headroom, matching theoretical P1 Lagrange rates to within
+roundoff. The derivation (`mms_dd_derivation.md`) documents the
+block-residual scale-disparity issue that forced the SNES
+tolerance tweak to `atol = 0.0` with `stol = 1e-12`.

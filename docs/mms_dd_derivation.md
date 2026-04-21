@@ -280,7 +280,7 @@ Standard FE theory on a smooth problem gives
 
 per-block. The coupled system inherits the same rates provided Newton
 converges to machine precision on each mesh so that iteration error
-does not floor the FE error. We therefore tighten SNES tolerances to
+does not floor the FE error. The derivation originally proposed
 
 ```
 snes_rtol = 1.0e-14
@@ -291,6 +291,70 @@ snes_max_it = 80
 
 matching the Poisson MMS (`mms_poisson.py:259-264`) with a larger
 `max_it` allowance because the coupled system needs more iterations.
+
+**Amendment: atol = 0, stol = 1e-12 (implementation-time fix).** The
+derivation's `snes_atol = 1e-16` was tuned to the Poisson block
+residual scale and turned out to terminate SNES prematurely on the
+continuity blocks in 2D. The cause is the block-residual scale
+disparity already flagged in Section 7.3: the Poisson block carries
+`L_D^2 ~ 1.6e-3 * L_0^2` while the continuity blocks carry `L_0^2`
+alone, and in 2D the integration area further shrinks the continuity
+residual by a factor of ~`L_0^2 ~ 4e-12`. In the 2D Variant-B and
+Variant-C tests the continuity blocks' initial absolute residual
+sat at roughly 1e-18 (already below the originally-proposed
+`atol = 1e-16`), so SNES would quit after the very first iteration
+without ever touching the Poisson block, which still had a ~1e-6
+initial residual to burn down. The Poisson row then recorded
+pre-Newton interpolation error and the measured rates came out
+noisy.
+
+The fix applied in `semi/verification/mms_dd.py:368-373` is:
+
+```
+snes_rtol   = 1.0e-14
+snes_atol   = 0.0      # was 1.0e-16; removes the premature-termination floor
+snes_stol   = 1.0e-12  # step-norm takes over as the stopping criterion
+snes_max_it = 80
+```
+
+Rationale:
+
+- Setting `atol = 0.0` defers absolute-residual termination
+  entirely. Newton iterates until either (a) the relative residual
+  drops by `rtol` across all blocks, or (b) the step norm drops
+  below `stol`, whichever comes first.
+- `stol = 1.0e-12` is the meaningful floor for this problem: the
+  scaled unknowns are O(1) (all amplitudes stay in [-1, 1]), so a
+  step norm of 1e-12 means every DOF has settled to within 10^-12
+  of its converged value. This is well below the FE error at the
+  finest mesh pair (L^2 ~ 1e-8 for N = 320 in 1D), so Newton is
+  fully converged relative to the discretization error.
+- `rtol = 1.0e-14` is retained from the original. In practice the
+  `stol` criterion fires first on 1D and the `rtol` criterion
+  fires first in 2D where the residual still has headroom.
+
+**Sanity check.** After the amendment the 2D runs converge in 2 or
+4 Newton iterations (2 for Variant A where only the Poisson block
+has a non-trivial residual; 4 for B/C where all three blocks must
+be relaxed), the Poisson block reaches its rate floor, and the
+continuity blocks in Variants B and C record rates within 0.01 of
+the theoretical 2.0 / 1.0 targets. The previous tuning produced
+rates below 1.0 on the continuity blocks at N=64 because Newton
+had stopped before the linear system had actually been solved.
+
+**Variant A noise floor.** With `phi_n_e = phi_p_e = 0`, the
+continuity-block manufactured sources are identically zero and
+there is nothing to drive those fields off the initial zero. The
+continuity-block L^2 errors therefore sit at pure roundoff
+(1e-35 to 1e-41 across the sweep). Dividing one roundoff level
+by another produces meaningless rates (they hop around zero),
+so the Variant A continuity-block rates are reported in the CSV
+but not gated. The Phase-4 CLI (`run_verification.py mms_dd`)
+and the pytest gate both check only the psi block for Variant A;
+all three blocks for Variants B and C. This is consistent with
+the purpose of Variant A as stated in Section 3.4: it is a
+Poisson-row sanity check routed through the coupled solver, not
+a convergence test for the continuity rows in isolation.
 
 **Gate thresholds** (finest-pair rate, asserted on all three blocks
 independently):
