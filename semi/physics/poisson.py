@@ -52,14 +52,21 @@ def build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, eps_r_value: float):
     msh = V.mesh
     v = ufl.TestFunction(V)
 
-    lam2   = fem.Constant(msh, PETSc.ScalarType(sc.lambda2))
+    # The mesh coordinates are in physical meters (see semi/mesh.py), so the
+    # stiffness coefficient is the dimensional squared Debye length
+    #     L_D^2 = eps_0 V_0 / (q C_0) = lambda2 * L_0^2
+    # rather than the bare scaled `lambda2`. The nondimensionalization only
+    # affects psi (scaled by V_t) and densities (scaled by C_0); the spatial
+    # coordinate is left in meters so that mesh extents and facet locations
+    # from the JSON can be specified in SI units.
+    L_D2   = fem.Constant(msh, PETSc.ScalarType(sc.lambda2 * sc.L0 ** 2))
     eps_r  = fem.Constant(msh, PETSc.ScalarType(eps_r_value))
     ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
 
     rho_hat = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
 
     F = (
-        lam2 * eps_r * ufl.inner(ufl.grad(psi), ufl.grad(v)) * ufl.dx
+        L_D2 * eps_r * ufl.inner(ufl.grad(psi), ufl.grad(v)) * ufl.dx
         - rho_hat * v * ufl.dx
     )
     return F

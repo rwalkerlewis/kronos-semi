@@ -40,6 +40,28 @@ pip install -e ".[dev]"
 
 The pure-Python modules (`schema`, `materials`, `scaling`, `doping`, `constants`) don't need dolfinx and can be installed standalone via `pip install -e .` into any environment; the FEM-heavy modules (`mesh`, `physics.poisson`, `solver`, `run`) need dolfinx available at import time.
 
+## Docker
+
+A reproducible dev environment is provided on top of the official `ghcr.io/fenics/dolfinx/dolfinx:stable` image (dolfinx 0.10). The source tree is bind-mounted at `/workspaces/kronos-semi` and the package is installed editable, so host edits take effect immediately.
+
+```bash
+# Build the image once (matches your host UID/GID so bind-mount writes stay owned by you)
+docker compose build
+
+# Run the test suite
+docker compose run --rm test
+
+# Run a benchmark (saves plots to results/<name>/)
+docker compose run --rm benchmark pn_1d
+
+# Interactive shell in a long-running dev container
+docker compose up -d dev
+docker compose exec dev bash
+
+# JupyterLab on http://localhost:8888
+docker compose up jupyter
+```
+
 ## Running the benchmark
 
 ```python

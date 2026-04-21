@@ -69,9 +69,23 @@ def run(cfg: dict[str, Any]) -> SimulationResult:
     psi = fem.Function(V, name="psi_hat")
     bcs = _build_ohmic_bcs(cfg, V, msh, facet_tags, sc, ref_mat, N_raw_fn)
 
-    # Set initial guess: apply BC values everywhere on boundary DOFs,
-    # leave interior at zero. Newton's line search handles the rest.
-    psi.x.array[:] = 0.0
+    # Initial guess: set psi pointwise to the local bulk equilibrium potential
+    # psi_hat(x) = asinh(N_net(x) / (2 n_i)). This matches the ohmic BC values at
+    # the contacts (under zero bias) and is already the correct answer deep in
+    # each bulk region, so Newton only needs to smooth the junction. Starting
+    # from psi = 0 everywhere would linearize exp(psi) around zero (losing the
+    # steep nonlinearity) and the Newton iteration converges spuriously to a
+    # linear-Poisson solution that underestimates the peak field.
+    two_ni = 2.0 * ref_mat.n_i
+
+    def psi_init_expr(x: np.ndarray) -> np.ndarray:
+        return np.arcsinh(N_raw_fn(x) / two_ni)
+
+    psi.interpolate(psi_init_expr)
+    # Re-apply Dirichlet values so the boundary dofs match exactly (the
+    # interpolation above uses per-point doping and so should agree to
+    # roundoff, but BC values are derived from facet-centroid doping; keep
+    # them consistent with what SNES will enforce).
     for bc in bcs:
         bc.set(psi.x.array)
     psi.x.scatter_forward()
