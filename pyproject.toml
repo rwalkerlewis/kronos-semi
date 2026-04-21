@@ -1,0 +1,68 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kronos-semi"
+version = "0.1.0"
+description = "JSON-driven FEM semiconductor device simulator on FEniCSx"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Robert Walker", email = "rwalkerlewis@gmail.com"},
+]
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=1.24",
+    "matplotlib>=3.7",
+    "jsonschema>=4.0",
+]
+
+[project.optional-dependencies]
+# dolfinx is intentionally NOT a pip dependency: it's installed via conda,
+# FEM-on-Colab, or system package manager. The pure-Python modules
+# (schema, materials, scaling, doping, constants) work without it.
+fem = []
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "nbformat>=5.0",
+    "ruff>=0.1",
+]
+
+[project.urls]
+Repository = "https://github.com/rwalkerlewis/kronos-semi"
+Issues = "https://github.com/rwalkerlewis/kronos-semi/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["semi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+# N rules disabled globally: physics codebases use conventional names
+# (N_A, N_D, V, F, J, psi_L, eps_Si, etc.) that don't follow PEP 8.
+# Renaming them would hurt readability without improving correctness.
+ignore = ["E501", "E741"]  # line length handled by formatter; ambiguous var names (I, l, O) allowed

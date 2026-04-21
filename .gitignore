@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual envs
+venv/
+env/
+.venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Results and scratch
+results/
+*.xdmf
+*.h5
+*.bp/
+*.vtu
+*.pvd
+scratch/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Mesh files (keep benchmark-defining ones via git-lfs later if needed)
+*.msh
+*.geo.bak
+
+# Local config overrides
+*.local.json
