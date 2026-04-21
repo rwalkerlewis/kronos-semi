@@ -109,6 +109,20 @@ def test_multiple_profiles_superpose():
     assert r_far == pytest.approx(-cm3_to_m3(1e16), rel=1e-4)
 
 
+def test_unknown_profile_type_raises():
+    spec = [{"region": "si", "profile": {"type": "magic"}}]
+    with pytest.raises(ValueError, match="Unknown doping profile type"):
+        doping.build_profile(spec)
+
+
+def test_evaluate_at_points_matches_build_profile():
+    spec = [{"region": "si", "profile": {"type": "uniform", "N_D": 1.0e17, "N_A": 0.0}}]
+    pts = np.array([[0.0, 0.5, 1.0]])
+    direct = doping.build_profile(spec)(pts)
+    via_helper = doping.evaluate_at_points(spec, pts)
+    np.testing.assert_array_equal(via_helper, direct)
+
+
 def test_input_shape_1d_accepted():
     """Should handle x of shape (N,) by treating it as 1D."""
     spec = [{"region": "x", "profile": {"type": "uniform", "N_D": 1e17, "N_A": 0.0}}]
