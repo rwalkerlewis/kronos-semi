@@ -1,5 +1,68 @@
 # Changelog
 
+## [0.6.0] - Day 6
+
+### Added
+- `semi/physics/poisson.py:build_equilibrium_poisson_form_mr`:
+  multi-region equilibrium Poisson residual. Stiffness integrates
+  over the full mesh with a cellwise DG0 eps_r Function; the
+  Boltzmann space-charge term is restricted to semiconductor cells
+  via `dx(subdomain_id=semi_tag)`, so the oxide region carries only
+  the Laplacian. The interface natural condition
+  eps_r_Si grad psi . n = eps_r_ox grad psi . n is enforced
+  automatically by the piecewise eps_r in the bilinear form (see
+  `docs/mos_derivation.md` section 3).
+- `semi/runners/mos_cv.py:run_mos_cv`: sweeps a gate contact through
+  its `voltage_sweep`, solves multi-region equilibrium Poisson at
+  each V_gate, and records (V_gate, Q_gate) rows by integrating the
+  silicon space charge and dividing by the lateral extent. Registers
+  under the new `solver.type == "mos_cv"` dispatch.
+- `benchmarks/mos_2d/mos_cap.json`: 500 nm p-type Si substrate
+  (N_A = 1e17 cm^-3) with 5 nm SiO2 gate oxide. Uniform 1 nm vertical
+  mesh (505 cells) lands the Si/SiO2 interface on a grid line.
+  V_gate sweeps [-0.9, +1.2] V in 0.05 V steps (43 points).
+- `scripts/run_benchmark.py`: 2D `plot_mos_2d` renders four PNGs
+  (`psi_2d.png` tricontourf, `potentials_1d.png` central-column
+  psi(y), `cv.png` simulation vs depletion-approximation theory with
+  verifier-window overlay, `qv.png` Q_gate(V_gate)). `verify_mos_2d`
+  extracts C_sim by centered finite difference and asserts
+  |C_sim - C_theory|/C_theory < 10% in the window
+  [V_FB + 0.2, V_T - 0.1] V. The 1D plotters (`plot_pn_1d`,
+  `plot_pn_1d_bias`, `plot_pn_1d_bias_reverse`) are untouched.
+- `docs/PHYSICS.md` Section 6 (condensed MOS reference: device
+  structure, equilibrium-Poisson model, V_FB / V_T formulae under
+  our psi=0-at-intrinsic convention, capacitance extraction, verifier
+  results). Section 5.5 adds the multi-region Poisson MMS entry.
+- `tests/fem/test_mos_cv.py` (4 tests): gate sweep behaviour,
+  flatband bulk equilibrium, multi-region form byte-identity vs
+  scalar form on a single-region mesh, and malformed-config error
+  path.
+- CI `.github/workflows/ci.yml` runs the `mos_2d` benchmark after
+  the three `pn_1d*` benchmarks.
+
+### Changed
+- `semi/schema.py`: adds `"mos_cv"` to the `solver.type` enum.
+- `semi/run.py` dispatcher routes `solver.type == "mos_cv"` to
+  `run_mos_cv`. `semi/runners/__init__.py` exports the new runner.
+
+### Notes
+- Worst C-V error in the verifier window is 9.25% at V_gate = -0.20 V
+  (V_FB + 0.217 V, the window's low edge). The window low edge was
+  shifted from V_FB + 0.1 to V_FB + 0.2 during development: the
+  initial 0.1 V margin hit 10.06% at V_gate = -0.25 V, and per the
+  reviewer's guidance the intended fix is to shrink the window, not
+  to loosen the 10% tolerance. Regimes outside the window
+  (accumulation, strong inversion) are physically real but are not
+  captured by the depletion approximation; the simulator does render
+  them on the C-V plot.
+- Body ohmic BC sets psi_body = -phi_F (our psi=0-at-intrinsic
+  convention), not 0. This shifts V_FB to `phi_ms - phi_F`, not the
+  textbook `phi_ms`, and V_T shifts correspondingly. Documented in
+  `docs/PHYSICS.md` Section 6.3.
+- Coverage is 95.43% on `semi/` (195 tests pass). The new
+  `mos_cv.py` contributes ~100 statements, of which 8 error-branch
+  lines are uncovered; the 95% CI gate still passes.
+
 ## [0.5.0] - Day 5
 
 ### Added
