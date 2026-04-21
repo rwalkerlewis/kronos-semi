@@ -51,6 +51,7 @@ def run_equilibrium(cfg: dict[str, Any]) -> SimulationResult:
     """Day 1 equilibrium Poisson solver (Boltzmann statistics)."""
     from dolfinx import fem
 
+    from .bcs import build_psi_dirichlet_bcs, resolve_contacts
     from .doping import build_profile
     from .mesh import build_mesh
     from .physics.poisson import build_equilibrium_poisson_form
@@ -72,7 +73,8 @@ def run_equilibrium(cfg: dict[str, Any]) -> SimulationResult:
     N_hat_fn.interpolate(N_hat_expr)
 
     psi = fem.Function(V, name="psi_hat")
-    bcs = _build_ohmic_bcs_psi(cfg, V, msh, facet_tags, sc, ref_mat, N_raw_fn)
+    contacts = resolve_contacts(cfg, facet_tags=facet_tags)
+    bcs = build_psi_dirichlet_bcs(V, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
 
     two_ni = 2.0 * ref_mat.n_i
 
@@ -119,6 +121,7 @@ def run_bias_sweep(
     """
     from dolfinx import fem
 
+    from .bcs import build_dd_dirichlet_bcs, resolve_contacts
     from .doping import build_profile
     from .mesh import build_mesh
     from .physics.drift_diffusion import build_dd_block_residual, make_dd_block_spaces
@@ -219,8 +222,9 @@ def run_bias_sweep(
             fn.x.scatter_forward()
 
     def solve_at(V_by_contact: dict[str, float], tag: str):
-        bcs = _build_dd_ohmic_bcs(
-            cfg, spaces, msh, facet_tags, sc, ref_mat, N_raw_fn, V_by_contact,
+        contacts = resolve_contacts(cfg, facet_tags=facet_tags, voltages=V_by_contact)
+        bcs = build_dd_dirichlet_bcs(
+            spaces, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn,
         )
         space_to_fn = {
             id(spaces.V_psi): spaces.psi,
@@ -496,85 +500,3 @@ def _reference_material(cfg: dict[str, Any]):
     raise ValueError("No semiconductor region found; nothing to solve.")
 
 
-def _build_ohmic_bcs_psi(cfg, V, msh, facet_tags, sc, ref_mat, N_raw_fn):
-    """Dirichlet BCs on psi only (equilibrium Poisson path)."""
-    from dolfinx import fem
-    from petsc4py import PETSc
-
-    fdim = msh.topology.dim - 1
-    tag_by_name = {p["name"]: int(p["tag"])
-                   for p in cfg["mesh"].get("facets_by_plane", [])}
-
-    bcs = []
-    for contact in cfg["contacts"]:
-        if contact["type"] != "ohmic":
-            continue
-        facet_ref = contact["facet"]
-        tag = tag_by_name[facet_ref] if isinstance(facet_ref, str) else int(facet_ref)
-        if facet_tags is None:
-            raise RuntimeError("Mesh has no facet tags.")
-        facets = facet_tags.find(tag)
-        if len(facets) == 0:
-            raise RuntimeError(
-                f"No facets with tag {tag} for contact {contact['name']!r}"
-            )
-        N_net = _evaluate_doping_at_facet(msh, facets, fdim, N_raw_fn)
-        psi_eq_hat = float(np.arcsinh(N_net / (2.0 * ref_mat.n_i)))
-        V_applied = contact.get("voltage", 0.0)
-        psi_bc = psi_eq_hat + V_applied / sc.V0
-        dofs = fem.locate_dofs_topological(V, fdim, facets)
-        bcs.append(fem.dirichletbc(PETSc.ScalarType(psi_bc), dofs, V))
-    return bcs
-
-
-def _build_dd_ohmic_bcs(cfg, spaces, msh, facet_tags, sc, ref_mat, N_raw_fn,
-                        voltages: dict[str, float]):
-    """
-    Dirichlet BCs for the (psi, phi_n, phi_p) block system.
-
-    psi_hat   = asinh(N_net / (2 n_i)) + V_app / V_t
-    phi_n_hat = phi_p_hat = V_app / V_t
-    """
-    from dolfinx import fem
-    from petsc4py import PETSc
-
-    fdim = msh.topology.dim - 1
-    tag_by_name = {p["name"]: int(p["tag"])
-                   for p in cfg["mesh"].get("facets_by_plane", [])}
-
-    bcs = []
-    for contact in cfg["contacts"]:
-        if contact["type"] != "ohmic":
-            continue
-        name = contact["name"]
-        facet_ref = contact["facet"]
-        tag = tag_by_name[facet_ref] if isinstance(facet_ref, str) else int(facet_ref)
-        facets = facet_tags.find(tag)
-        if len(facets) == 0:
-            raise RuntimeError(f"No facets with tag {tag} for contact {name!r}")
-        N_net = _evaluate_doping_at_facet(msh, facets, fdim, N_raw_fn)
-        psi_eq_hat = float(np.arcsinh(N_net / (2.0 * ref_mat.n_i)))
-        V_app = float(voltages.get(name, contact.get("voltage", 0.0)))
-        V_hat = V_app / sc.V0
-        psi_bc = psi_eq_hat + V_hat
-        phi_bc = V_hat
-
-        dofs_psi = fem.locate_dofs_topological(spaces.V_psi, fdim, facets)
-        dofs_n = fem.locate_dofs_topological(spaces.V_phi_n, fdim, facets)
-        dofs_p = fem.locate_dofs_topological(spaces.V_phi_p, fdim, facets)
-
-        bcs.append(fem.dirichletbc(PETSc.ScalarType(psi_bc), dofs_psi, spaces.V_psi))
-        bcs.append(fem.dirichletbc(PETSc.ScalarType(phi_bc), dofs_n, spaces.V_phi_n))
-        bcs.append(fem.dirichletbc(PETSc.ScalarType(phi_bc), dofs_p, spaces.V_phi_p))
-    return bcs
-
-
-def _evaluate_doping_at_facet(msh, facets, fdim, N_raw_fn) -> float:
-    tdim = msh.topology.dim
-    msh.topology.create_connectivity(fdim, 0)
-    f2v = msh.topology.connectivity(fdim, 0)
-    coords = msh.geometry.x
-    verts = f2v.links(int(facets[0]))
-    centroid = coords[verts, :tdim].mean(axis=0)
-    pt = centroid.reshape(tdim, 1)
-    return float(N_raw_fn(pt)[0])
