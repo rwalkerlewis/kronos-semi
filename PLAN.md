@@ -30,7 +30,7 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `dev/day2-drift-diffusion` (Day 2 in flight)
+- Active dev branch: `dev/day2-drift-diffusion` (Day 2 complete, PR open)
 
 ## Current state
 
@@ -82,8 +82,26 @@ block Newton, forward-bias sweep) is in flight on
 
 ## Next task
 
-**Day 2: Slotboom drift-diffusion and bias support.** In flight on
-`dev/day2-drift-diffusion`.
+**Day 3: Bias ramping continuation, IV verifier hardening, ideality-
+factor diagnostics.** Planned.
+
+- **Branch:** `dev/day3-bias-hardening` (to be cut from `main` after the
+  Day 2 PR merges).
+- **Scope, in:**
+  - Add explicit Sah-Noyce-Shockley recombination-current term to the
+    `pn_1d_bias` verifier so low-bias checks become quantitative.
+  - Automatic continuation step-size tuning based on Newton iteration
+    count.
+  - Optional reverse-bias (saturation region) check.
+  - Consider Scharfetter-Gummel box-scheme discretization as an ADR if
+    the current Galerkin Slotboom residual shows further accuracy
+    issues at high doping or wider bias ranges.
+- **Preconditions:** Day 2 PR merged into `main`.
+
+**Day 2: Slotboom drift-diffusion and bias support.** Merged in PR
+`dev/day2-drift-diffusion` on 2026-04-20. See "Completed work log".
+
+Historical scope for Day 2, kept here for context while the PR is open:
 
 - **Branch:** `dev/day2-drift-diffusion` (created off `main` at
   commit 32dcafd, the Day 1 merge).
@@ -129,7 +147,7 @@ block Newton, forward-bias sweep) is in flight on
 | Day | Milestone                                                    | Status  | Notes                                                                 |
 |----:|--------------------------------------------------------------|---------|-----------------------------------------------------------------------|
 | 1   | Equilibrium Poisson, 1D pn junction, Docker env              | Done    | 6/6 verifier checks pass; PR `dev/docker-day1-fix`                    |
-| 2   | Slotboom drift-diffusion, coupled Newton, bias sweep         | Planned | Target benchmark `pn_1d_bias` vs Shockley                             |
+| 2   | Slotboom drift-diffusion, coupled Newton, bias sweep         | Done    | 6/6 `pn_1d_bias` checks pass; PR `dev/day2-drift-diffusion`           |
 | 3   | Bias ramping continuation, Shockley IV verifier hardening    | Planned | Tighten tolerance, add reverse bias (saturation region)               |
 | 4   | Refactor pass, expanded test coverage, physics docs updates  | Planned | Ruff-clean, coverage target, ADR review                               |
 | 5   | 2D MOS capacitor (oxide + silicon multi-region)              | Planned | Uses submesh for carriers; verify C-V curve                           |
@@ -195,6 +213,26 @@ They may be added after submission as stretch goals (see
 
 Append-only. Newest entries on top.
 
+- **Day 2 (2026-04-20):** coupled Slotboom drift-diffusion with SRH
+  recombination and forward-bias sweep. Added `semi/physics/slotboom.py`
+  (n/p from (psi, phi_n, phi_p), UFL and NumPy),
+  `semi/physics/recombination.py` (SRH with E_t trap level),
+  `semi/physics/drift_diffusion.py` (three-block P1 Galerkin residual
+  with `L_D^2 * eps_r` on Poisson and `L_0^2 * mu_hat` on continuity);
+  extended `semi/solver.py` with `solve_nonlinear_block` (blocked
+  NonlinearProblem wrapper) and `semi/run.py` with `run_bias_sweep`
+  (adaptive-halving voltage continuation, snapshot/restore on SNES
+  failure, UFL facet-integral current evaluation, IV table recording).
+  Extended the JSON schema with `recombination.E_t`, per-contact
+  `voltage_sweep`, and `solver.type in {drift_diffusion, bias_sweep}`
+  plus `solver.continuation.{min_step, max_halvings}`. Added the
+  `pn_1d_bias` benchmark (20 um symmetric 1e17 junction, anode swept
+  0->0.6 V) and Shockley long-diode verifier. At V=0.6 V the simulated
+  current matches Shockley within 10%; at lower bias SRH depletion-
+  region current dominates, so the verifier only requires qualitative
+  properties there. 34 new tests (schema, Slotboom, SRH, bias BC
+  helpers) pass alongside the Day 1 suite (70 total). PR:
+  `dev/day2-drift-diffusion`.
 - **Day 1 (2026-04-20):** equilibrium Poisson, 1D pn junction benchmark,
   Docker dev environment, benchmark runner CLI, physics coefficient fix
   (scaled Poisson LHS uses `L_D^2 = lambda2 * L_0^2`, not `lambda2`, since
