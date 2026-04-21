@@ -30,11 +30,12 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `dev/day5-refactor` (Day 5 refactor pass complete, PR pending)
+- Active dev branch: `dev/day6-mos-2d` (Day 6 MOS capacitor Phase 6 +
+  Phase 8 complete, awaiting review before merging)
 
 ## Current state
 
-Day 1 through Day 4 are merged into `main`. CI hardening (branch glob
+Day 1 through Day 5 are merged into `main`. CI hardening (branch glob
 plus Dockerized FEM job) merged on `ci/docker-benchmark-matrix`.
 Day 3 (adaptive bias continuation, Sah-Noyce-Shockley verifier,
 reverse-bias generation check) merged via PR #5 from
@@ -44,8 +45,12 @@ drift-diffusion, CI integration, documentation) merged via PR #6 from
 `dev/day4-vnv`. Day 5 (refactor pass: `semi/bcs.py` extraction,
 `semi/run.py` split into a 74-line dispatcher plus `runners/` and
 `postprocess.py`, coverage to 96.25% with a 95% CI gate, completed
-`docs/PHYSICS.md` Section 2.5, ADR 0007) is complete on
-`dev/day5-refactor` and awaiting PR.
+`docs/PHYSICS.md` Section 2.5, ADR 0007) merged via PR #7 from
+`dev/day5-refactor`. Day 6 (2D MOS capacitor: multi-region Poisson
+over oxide plus silicon, gate contact, continuity on a semiconductor
+submesh, C-V verifier matching depletion-approximation MOS theory
+within 10% in [V_FB + 0.2, V_T - 0.1] V, multi-region MMS) is
+complete on `dev/day6-mos-2d` and awaiting review.
 
 ### What works (verified in Docker on current `main`)
 
@@ -79,6 +84,13 @@ drift-diffusion, CI integration, documentation) merged via PR #6 from
 - `pn_1d_bias_reverse` benchmark (reverse bias): |J| within 20% of the
   net SRH generation current (q n_i / 2 tau_eff)(W(V) - W(0)) on V in
   [-2, -0.5] V.
+- `mos_2d` benchmark (C-V sweep, Day 6): 500 nm p-type Si / 5 nm SiO2
+  capacitor; |C_sim - C_theory|/C_theory < 10% in the depletion-regime
+  window [V_FB + 0.2, V_T - 0.1] V (worst 9.25% at V_gate = -0.20 V
+  under ideal phi_ms = 0 with psi = 0 at intrinsic level). Sweep
+  covers [-0.9, +1.2] V; accumulation and strong-inversion regimes
+  are rendered on the plot but excluded from the verifier per
+  depletion-approximation scope.
 - GitHub Actions runs pure-Python tests on 3.10/3.11/3.12, ruff, and a
   Dockerized FEM job that runs pytest, three benchmark verifiers, and
   the full V&V suite on every push to `main`, `dev/**`, `ci/**`,
@@ -93,44 +105,65 @@ drift-diffusion, CI integration, documentation) merged via PR #6 from
 
 ### What does not work / not yet built
 
-- 2D MOS capacitor benchmark (Day 6).
 - 3D doped resistor benchmark (Day 7).
 - Gmsh `.msh` mesh loader (stubbed, raises `NotImplementedError`).
-- Gate contacts (`type: "gate"`), Schottky contacts.
+- Schottky contacts: deferred (Non-goals).
 - Field-dependent mobility, Auger/radiative recombination, Fermi-Dirac
   statistics (see Non-goals).
 
 ## Next task
 
-**Day 5: Refactor pass, expanded coverage, docs update.** In flight
-on `dev/day5-refactor`.
+**Day 7: 3D doped resistor.** Planned, starts after Day 6 merges.
 
-- **Branch:** `dev/day5-refactor` cut from `main` at SHA 906ea99.
-- **Goal:** pay down accumulated technical debt before moving to 2D/3D
-  (Days 6-7). Break `semi/run.py` (580 lines) into `run_equilibrium`
-  and `run_bias_sweep` functions behind a thin `run(cfg)` dispatcher;
-  factor BC construction into `semi/bcs.py` so ohmic, gate, and future
-  Schottky contacts share a common interface.
+**Day 6 complete recap (awaiting review on `dev/day6-mos-2d`).**
+
+- **Branch:** `dev/day6-mos-2d` cut from `main` at SHA 64010c4 (Day 5
+  merge).
+- **Goal:** first 2D benchmark and first multi-region device. Poisson
+  assembles over the full mesh (silicon plus SiO2 gate oxide);
+  continuity equations assemble only over the semiconductor submesh.
+  A gate contact applies a Dirichlet BC on psi at the oxide top facet
+  and imposes no Slotboom BC. A C-V verifier differentiates gate
+  charge with respect to V_gate and matches depletion-region MOS
+  theory within 10%. A new multi-region Poisson MMS test protects the
+  coefficient-jump assembly with the same rigor Day 4 applied to the
+  single-region case.
 - **Scope, in:**
-  - `semi/bcs.py` extraction from `_build_ohmic_bcs_psi` and
-    `_build_dd_ohmic_bcs`, with a pure-data `ContactBC` dataclass and
-    a `resolve_contacts` resolver that does not touch dolfinx.
-  - `semi/run.py` split into a thin dispatcher plus `runners/` (or
-    flat `run_equilibrium.py` / `run_bias_sweep.py`) and a
-    `postprocess.py` for current evaluation and IV recording. No
-    behavioral change to `pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`.
-  - Coverage target: 95%+ per `pytest --cov=semi`, enforced in CI via
-    `--cov-fail-under=95`.
-  - `docs/PHYSICS.md` Section 2.5 scaled drift-diffusion derivation
-    completed (currently a placeholder).
-  - Any ADR the refactor requires (ADR 0007 is free).
+  - `docs/mos_derivation.md`: derivation-first gate (device geometry,
+    per-region equations, Si/SiO2 interface conditions, submesh
+    formulation, gate BC, MOS C-V theory, multi-region MMS
+    construction).
+  - `semi/mesh.py`: `build_submesh_by_role` via
+    `dolfinx.mesh.create_submesh`; cellwise DG0 eps_r Function on the
+    full mesh.
+  - `semi/bcs.py`: fill in the `"gate"` branch in
+    `build_psi_dirichlet_bcs` (Dirichlet psi with optional phi_ms);
+    `build_dd_dirichlet_bcs` continues to skip gate contacts.
+  - `semi/physics/poisson.py`: cellwise eps_r path for multi-region,
+    scalar fast path preserved for single region.
+  - `semi/physics/drift_diffusion.py`: V_phi_n, V_phi_p on the
+    semiconductor submesh via dolfinx 0.10 `entity_maps`.
+  - `benchmarks/mos_2d/mos_cap.json` device spec; 2D contour plotting
+    (psi, |E|, n, p) in `scripts/run_benchmark.py`; C-V verifier
+    restricted to the depletion regime with a comment documenting
+    the exclusion of accumulation and strong inversion.
+  - `semi/verification/mms_poisson.py`:
+    `mms_poisson_2d_multiregion` variant; wired into
+    `scripts/run_verification.py all`.
+  - `docs/PHYSICS.md` Section 6 (condensed MOS reference);
+    `docs/ROADMAP.md` Day 6 done; `CHANGELOG.md` Day 6 entry;
+    optional ADR 0008 if the submesh approach needs a design record.
 - **Scope, out:**
-  - 2D MOS capacitor (Day 6) and 3D resistor (Day 7).
+  - 3D doped resistor (Day 7) and submission polish (Day 8).
+  - Full MOSFET (source/drain/gate/body). Post-submission stretch.
   - Field-dependent mobility, Auger, Fermi-Dirac (Non-goals).
-- **Preconditions:** Day 4 V&V suite merged into `main` (done, PR #6).
-- **Hard invariants for this PR:** see "Invariants" below; Day-4 V&V
-  gates must stay green through the refactor. `semi/bcs.py` joins the
-  pure-Python core tier and must not import dolfinx at module scope.
+- **Preconditions:** Day 5 refactor merged into `main` (done, PR #7).
+- **Hard invariants for this PR:** see "Invariants" below. Day 4 V&V
+  gates stay green (every MMS rate within 0.01 of Day 4 values);
+  1D benchmarks (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`) stay
+  green; coverage stays >= 95%. `semi/bcs.py` remains pure-Python.
+  Mesh coordinates stay in meters; Poisson LHS uses
+  `L_D^2 * eps_r(x)` with cellwise eps_r.
 
 ## Roadmap
 
@@ -141,7 +174,7 @@ on `dev/day5-refactor`.
 | 3   | Bias ramping continuation, Shockley IV verifier hardening    | Done       | Adaptive ramp (-26.2% iters), SNS verifier, reverse-bias gen check    |
 | 4   | Verification & Validation suite (MMS, conv, conservation)    | Done       | `dev/day4-vnv`; all four phases green, CI V&V step within 15 min      |
 | 5   | Refactor pass, expanded test coverage, physics docs updates  | Done       | `dev/day5-refactor`; run.py 580->74, bcs.py extracted, coverage 96.25% |
-| 6   | 2D MOS capacitor (oxide + silicon multi-region)              | Planned    | Uses submesh for carriers; verify C-V curve (was Day 5)               |
+| 6   | 2D MOS capacitor (oxide + silicon multi-region)              | Done       | `dev/day6-mos-2d`; mos_cv runner, 4/4 C-V checks green, coverage 95.43% |
 | 7   | 3D doped resistor                                            | Planned    | Framework extension; verify Ohmic V-I linearity (was Day 6)           |
 | 8   | Final polish, submission packaging                           | Planned    | Regenerate notebooks, tag release (was Day 7)                         |
 
@@ -205,8 +238,74 @@ They may be added after submission as stretch goals (see
 
 Append-only. Newest entries on top.
 
+- **Day 6 (2026-04-21):** 2D MOS capacitor (first 2D benchmark, first
+  multi-region device). Delivered on `dev/day6-mos-2d`:
+  - **`docs/mos_derivation.md`** (pre-approved derivation gate):
+    device geometry, per-region equations, Si/SiO2 interface
+    conditions, submesh formulation, gate BC, MOS C-V theory with
+    10% verifier rationale, multi-region Poisson MMS construction.
+  - **`semi/mesh.py`**: `build_submesh_by_role` via
+    `dolfinx.mesh.create_submesh`; DG0 cellwise `eps_r(x)` Function
+    on the parent mesh (719b9e8).
+  - **`semi/bcs.py`**: gate branch in `build_psi_dirichlet_bcs`
+    (Dirichlet `(V_gate - phi_ms) / V_t` on psi, no Slotboom BC);
+    `build_dd_dirichlet_bcs` explicitly skips gate contacts
+    (b24c650).
+  - **`semi/physics/drift_diffusion.py`**: `DDBlockSpacesMR`,
+    `make_dd_block_spaces_mr`, `build_dd_block_residual_mr` for
+    `V_phi_n`, `V_phi_p` on the submesh with `entity_maps` threading
+    the parent<->submesh mapping through `fem.form` and
+    `NonlinearProblem` (455196a). Covered by `test_dd_submesh.py`.
+  - **`semi/physics/poisson.py`**: `build_equilibrium_poisson_form_mr`
+    for multi-region equilibrium Poisson (stiffness on full mesh
+    with cellwise eps_r, space-charge restricted to silicon via
+    `dx(subdomain_id=semi_tag)`). The scalar single-region path is
+    preserved byte-identically.
+  - **`semi/runners/mos_cv.py`**: new `run_mos_cv` runner driven
+    by `solver.type == "mos_cv"`. Sweeps the gate contact, solves
+    at each V_gate, integrates silicon space charge to produce
+    `(V_gate, Q_gate)` rows.
+  - **`benchmarks/mos_2d/mos_cap.json`**: 500 nm p-type Si
+    (N_A = 1e17 cm^-3) / 5 nm SiO2; uniform 1 nm vertical mesh
+    (505 cells) respects the Si/SiO2 interface as a grid line;
+    V_gate sweep [-0.9, +1.2] V in 0.05 V steps (43 points).
+    Ideal gate (phi_ms = 0), V_FB = -0.417 V, V_T = +0.658 V.
+  - **`scripts/run_benchmark.py`**: 2D `plot_mos_2d` (tricontourf
+    of psi, central-column psi(y), C-V and Q-V curves);
+    `verify_mos_2d` (C_sim via centered FD, depletion-approx theory
+    via closed-form psi_s inversion, 10% tolerance in
+    [V_FB + 0.2, V_T - 0.1] V, monotone non-increasing check). 1D
+    plotters untouched.
+  - **`semi/verification/mms_poisson.py`**:
+    `run_mms_poisson_2d_multiregion` / `run_mr_convergence_study`
+    on the Si/SiO2 coefficient jump with eps-weighted flux
+    continuity (99fcd2b). Finest-pair rate_L^2 >= 1.99, rate_H^1
+    >= 0.95 enforced in `scripts/run_verification.py mms_poisson`.
+    Pytest `test_mms_poisson_2d_multiregion_convergence` gates the
+    looser >= 1.85 / >= 0.85 thresholds.
+  - **`docs/PHYSICS.md`** Section 6 (condensed MOS reference:
+    device, equilibrium model, BC-convention shift for V_FB,
+    capacitance extraction, verifier result). Section 5.5 adds the
+    multi-region Poisson MMS entry.
+  - **`tests/fem/test_mos_cv.py`** (4 tests): gate sweep Q_gate
+    behaviour, flatband bulk equilibrium, multi-region form
+    byte-identity on single-region mesh, malformed-config error
+    path.
+  - **CI**: `.github/workflows/ci.yml` adds the `mos_2d` benchmark
+    step after the three `pn_1d*` benchmarks.
+  - **Verifier result**: worst |C_sim - C_theory|/C_theory = 9.25%
+    at V_gate = -0.20 V (window edge), inside the fixed 10%
+    tolerance. The initial V_FB+0.1 window hit 10.06% at
+    V_gate = -0.25 V; per the reviewer's guidance the fix was to
+    shrink the window to V_FB+0.2, not loosen the tolerance.
+  - **Regressions**: 1D benchmarks (`pn_1d`, `pn_1d_bias`,
+    `pn_1d_bias_reverse`) are byte-identical to Day 5; V&V suite
+    clears all gates including the new multi-region MMS; pytest
+    195/195 passes; coverage 95.43% (95% CI gate passes).
+
 - **Day 5 (2026-04-21):** Refactor pass, coverage to 95%+, completed
-  `docs/PHYSICS.md` Section 2.5. On `dev/day5-refactor`:
+  `docs/PHYSICS.md` Section 2.5. Merged via PR #7 from
+  `dev/day5-refactor`:
   - **`semi/bcs.py`** extracted (pure-Python core, no dolfinx at
     module scope). Public API: `ContactBC` dataclass,
     `resolve_contacts(cfg, facet_tags=None, voltages=None)`,
@@ -234,7 +333,7 @@ Append-only. Newest entries on top.
     design.
   - **No behavioral regression.** `pn_1d`, `pn_1d_bias`,
     `pn_1d_bias_reverse` byte-identical to Day 4 baseline; V&V 53
-    PASS / 0 FAIL with rates byte-identical. PR: `dev/day5-refactor`.
+    PASS / 0 FAIL with rates byte-identical. PR #7.
 
 - **Day 4 (2026-04-21):** Verification & Validation suite. Replaces
   the originally-planned refactor (pushed to Day 5) with four

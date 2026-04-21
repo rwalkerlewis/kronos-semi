@@ -66,6 +66,24 @@ def cmd_mms_poisson(args) -> int:
     print(("[PASS]" if smoke_ok else "[FAIL]") + " quad/triangle ratio in [0.1, 10]")
     all_ok = all_ok and smoke_ok
 
+    # Day 6: multi-region coefficient-jump guard on the Si/SiO2 assembly.
+    # The Day 6 acceptance criterion from docs/mos_derivation.md is
+    # rate_L2 >= 1.99 on the finest pair (theoretical 2.00). The CLI
+    # enforces that stricter floor here; pytest uses a looser 1.85
+    # floor to absorb solver-tolerance noise.
+    mr_rows = studies["2d_multiregion"]
+    print()
+    print(report_table(mr_rows, header="=== mms_poisson 2d_multiregion (Si/SiO2) ==="))
+    ok_mr_l2, msg_mr_l2 = _gate_finest_pair_rate(
+        mr_rows, "rate_L2", 1.99, "2d_multiregion L2",
+    )
+    ok_mr_h1, msg_mr_h1 = _gate_finest_pair_rate(
+        mr_rows, "rate_H1", 0.95, "2d_multiregion H1",
+    )
+    print(msg_mr_l2)
+    print(msg_mr_h1)
+    all_ok = all_ok and ok_mr_l2 and ok_mr_h1
+
     return 0 if all_ok else 5
 
 

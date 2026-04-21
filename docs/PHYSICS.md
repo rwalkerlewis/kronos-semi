@@ -630,3 +630,114 @@ Every gated rate clears the L^2 >= 1.75 / H^1 >= 0.80 floor with
 roundoff. The derivation (`mms_dd_derivation.md`) documents the
 block-residual scale-disparity issue that forced the SNES
 tolerance tweak to `atol = 0.0` with `stol = 1e-12`.
+
+### 5.5 MMS for multi-region Poisson (Day 6)
+
+Guards the Si/SiO2 coefficient-jump assembly used by the MOS
+capacitor. A manufactured psi_exact(x, y) is C^0 across the interface
+y = y_int and satisfies eps-weighted flux continuity there (no
+surface delta source); per-region forcing is supplied via a cellwise
+DG0 eps_r Function. The derivation is in `mos_derivation.md` section
+7. Convergence sweep on the Si/SiO2 rectangle (t_Si = 70 nm, t_ox =
+30 nm, oxide inflated from the device 5 nm to keep a reasonable
+aspect ratio on a square uniform mesh):
+
+    N in [20, 40, 80, 160]     finest-pair rate_L^2 = 2.000, rate_H^1 = 1.000
+
+The CLI (`scripts/run_verification.py mms_poisson`) enforces
+`rate_L^2 >= 1.99` and `rate_H^1 >= 0.95` on the finest pair; the
+pytest gate uses the looser `>= 1.85 / >= 0.85` thresholds common to
+the single-region MMS tests.
+
+## 6. 2D MOS capacitor (Day 6)
+
+Condensed reference; the full derivation is in
+`docs/mos_derivation.md`.
+
+### 6.1 Device structure
+
+- Silicon substrate, uniform N_A = 1e17 cm^-3, 500 nm thick
+- SiO2 gate oxide, 5 nm thick
+- Body contact on the bottom face (ohmic)
+- Gate contact on the top face (ideal gate, phi_ms = 0)
+
+The benchmark mesh is uniform at 1 nm per cell vertically (505 cells
+over 505 nm), which lands the Si/SiO2 interface on a grid line and
+gives 5 cells in the oxide. Lateral extent is 500 nm with 4 cells
+(the device is translation invariant in x away from the lateral
+edges). Either a dense uniform or a graded vertical mesh is
+acceptable; the uniform path is used here because CI time is not
+the bottleneck at this resolution (the full sweep runs in ~2 s).
+
+### 6.2 Physics model
+
+Equilibrium Poisson with multi-region coefficient, solved once per
+gate bias:
+
+- Stiffness L_D^2 eps_r(x) grad psi . grad v over the full mesh with
+  cellwise DG0 eps_r (Si: 11.7, SiO2: 3.9)
+- Space-charge rho_hat = n_i_hat (exp(-psi) - exp(psi)) + N_net_hat
+  restricted to silicon cells via `dx(subdomain_id=semi_tag)`
+- Oxide: Laplacian only, no space charge, no Slotboom variables
+
+The body ohmic BC sets psi_body = -phi_F (equilibrium p-type value
+under our psi=0-at-intrinsic convention); the gate BC is
+psi_gate = V_gate - phi_ms.
+
+Gate and body DOFs cannot overlap: gate contacts live on the oxide
+side of the interface where Slotboom variables do not exist, so
+`build_dd_dirichlet_bcs` explicitly skips them.
+
+### 6.3 Flatband, threshold, and the BC-convention shift
+
+With our BC convention a p-type substrate at equilibrium has
+psi_body = -phi_F = -V_t ln(N_A / n_i). Flatband (psi flat through
+silicon) therefore requires psi_gate = psi_body, giving
+
+    V_FB = phi_ms - phi_F
+
+not the textbook V_FB = phi_ms. For the ideal-gate Day-6 device
+(phi_ms = 0, N_A = 1e17 cm^-3, T = 300 K), V_FB = -0.417 V and
+V_T = -0.417 + 2 * 0.417 + sqrt(4 eps_s q N_A phi_F) / C_ox = +0.658 V.
+The benchmark sweep covers V_gate in [-0.9, +1.2] V (roughly V_FB -
+0.5 through V_T + 0.5) and the verifier window sits strictly inside
+the depletion regime at [V_FB + 0.2, V_T - 0.1] = [-0.217, +0.558] V.
+
+The 0.2 V low-edge margin is wider than the nominal 0.1 V because at
+psi_s < ~2 V_t the carrier tail reaches across a significant fraction
+of W_dep and the depletion approximation naturally drifts toward 10%.
+Shrinking the window (not loosening the tolerance) is the intended
+knob per `mos_derivation.md` section 6.9.
+
+### 6.4 Capacitance extraction and theory
+
+At each V_gate the integrated silicon space charge gives
+
+    Q_gate(V_gate) = -(q / W_lat) * integral_{Omega_Si} rho(x, y) dA
+
+(2D: dividing the charge-per-unit-depth by the lateral extent W_lat
+converts to per-area). The simulated capacitance is the centered
+finite difference dQ_gate/dV_gate on the sweep grid. Theory
+(depletion approximation) is the series combination
+
+    1/C = 1/C_ox + 1/C_dep(psi_s)
+    C_ox  = eps_ox / t_ox
+    C_dep = sqrt(eps_s q N_A / (2 psi_s))
+
+with psi_s(V_gate) obtained by closed-form inversion of
+
+    V_gate - V_FB = psi_s + a sqrt(psi_s),   a = sqrt(2 eps_s q N_A) / C_ox
+
+(substitute u = sqrt(psi_s) and solve the quadratic
+u^2 + a u - V_ov = 0).
+
+### 6.5 Verifier result
+
+Inside the verifier window [V_FB + 0.2, V_T - 0.1] V the worst
+relative error |C_sim - C_theory| / C_theory is ~9.3% (at V_gate =
+V_FB + 0.217 V, the window edge), inside the 10% tolerance. The
+benchmark artifacts are `results/mos_2d/{psi_2d, potentials_1d, cv,
+qv}.png`. Monotone non-increasing C in the window is also checked
+(C starts near C_ox in accumulation, drops through depletion, rises
+back toward C_ox in inversion; inside the window it is strictly
+decreasing up to ~1% noise).

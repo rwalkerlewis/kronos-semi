@@ -176,3 +176,131 @@ def _cell_centroids(msh, cells: np.ndarray) -> np.ndarray:
         verts = c2v.links(int(c))
         centroids[i] = coords[verts, :tdim].mean(axis=0)
     return centroids
+
+
+def _semiconductor_tags(regions_cfg: dict) -> set[int]:
+    """Set of cell tags whose region role is 'semiconductor'."""
+    out: set[int] = set()
+    for r in regions_cfg.values():
+        if "tag" not in r:
+            continue
+        role = r.get("role", "semiconductor")
+        if role == "semiconductor":
+            out.add(int(r["tag"]))
+    return out
+
+
+def is_single_region_semiconductor(cell_tags, regions_cfg: dict) -> bool:
+    """
+    Detect the single-region-semiconductor fast path.
+
+    Returns True if `cell_tags` is None (no regions declared, treated as
+    bare semiconductor) or if every tagged cell has role 'semiconductor'
+    and there is at most one distinct tag. This is the condition under
+    which the Poisson LHS coefficient can collapse to a scalar Constant
+    and the continuity equations assemble directly on the full mesh,
+    giving byte-identical behaviour against the Day 2-5 1D path.
+    """
+    if cell_tags is None:
+        return True
+    tag_role: dict[int, str] = {}
+    for r in regions_cfg.values():
+        if "tag" not in r:
+            continue
+        tag_role[int(r["tag"])] = r.get("role", "semiconductor")
+    unique_tags = set(int(t) for t in np.unique(cell_tags.values))
+    if len(unique_tags) > 1:
+        return False
+    for t in unique_tags:
+        if tag_role.get(t, "semiconductor") != "semiconductor":
+            return False
+    return True
+
+
+def build_submesh_by_role(msh, cell_tags, regions_cfg: dict, role: str = "semiconductor"):
+    """
+    Construct a submesh consisting of all cells whose region tag maps to
+    the given `role` in `regions_cfg`.
+
+    Returns
+    -------
+    (submesh, entity_map, vertex_map, geom_map)
+        `entity_map` has length equal to the number of cells in
+        `submesh`; `entity_map[i]` is the parent-mesh cell index of
+        submesh cell `i`. This is the object needed as
+        `entity_maps={msh: inv_entity_map}` when assembling a form on
+        the parent mesh that reads Functions defined on the submesh.
+
+    Raises
+    ------
+    ValueError if `cell_tags` is None or no cells match the role.
+    """
+    from dolfinx import mesh as dmesh
+
+    if cell_tags is None:
+        raise ValueError(
+            "build_submesh_by_role requires cell_tags; no regions declared"
+        )
+
+    tag_role: dict[int, str] = {}
+    for r in regions_cfg.values():
+        if "tag" not in r:
+            continue
+        tag_role[int(r["tag"])] = r.get("role", "semiconductor")
+
+    wanted_tags = sorted(t for t, rr in tag_role.items() if rr == role)
+    if not wanted_tags:
+        raise ValueError(
+            f"No region in regions_cfg has role={role!r}; cannot build submesh."
+        )
+
+    tdim = msh.topology.dim
+    index_lists = [cell_tags.find(t) for t in wanted_tags]
+    cells = np.unique(np.concatenate(index_lists)).astype(np.int32) if index_lists else np.array([], dtype=np.int32)
+    if cells.size == 0:
+        raise ValueError(
+            f"No cells carry a tag matching role={role!r}; check regions_by_box."
+        )
+
+    submesh, entity_map, vertex_map, geom_map = dmesh.create_submesh(
+        msh, tdim, cells,
+    )
+    return submesh, entity_map, vertex_map, geom_map
+
+
+def build_eps_r_function(msh, cell_tags, regions_cfg: dict):
+    """
+    Build a DG0 cellwise `eps_r(x)` Function on the parent mesh.
+
+    Maps each cell's region tag to the material's relative permittivity.
+    Cells whose tag is not represented in `regions_cfg` fall back to
+    eps_r = 1.0 (vacuum), which is never exercised in practice because
+    `regions_by_box` defines a full partition of the mesh for every
+    multi-region benchmark.
+    """
+    from dolfinx import fem
+    from petsc4py import PETSc
+
+    from .materials import get_material
+
+    tag_eps_r: dict[int, float] = {}
+    for r in regions_cfg.values():
+        if "tag" not in r:
+            continue
+        mat = get_material(r["material"])
+        tag_eps_r[int(r["tag"])] = float(mat.epsilon_r)
+
+    V_DG0 = fem.functionspace(msh, ("DG", 0))
+    eps_r_fn = fem.Function(V_DG0, name="eps_r")
+    eps_r_fn.x.array[:] = PETSc.ScalarType(1.0)
+
+    if cell_tags is None:
+        return eps_r_fn
+
+    for tag, eps in tag_eps_r.items():
+        cells = cell_tags.find(tag)
+        for c in cells:
+            dof = V_DG0.dofmap.cell_dofs(int(c))[0]
+            eps_r_fn.x.array[dof] = PETSc.ScalarType(eps)
+    eps_r_fn.x.scatter_forward()
+    return eps_r_fn

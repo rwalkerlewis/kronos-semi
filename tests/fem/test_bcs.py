@@ -187,6 +187,130 @@ def test_build_psi_dirichlet_bcs_matches_legacy_at_forward_bias():
         assert np.array_equal(_bc_dofs(bc_new), _bc_dofs(bc_old))
 
 
+def _mos_like_cfg(V_gate: float = 0.0, phi_ms: float = 0.0):
+    """
+    Minimal two-region 2D config with one ohmic body contact and one
+    gate contact. Used to cover the gate branch in build_psi_dirichlet_bcs
+    and to confirm build_dd_dirichlet_bcs skips the gate entirely.
+    """
+    return {
+        "name": "mos_bc_test",
+        "dimension": 2,
+        "mesh": {
+            "source": "builtin",
+            "extents": [[0.0, 1.0e-7], [0.0, 1.0e-7]],
+            "resolution": [8, 10],
+            "regions_by_box": [
+                {"name": "silicon", "tag": 1,
+                 "bounds": [[0.0, 1.0e-7], [0.0, 0.7e-7]]},
+                {"name": "oxide", "tag": 2,
+                 "bounds": [[0.0, 1.0e-7], [0.7e-7, 1.0e-7]]},
+            ],
+            "facets_by_plane": [
+                {"name": "body", "tag": 1, "axis": 1, "value": 0.0},
+                {"name": "gate", "tag": 2, "axis": 1, "value": 1.0e-7},
+            ],
+        },
+        "regions": {
+            "silicon": {"material": "Si", "tag": 1, "role": "semiconductor"},
+            "oxide":   {"material": "SiO2", "tag": 2, "role": "insulator"},
+        },
+        "doping": [
+            {
+                "region": "silicon",
+                "profile": {"type": "uniform", "N_D": 0.0, "N_A": 1.0e17},
+            },
+        ],
+        "contacts": [
+            {"name": "body", "facet": "body", "type": "ohmic", "voltage": 0.0},
+            {"name": "gate", "facet": "gate", "type": "gate",
+             "voltage": float(V_gate), "workfunction": float(phi_ms)},
+        ],
+        "physics": {"temperature": 300.0, "statistics": "boltzmann"},
+        "solver": {"type": "equilibrium"},
+    }
+
+
+def test_build_psi_dirichlet_bcs_gate_zero_workfunction():
+    """V_gate = 0, phi_ms = 0 -> psi_hat = 0 at the gate facet."""
+    from dolfinx import fem
+
+    cfg = _mos_like_cfg(V_gate=0.0, phi_ms=0.0)
+    ref_mat = get_material("Si")
+    sc = make_scaling_from_config(cfg, ref_mat)
+    msh, _cell_tags, facet_tags = build_mesh(cfg)
+    V = fem.functionspace(msh, ("Lagrange", 1))
+    N_raw_fn = build_profile(cfg["doping"])
+
+    contacts = resolve_contacts(cfg, facet_tags=facet_tags)
+    bcs = build_psi_dirichlet_bcs(V, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
+
+    # One ohmic body BC + one gate BC.
+    assert len(bcs) == 2
+    gate_bc = bcs[1]
+    assert _bc_value(gate_bc) == pytest.approx(0.0, abs=1e-14)
+
+
+def test_build_psi_dirichlet_bcs_gate_applied_voltage_scaled_by_Vt():
+    """V_gate = 1.5 V, phi_ms = 0 -> psi_hat = 1.5 / V_t."""
+    from dolfinx import fem
+
+    cfg = _mos_like_cfg(V_gate=1.5, phi_ms=0.0)
+    ref_mat = get_material("Si")
+    sc = make_scaling_from_config(cfg, ref_mat)
+    msh, _cell_tags, facet_tags = build_mesh(cfg)
+    V = fem.functionspace(msh, ("Lagrange", 1))
+    N_raw_fn = build_profile(cfg["doping"])
+
+    contacts = resolve_contacts(cfg, facet_tags=facet_tags)
+    bcs = build_psi_dirichlet_bcs(V, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
+
+    gate_bc = bcs[1]
+    expected = 1.5 / sc.V0
+    assert _bc_value(gate_bc) == pytest.approx(expected, rel=1e-12)
+
+
+def test_build_psi_dirichlet_bcs_gate_honors_workfunction():
+    """psi_hat(gate) = (V_gate - phi_ms) / V_t."""
+    from dolfinx import fem
+
+    V_gate = 1.0
+    phi_ms = 0.25
+    cfg = _mos_like_cfg(V_gate=V_gate, phi_ms=phi_ms)
+    ref_mat = get_material("Si")
+    sc = make_scaling_from_config(cfg, ref_mat)
+    msh, _cell_tags, facet_tags = build_mesh(cfg)
+    V = fem.functionspace(msh, ("Lagrange", 1))
+    N_raw_fn = build_profile(cfg["doping"])
+
+    contacts = resolve_contacts(cfg, facet_tags=facet_tags)
+    bcs = build_psi_dirichlet_bcs(V, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
+
+    gate_bc = bcs[1]
+    expected = (V_gate - phi_ms) / sc.V0
+    assert _bc_value(gate_bc) == pytest.approx(expected, rel=1e-12)
+
+
+def test_build_dd_dirichlet_bcs_skips_gate_contact():
+    """Gate contact is on the oxide side, so DD assembly must skip it."""
+    from semi.physics.drift_diffusion import make_dd_block_spaces
+
+    cfg = _mos_like_cfg(V_gate=0.5, phi_ms=0.0)
+    ref_mat = get_material("Si")
+    sc = make_scaling_from_config(cfg, ref_mat)
+    msh, _cell_tags, facet_tags = build_mesh(cfg)
+    spaces = make_dd_block_spaces(msh)
+    N_raw_fn = build_profile(cfg["doping"])
+
+    contacts = resolve_contacts(cfg, facet_tags=facet_tags)
+    bcs = build_dd_dirichlet_bcs(spaces, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
+
+    # Only the body ohmic contact contributes (psi, phi_n, phi_p) = 3 BCs.
+    # The gate is on the oxide side; DD assembles on the semiconductor submesh
+    # only, so a gate BC there is meaningless and must be skipped.
+    assert len(bcs) == 3
+
+
 def test_build_dd_dirichlet_bcs_matches_legacy_at_bias_step():
     from semi.physics.drift_diffusion import make_dd_block_spaces
 

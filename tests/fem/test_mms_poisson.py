@@ -134,6 +134,40 @@ def test_mms_poisson_2d_quad_smoke():
     )
 
 
+def test_mms_poisson_2d_multiregion_convergence():
+    """
+    2D multi-region (Si/SiO2) coefficient-jump assembly.
+
+    The exact solution is C^0 across the interface y = y_int and
+    satisfies eps_r * (d psi / d y) continuity by construction, so the
+    FE problem is well-posed and the finest-pair L^2 rate must hit
+    theoretical 2.0. Pytest uses a 1.85 floor so solver-tolerance
+    jitter does not destabilise the gate; the stricter 1.99 floor
+    lives in run_verification.py per the Day 6 acceptance criterion
+    in docs/mos_derivation.md section 7.
+    """
+    from semi.verification.mms_poisson import run_mr_convergence_study
+
+    # N_y must be divisible by 10 so y_int lands on a grid line.
+    results = run_mr_convergence_study([10, 20, 40, 80])
+    hs = [r.h for r in results]
+    eL2 = [r.e_L2 for r in results]
+    eH1 = [r.e_H1 for r in results]
+
+    assert all(eL2[i + 1] < eL2[i] for i in range(len(eL2) - 1)), (
+        f"L^2 error should decrease monotonically: {eL2}"
+    )
+
+    rate_L2 = _finest_pair_rate(hs, eL2)
+    rate_H1 = _finest_pair_rate(hs, eH1)
+    assert rate_L2 >= 1.85, (
+        f"multi-region finest-pair L^2 rate {rate_L2:.3f} < 1.85"
+    )
+    assert rate_H1 >= 0.85, (
+        f"multi-region finest-pair H^1 rate {rate_H1:.3f} < 0.85"
+    )
+
+
 @pytest.mark.parametrize("dim", [1, 2])
 def test_mms_poisson_snes_converges(dim):
     """

@@ -220,6 +220,7 @@ SCHEMA: dict[str, Any] = {
                         "equilibrium",
                         "drift_diffusion",
                         "bias_sweep",
+                        "mos_cv",
                     ],
                 },
                 "max_iterations": {"type": "integer"},

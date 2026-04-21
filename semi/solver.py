@@ -83,6 +83,7 @@ def solve_nonlinear_block(
     prefix: str,
     petsc_options: dict[str, Any] | None = None,
     kind: str | None = None,
+    entity_maps: list | None = None,
 ):
     """
     Solve a coupled block nonlinear problem via SNES.
@@ -108,6 +109,11 @@ def solve_nonlinear_block(
         PETSc matrix/vector kind. `None` for monolithic blocked (default,
         works with the MUMPS LU solver). Use `"nest"` if you supply a
         fieldsplit preconditioner.
+    entity_maps : list of dolfinx.mesh.EntityMap, optional
+        Passed through to `NonlinearProblem` for mixed-domain assembly
+        (for example, when psi lives on the parent mesh and phi_n /
+        phi_p live on a semiconductor submesh). `None` (the default)
+        leaves the single-region path unchanged.
 
     Returns
     -------
@@ -120,12 +126,18 @@ def solve_nonlinear_block(
     if petsc_options:
         opts.update(petsc_options)
 
-    problem = NonlinearProblem(
-        list(F_list), list(u_list),
+    np_kwargs: dict[str, Any] = dict(
         bcs=list(bcs),
         petsc_options_prefix=prefix,
         petsc_options=opts,
         kind=kind,
+    )
+    if entity_maps is not None:
+        np_kwargs["entity_maps"] = list(entity_maps)
+
+    problem = NonlinearProblem(
+        list(F_list), list(u_list),
+        **np_kwargs,
     )
     problem.solve()
     reason = problem.solver.getConvergedReason()

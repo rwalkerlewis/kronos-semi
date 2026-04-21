@@ -221,21 +221,47 @@ Read `PLAN.md` for the short version and the current in-flight task.
 
 ## Day 6. 2D MOS capacitor
 
-- **Status:** Planned. Was originally Day 5.
-- **Goal:** extend to 2D and multi-region (oxide plus silicon).
-- **Deliverables:**
-  - `benchmarks/mos_2d/mos_cap.json` with a gate, oxide, silicon
-    substrate, and body contact.
-  - Submesh handling in `semi/mesh.py` so carriers live only on the
-    semiconductor region.
-  - Gate boundary condition (Dirichlet on psi, no continuity
-    equations in oxide).
-  - C-V curve verifier: depletion C-V should match MOS theory within
-    10% across the depletion-to-inversion transition.
-- **Verification:**
-  - `benchmark mos_2d` exits 0.
-  - 2D plots rendered (psi contour, |E| contour, n and p contours).
-- **Dependencies:** Day 5 refactor.
+- **Status:** Done (2026-04-21). Delivered on `dev/day6-mos-2d`.
+  All eight deliverables landed; the `mos_2d` benchmark exits 0
+  with 4/4 verifier checks green; Day 4-5 V&V suite stayed green
+  with the new multi-region Poisson MMS study clearing
+  rate_L^2 >= 1.99; 1D benchmarks (`pn_1d`, `pn_1d_bias`,
+  `pn_1d_bias_reverse`) are byte-identical to Day 5.
+- **Goal (as delivered):** first 2D benchmark and first multi-region
+  device. Equilibrium Poisson assembles over the full mesh with
+  cellwise DG0 eps_r; space charge is restricted to silicon via
+  `dx(subdomain_id=semi_tag)`; gate contact applies a Dirichlet BC on
+  psi at the oxide top face; a C-V verifier differentiates gate charge
+  with respect to V_gate and matches depletion-approximation MOS
+  theory within 10% in the verifier window.
+- **Deliverables (as landed):**
+  - `docs/mos_derivation.md`: derivation-first gate, approved Day 6
+    prerequisite (9da5fa6).
+  - `semi/mesh.py` submesh + cellwise eps_r helpers (719b9e8).
+  - `semi/bcs.py` gate contact wiring (b24c650).
+  - `semi/physics/poisson.py:build_equilibrium_poisson_form_mr`
+    (this commit).
+  - `semi/physics/drift_diffusion.py` submesh block residual via
+    `entity_maps` (455196a).
+  - `benchmarks/mos_2d/mos_cap.json` device spec: 500 nm p-type Si
+    (N_A = 1e17 cm^-3) / 5 nm SiO2, uniform 1 nm vertical mesh,
+    V_gate sweep [-0.9, +1.2] V.
+  - `scripts/run_benchmark.py`: 2D `plot_mos_2d` (tricontourf of
+    psi, central-column psi(y), C-V and Q-V) and `verify_mos_2d`
+    (10% tolerance in [V_FB + 0.2, V_T - 0.1] V).
+  - `semi/verification/mms_poisson.py`:
+    `run_mms_poisson_2d_multiregion` with Si/SiO2 coefficient jump
+    (99fcd2b).
+  - `docs/PHYSICS.md` Section 6 (MOS reference).
+- **Verification (observed):**
+  - `benchmark mos_2d` exits 0; worst |C_sim - C_theory|/C_theory in
+    the verifier window is 9.25% at V_gate = -0.20 V.
+  - 4 plots written: `psi_2d.png`, `potentials_1d.png`, `cv.png`,
+    `qv.png`.
+  - V&V suite rates: see `PHYSICS.md` sections 5.1-5.5.
+  - `pytest --cov=semi --cov-fail-under=95` exits 0 at 95.43%
+    (195 tests pass).
+- **Dependencies:** Day 5 refactor (PR #7).
 
 ## Day 7. 3D doped resistor
 

@@ -404,6 +404,269 @@ CLI_NS_1D = [40, 80, 160, 320, 640]
 CLI_NS_2D = [16, 32, 64, 128]
 
 
+# ---------------------------------------------------------------------------
+# Multi-region Poisson MMS (Day 6)
+#
+# The single-region studies above fix eps_r to a scalar Constant. This
+# variant exercises the coefficient-jump assembly with a piecewise DG0
+# eps_r(x) matching the Day-6 MOS stack: eps_r_Si = 11.7 over the bottom
+# fraction of the square, eps_r_ox = 3.9 over the top. The exact
+# solution
+#
+#     psi_exact(x, y) = sin(pi x / W) * h(y)
+#
+# uses a piecewise-polynomial h(y) chosen so that (i) psi is C^0 across
+# the Si/SiO2 interface and (ii) eps_r * d psi/dy is continuous across
+# it (the natural interface condition for the weak form). Per-region
+# forcings f_Si, f_ox are manufactured directly from psi_exact and the
+# local eps_r_k.
+#
+# The scaling factor L_D^2 from the production Poisson LHS cancels out
+# when paired with a consistent RHS, so this MMS runs in pure scalar
+# Poisson form without the Slotboom / doping / carrier terms. That
+# isolates the coefficient-jump assembly, which is the only new thing
+# in Day-6 Poisson physics. See docs/mos_derivation.md section 7.
+# ---------------------------------------------------------------------------
+
+# Material constants used by the multi-region MMS. Hard-coded so the
+# test is self-contained.
+MR_EPS_R_SI: float = 11.7
+MR_EPS_R_OX: float = 3.9
+
+# Geometry per docs/mos_derivation.md section 7.1.
+MR_W: float = 1.0e-7
+MR_T_SI: float = 0.7e-7
+MR_T_OX: float = 0.3e-7
+MR_Y_INT: float = MR_T_SI
+MR_Y_TOP: float = MR_T_SI + MR_T_OX
+
+# psi_exact amplitudes.
+MR_AMPL: float = 1.0
+MR_H_TOP: float = 0.5
+
+
+def _mr_B_ox() -> float:
+    return 2.0 * MR_EPS_R_SI / (MR_EPS_R_OX * MR_T_SI)
+
+
+def _mr_gamma_ox() -> float:
+    return (MR_H_TOP - MR_AMPL * (1.0 + _mr_B_ox() * MR_T_OX)) / (MR_T_OX ** 2)
+
+
+def _mr_psi_exact_ufl(mesh):
+    """Piecewise-polynomial exact solution psi_exact(x, y) on the full square.
+
+    Because UFL does not provide a clean per-subdomain branch for the
+    exact solution (it lives in a single expression on the mesh), we
+    use a `ufl.conditional` on the spatial y coordinate to select the
+    correct polynomial in each region. At the interface both branches
+    give the same value (by construction), so the conditional is
+    unambiguous.
+    """
+    import ufl
+
+    x = ufl.SpatialCoordinate(mesh)
+    sx = ufl.sin(ufl.pi * x[0] / MR_W)
+
+    A = MR_AMPL
+    t_Si = MR_T_SI
+    y_int = MR_Y_INT
+    B_ox = _mr_B_ox()
+    gamma_ox = _mr_gamma_ox()
+
+    h_Si = A * (x[1] / t_Si) ** 2
+    dy = x[1] - y_int
+    h_ox = A + A * B_ox * dy + gamma_ox * dy ** 2
+
+    # conditional(y <= y_int, h_Si, h_ox)
+    h = ufl.conditional(ufl.le(x[1], y_int), h_Si, h_ox)
+    return sx * h
+
+
+def _mr_build_mesh(N_x: int, N_y: int):
+    """Rectangle on [0, W] x [0, y_top] with y_int as a grid line.
+
+    Requires N_y such that y_int = (N_y * T_SI / Y_TOP) is an integer,
+    else the interface falls inside a cell and the coefficient-jump
+    assembly becomes ill-defined in a DG0 eps_r field.
+    """
+    import numpy as _np
+    from dolfinx import mesh as dmesh
+    from mpi4py import MPI
+
+    expected_layer = N_y * MR_T_SI / MR_Y_TOP
+    if abs(expected_layer - round(expected_layer)) > 1.0e-9:
+        raise ValueError(
+            f"N_y = {N_y} does not land y_int on a grid line "
+            f"(y_int / h_y = {expected_layer!r}). Use N_y divisible by 10."
+        )
+    return dmesh.create_rectangle(
+        MPI.COMM_WORLD,
+        [_np.array([0.0, 0.0]), _np.array([MR_W, MR_Y_TOP])],
+        [N_x, N_y],
+        cell_type=dmesh.CellType.triangle,
+        diagonal=dmesh.DiagonalType.right,
+    )
+
+
+def _mr_build_region_tags(msh):
+    """Cell tags: 1 = silicon (y_mid <= y_int), 2 = oxide (y_mid > y_int)."""
+    import numpy as _np
+    from dolfinx import mesh as dmesh
+
+    tdim = msh.topology.dim
+    msh.topology.create_entities(tdim)
+    n = msh.topology.index_map(tdim).size_local + msh.topology.index_map(tdim).num_ghosts
+    all_cells = _np.arange(n, dtype=_np.int32)
+    msh.topology.create_connectivity(tdim, 0)
+    c2v = msh.topology.connectivity(tdim, 0)
+    coords = msh.geometry.x
+    values = _np.empty(n, dtype=_np.int32)
+    for c in range(n):
+        verts = c2v.links(int(c))
+        y_mid = coords[verts, 1].mean()
+        values[c] = 1 if y_mid <= MR_Y_INT else 2
+    return dmesh.meshtags(msh, tdim, all_cells, values)
+
+
+def _mr_build_eps_r_function(msh, cell_tags):
+    """DG0 eps_r with eps_r_Si on tag 1 and eps_r_ox on tag 2."""
+    from dolfinx import fem
+    from petsc4py import PETSc
+
+    V_DG0 = fem.functionspace(msh, ("DG", 0))
+    eps_r_fn = fem.Function(V_DG0, name="eps_r")
+    eps_r_fn.x.array[:] = PETSc.ScalarType(1.0)
+    for tag, eps in ((1, MR_EPS_R_SI), (2, MR_EPS_R_OX)):
+        for c in cell_tags.find(tag):
+            dof = V_DG0.dofmap.cell_dofs(int(c))[0]
+            eps_r_fn.x.array[dof] = PETSc.ScalarType(eps)
+    eps_r_fn.x.scatter_forward()
+    return eps_r_fn
+
+
+def _mr_all_boundary_facets(mesh, fdim: int):
+    import numpy as _np
+    from dolfinx import mesh as dmesh
+
+    return dmesh.locate_entities_boundary(
+        mesh, fdim, lambda x: _np.full(x.shape[1], True)
+    )
+
+
+def run_mms_poisson_2d_multiregion(N_x: int, N_y: int) -> MMSPoissonResult:
+    """Solve the multi-region Poisson MMS problem on one (N_x, N_y) level.
+
+    Piecewise eps_r(x, y) with a Si/SiO2 coefficient jump at y = y_int.
+    Dirichlet BCs are taken directly from psi_exact (non-homogeneous
+    at the top edge y = y_top). The exact solution is C^0 across the
+    interface and has continuous eps-weighted normal flux there, so
+    the weak form matches psi_exact up to FE discretization error and
+    the finest-pair L^2 rate targets 2.
+    """
+    import time as _time
+
+    import numpy as _np
+    import ufl
+    from dolfinx import fem
+
+    from semi.solver import solve_nonlinear
+
+    from ._norms import h1_seminorm_error_squared, l2_error_squared
+
+    msh = _mr_build_mesh(N_x, N_y)
+    cell_tags = _mr_build_region_tags(msh)
+    eps_r_fn = _mr_build_eps_r_function(msh, cell_tags)
+
+    V = fem.functionspace(msh, ("Lagrange", 1))
+    v = ufl.TestFunction(V)
+    psi = fem.Function(V, name="psi_hat_mr_mms")
+    psi.x.array[:] = 0.0
+
+    psi_e = _mr_psi_exact_ufl(msh)
+
+    # Dirichlet on entire boundary, interpolated from psi_exact via a
+    # Function so dolfinx can apply it to the DOFs that coincide with
+    # grid nodes. psi_exact is smooth in each region and continuous at
+    # the interface, so interpolation is exact for P1 away from y_int
+    # and accurate to O(h^2) at the interface row (which is adequate
+    # for an L^2 rate of 2).
+    fdim = msh.topology.dim - 1
+    msh.topology.create_connectivity(fdim, msh.topology.dim)
+    boundary_facets = _mr_all_boundary_facets(msh, fdim)
+    bdofs = fem.locate_dofs_topological(V, fdim, boundary_facets)
+
+    psi_bc_fn = fem.Function(V, name="psi_bc_mr_mms")
+    psi_bc_fn.interpolate(fem.Expression(psi_e, V.element.interpolation_points))
+    bcs = [fem.dirichletbc(psi_bc_fn, bdofs)]
+
+    # Weak form: integral eps_r grad(psi) . grad(v) dx - integral f v dx = 0
+    # where f_k = -div(eps_r_k grad(psi_exact)). Using integration by
+    # parts on the manufactured source term (with psi_exact taking its
+    # boundary values through the Dirichlet BC lifting), this reduces
+    # to
+    #     F(psi) = integral eps_r [grad(psi) - grad(psi_exact)] . grad(v) dx
+    # so at convergence grad(psi) == grad(psi_exact) weakly. No L_D^2
+    # prefactor: the scaling factor cancels out of both terms (section
+    # 7.3 of docs/mos_derivation.md).
+    F = eps_r_fn * ufl.inner(ufl.grad(psi) - ufl.grad(psi_e), ufl.grad(v)) * ufl.dx
+
+    petsc_options = {
+        "snes_rtol": 1.0e-14,
+        "snes_atol": 1.0e-16,
+        "snes_stol": 0.0,
+        "snes_max_it": 50,
+    }
+    t0 = _time.perf_counter()
+    info = solve_nonlinear(
+        F, psi, bcs,
+        prefix=f"mms_poisson_mr_Nx{N_x}_Ny{N_y}_",
+        petsc_options=petsc_options,
+    )
+    dt = _time.perf_counter() - t0
+    if not info.get("converged", False):
+        raise RuntimeError(
+            f"MMS multi-region Poisson did not converge at "
+            f"N=({N_x}, {N_y}): reason={info.get('reason')}"
+        )
+
+    e_L2 = float(_np.sqrt(max(l2_error_squared(psi, psi_e), 0.0)))
+    e_H1 = float(_np.sqrt(max(h1_seminorm_error_squared(psi, psi_e), 0.0)))
+
+    n_dofs = int(V.dofmap.index_map.size_global)
+    # Report the y-direction spacing as the characteristic h (the
+    # coefficient jump is perpendicular to y, so this is the
+    # refinement direction that controls the interface error).
+    h = MR_Y_TOP / N_y
+    return MMSPoissonResult(
+        dim=2,
+        N=N_y,
+        h=h,
+        n_dofs=n_dofs,
+        e_L2=e_L2,
+        e_H1=e_H1,
+        snes_iters=int(info.get("iterations", -1)),
+        solve_time_s=dt,
+        cell_kind="triangle",
+        amplitude=MR_AMPL,
+    )
+
+
+def run_mr_convergence_study(Ns: list[int]) -> list[MMSPoissonResult]:
+    """Run the multi-region MMS on a sequence of refinements.
+
+    Uses a square mesh with N_x = N_y = N and requires N divisible by
+    10 so that the Si/SiO2 interface lands on a grid line.
+    """
+    results: list[MMSPoissonResult] = []
+    for N in Ns:
+        results.append(run_mms_poisson_2d_multiregion(N, N))
+    return results
+
+
+CLI_NS_MR = [20, 40, 80, 160]
+
+
 def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
     """
     Run the artifact-production sweep used by `scripts/run_verification.py`.
@@ -483,5 +746,14 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
         list(smoke_row.keys()),
     )
     studies["2d_quad_smoke"] = [smoke_row]
+
+    # 2D multi-region (Si/SiO2 coefficient jump) -- Day 6.
+    mr_results = run_mr_convergence_study(CLI_NS_MR)
+    mr_rows = to_table_rows(mr_results)
+    write_artifacts(
+        mr_rows, out_dir / "2d_multiregion",
+        title="MMS Poisson 2D multi-region (Si/SiO2 coefficient jump)",
+    )
+    studies["2d_multiregion"] = mr_rows
 
     return studies
