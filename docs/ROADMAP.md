@@ -186,28 +186,38 @@ Read `PLAN.md` for the short version and the current in-flight task.
 
 ## Day 5. Refactor, expanded test coverage, docs pass
 
-- **Status:** Planned. Was originally Day 4; pushed back one slot to
-  make room for the V&V suite.
-- **Goal:** pay down technical debt accumulated across Days 1-3 and
-  expand coverage before moving to higher dimensions.
-- **Deliverables:**
-  - Break `semi/run.py` into `run_equilibrium` and `run_bias_sweep`
-    functions with a thin `run(cfg)` dispatcher.
-  - Factor BC construction into `semi/bcs.py` so ohmic, gate, and
-    future Schottky contacts share a common interface.
-  - Raise pure-Python coverage to 95%+; add integration tests for
-    `run` itself that can be parameterized over small in-memory
-    configs.
-  - Update `docs/PHYSICS.md` with the scaled drift-diffusion
-    derivation now that it is implemented.
-  - Add `docs/adr/0007-bc-construction-interface.md` if the BC
-    refactor introduces a new decision (note: ADR 0006 is reserved
-    for the Day 4 V&V strategy).
+- **Status:** Done (2026-04-21). Delivered on `dev/day5-refactor`.
+- **Goal:** paid down technical debt accumulated across Days 1-3 and
+  expanded coverage before moving to higher dimensions.
+- **Deliverables (as delivered):**
+  - `semi/bcs.py` extracted (pure-Python core tier, no dolfinx import
+    at module scope) with `ContactBC` dataclass,
+    `resolve_contacts(cfg, facet_tags=None, voltages=None)`,
+    `build_psi_dirichlet_bcs(...)`, and `build_dd_dirichlet_bcs(...)`.
+    Inline `_build_ohmic_bcs_psi` and `_build_dd_ohmic_bcs` removed
+    from `semi/run.py`.
+  - `semi/run.py` split into a thin dispatcher (74 lines) plus
+    `semi/runners/` (`equilibrium.py`, `bias_sweep.py`, `_common.py`)
+    and `semi/postprocess.py`. `bias_sweep.py` 294 lines; no module
+    in `semi/` exceeds 300 lines (was 580 in `run.py`).
+  - Coverage 96.25% (1598 statements, 60 missed) across 177 tests
+    (139 prior + 38 new). CI gate `--cov-fail-under=95` enforced
+    in the `docker-fem` job.
+  - `docs/PHYSICS.md` Section 2.5 completed: full scaled
+    drift-diffusion derivation (continuity rows pick up `L_0^2`
+    explicitly because the mesh stays in meters per Invariant 3),
+    scaled SRH kernel, residual-sign block summary, J_0 numerical
+    check.
+  - `docs/adr/0007-contact-bc-interface.md` records the dataclass-
+    over-dict / voltages-override / insulating-skip / optional-facet-
+    verification design choices.
 - **Verification:**
-  - `pytest --cov=semi --cov-report=term-missing` shows core coverage
-    at or above 95%.
-  - No behavioral regressions in `pn_1d` or `pn_1d_bias`.
-- **Dependencies:** Day 4 V&V suite merged.
+  - `pytest --cov=semi --cov-fail-under=95` exits 0 at 96.25%.
+  - `pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse` benchmarks all pass
+    with byte-identical numerics to the Day 4 baseline.
+  - `python scripts/run_verification.py all` reports 53 PASS / 0 FAIL
+    with finest-pair MMS rates byte-identical to Day 4.
+- **Dependencies:** Day 4 V&V suite merged (PR #6).
 
 ## Day 6. 2D MOS capacitor
 

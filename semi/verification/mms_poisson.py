@@ -332,7 +332,7 @@ def run_convergence_study(
     return results
 
 
-def to_table_rows(results: list[MMSPoissonResult]) -> list[dict]:
+def to_table_rows(results: list[MMSPoissonResult]) -> list[dict]:  # pragma: no cover
     """Build the (h, N_dofs, e_L2, rate_L2, e_H1, rate_H1) rows."""
     from ._convergence import observed_rates
 
@@ -357,7 +357,7 @@ def to_table_rows(results: list[MMSPoissonResult]) -> list[dict]:
     return rows
 
 
-def write_artifacts(
+def write_artifacts(  # pragma: no cover
     rows: list[dict],
     out_dir: Path,
     *,
@@ -389,7 +389,7 @@ def write_artifacts(
     )
 
 
-def report_table(rows: list[dict], header: str = "") -> str:
+def report_table(rows: list[dict], header: str = "") -> str:  # pragma: no cover
     """Pretty multi-line stdout table."""
     from ._convergence import format_table
 
@@ -404,7 +404,7 @@ CLI_NS_1D = [40, 80, 160, 320, 640]
 CLI_NS_2D = [16, 32, 64, 128]
 
 
-def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:
+def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
     """
     Run the artifact-production sweep used by `scripts/run_verification.py`.
 

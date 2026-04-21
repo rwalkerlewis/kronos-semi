@@ -1,0 +1,217 @@
+"""
+FEM tests for `semi.bcs.build_psi_dirichlet_bcs` and
+`semi.bcs.build_dd_dirichlet_bcs`.
+
+These compare the extracted helpers against a copy of the legacy
+inline implementation that previously lived in `semi/run.py`. Keeping
+the reference embedded here means the assertion stays meaningful even
+after the inline copies are removed in the follow-up commit.
+"""
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+from semi.bcs import (
+    build_dd_dirichlet_bcs,
+    build_psi_dirichlet_bcs,
+    resolve_contacts,
+)
+from semi.doping import build_profile
+from semi.materials import get_material
+from semi.mesh import build_mesh
+from semi.scaling import make_scaling_from_config
+
+
+def _legacy_evaluate_doping_at_facet(msh, facets, fdim, N_raw_fn) -> float:
+    """Verbatim copy of the pre-extraction helper from semi/run.py."""
+    tdim = msh.topology.dim
+    msh.topology.create_connectivity(fdim, 0)
+    f2v = msh.topology.connectivity(fdim, 0)
+    coords = msh.geometry.x
+    verts = f2v.links(int(facets[0]))
+    centroid = coords[verts, :tdim].mean(axis=0)
+    pt = centroid.reshape(tdim, 1)
+    return float(N_raw_fn(pt)[0])
+
+
+def _legacy_build_ohmic_bcs_psi(cfg, V, msh, facet_tags, sc, ref_mat, N_raw_fn):
+    """Verbatim copy of the pre-extraction inline helper from semi/run.py."""
+    from dolfinx import fem
+    from petsc4py import PETSc
+
+    fdim = msh.topology.dim - 1
+    tag_by_name = {p["name"]: int(p["tag"])
+                   for p in cfg["mesh"].get("facets_by_plane", [])}
+    bcs = []
+    for contact in cfg["contacts"]:
+        if contact["type"] != "ohmic":
+            continue
+        facet_ref = contact["facet"]
+        tag = tag_by_name[facet_ref] if isinstance(facet_ref, str) else int(facet_ref)
+        facets = facet_tags.find(tag)
+        N_net = _legacy_evaluate_doping_at_facet(msh, facets, fdim, N_raw_fn)
+        psi_eq_hat = float(np.arcsinh(N_net / (2.0 * ref_mat.n_i)))
+        V_applied = contact.get("voltage", 0.0)
+        psi_bc = psi_eq_hat + V_applied / sc.V0
+        dofs = fem.locate_dofs_topological(V, fdim, facets)
+        bcs.append(fem.dirichletbc(PETSc.ScalarType(psi_bc), dofs, V))
+    return bcs
+
+
+def _legacy_build_dd_ohmic_bcs(cfg, spaces, msh, facet_tags, sc, ref_mat,
+                               N_raw_fn, voltages):
+    """Verbatim copy of the pre-extraction inline DD helper from semi/run.py."""
+    from dolfinx import fem
+    from petsc4py import PETSc
+
+    fdim = msh.topology.dim - 1
+    tag_by_name = {p["name"]: int(p["tag"])
+                   for p in cfg["mesh"].get("facets_by_plane", [])}
+    bcs = []
+    for contact in cfg["contacts"]:
+        if contact["type"] != "ohmic":
+            continue
+        name = contact["name"]
+        facet_ref = contact["facet"]
+        tag = tag_by_name[facet_ref] if isinstance(facet_ref, str) else int(facet_ref)
+        facets = facet_tags.find(tag)
+        N_net = _legacy_evaluate_doping_at_facet(msh, facets, fdim, N_raw_fn)
+        psi_eq_hat = float(np.arcsinh(N_net / (2.0 * ref_mat.n_i)))
+        V_app = float(voltages.get(name, contact.get("voltage", 0.0)))
+        V_hat = V_app / sc.V0
+        psi_bc = psi_eq_hat + V_hat
+        phi_bc = V_hat
+        dofs_psi = fem.locate_dofs_topological(spaces.V_psi, fdim, facets)
+        dofs_n = fem.locate_dofs_topological(spaces.V_phi_n, fdim, facets)
+        dofs_p = fem.locate_dofs_topological(spaces.V_phi_p, fdim, facets)
+        bcs.append(fem.dirichletbc(PETSc.ScalarType(psi_bc), dofs_psi, spaces.V_psi))
+        bcs.append(fem.dirichletbc(PETSc.ScalarType(phi_bc), dofs_n, spaces.V_phi_n))
+        bcs.append(fem.dirichletbc(PETSc.ScalarType(phi_bc), dofs_p, spaces.V_phi_p))
+    return bcs
+
+
+def _pn_1d_cfg(*, anode_voltage: float = 0.0, cathode_voltage: float = 0.0):
+    """A minimal symmetric 1D pn junction config sufficient for BC tests."""
+    return {
+        "name": "pn_1d_bc_test",
+        "dimension": 1,
+        "mesh": {
+            "source": "builtin",
+            "extents": [[0.0, 2.0e-6]],
+            "resolution": [40],
+            "regions_by_box": [
+                {"name": "silicon", "tag": 1, "bounds": [[0.0, 2.0e-6]]}
+            ],
+            "facets_by_plane": [
+                {"name": "anode",   "tag": 1, "axis": 0, "value": 0.0},
+                {"name": "cathode", "tag": 2, "axis": 0, "value": 2.0e-6},
+            ],
+        },
+        "regions": {
+            "silicon": {"material": "Si", "tag": 1, "role": "semiconductor"},
+        },
+        "doping": [
+            {
+                "region": "silicon",
+                "profile": {
+                    "type": "step",
+                    "axis": 0,
+                    "location": 1.0e-6,
+                    "N_D_left": 0.0,
+                    "N_A_left": 1.0e17,
+                    "N_D_right": 1.0e17,
+                    "N_A_right": 0.0,
+                },
+            }
+        ],
+        "contacts": [
+            {"name": "anode",   "facet": "anode",   "type": "ohmic",
+             "voltage": float(anode_voltage)},
+            {"name": "cathode", "facet": "cathode", "type": "ohmic",
+             "voltage": float(cathode_voltage)},
+        ],
+        "physics": {"temperature": 300.0, "statistics": "boltzmann"},
+        "solver": {"type": "equilibrium"},
+    }
+
+
+def _bc_value(bc):
+    """Return the (scalar) Dirichlet value attached to a dolfinx bc."""
+    arr = np.asarray(bc.g.value)
+    return float(arr.flat[0])
+
+
+def _bc_dofs(bc):
+    """Return the sorted DOF index array attached to a dolfinx bc."""
+    return np.sort(np.asarray(bc.dof_indices()[0], dtype=np.int64))
+
+
+def test_build_psi_dirichlet_bcs_matches_legacy_at_equilibrium():
+    from dolfinx import fem
+
+    cfg = _pn_1d_cfg(anode_voltage=0.0, cathode_voltage=0.0)
+    ref_mat = get_material("Si")
+    sc = make_scaling_from_config(cfg, ref_mat)
+    msh, _cell_tags, facet_tags = build_mesh(cfg)
+    V = fem.functionspace(msh, ("Lagrange", 1))
+    N_raw_fn = build_profile(cfg["doping"])
+
+    bcs_old = _legacy_build_ohmic_bcs_psi(cfg, V, msh, facet_tags, sc, ref_mat, N_raw_fn)
+    contacts = resolve_contacts(cfg, facet_tags=facet_tags)
+    bcs_new = build_psi_dirichlet_bcs(V, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
+
+    assert len(bcs_old) == len(bcs_new) == 2
+    for bc_old, bc_new in zip(bcs_old, bcs_new, strict=True):
+        assert _bc_value(bc_new) == pytest.approx(_bc_value(bc_old), rel=0.0, abs=1e-14)
+        assert np.array_equal(_bc_dofs(bc_new), _bc_dofs(bc_old))
+
+
+def test_build_psi_dirichlet_bcs_matches_legacy_at_forward_bias():
+    from dolfinx import fem
+
+    # Anode at +0.4 V exercises the V_applied / V_t branch.
+    cfg = _pn_1d_cfg(anode_voltage=0.4, cathode_voltage=0.0)
+    ref_mat = get_material("Si")
+    sc = make_scaling_from_config(cfg, ref_mat)
+    msh, _cell_tags, facet_tags = build_mesh(cfg)
+    V = fem.functionspace(msh, ("Lagrange", 1))
+    N_raw_fn = build_profile(cfg["doping"])
+
+    bcs_old = _legacy_build_ohmic_bcs_psi(cfg, V, msh, facet_tags, sc, ref_mat, N_raw_fn)
+    contacts = resolve_contacts(cfg, facet_tags=facet_tags)
+    bcs_new = build_psi_dirichlet_bcs(V, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
+
+    for bc_old, bc_new in zip(bcs_old, bcs_new, strict=True):
+        assert _bc_value(bc_new) == pytest.approx(_bc_value(bc_old), rel=0.0, abs=1e-14)
+        assert np.array_equal(_bc_dofs(bc_new), _bc_dofs(bc_old))
+
+
+def test_build_dd_dirichlet_bcs_matches_legacy_at_bias_step():
+    from semi.physics.drift_diffusion import make_dd_block_spaces
+
+    cfg = _pn_1d_cfg()
+    ref_mat = get_material("Si")
+    sc = make_scaling_from_config(cfg, ref_mat)
+    msh, _cell_tags, facet_tags = build_mesh(cfg)
+    spaces = make_dd_block_spaces(msh)
+    N_raw_fn = build_profile(cfg["doping"])
+
+    # Mid-ramp bias step: cathode held at 0, anode pushed to +0.25 V via the
+    # voltages override (the same code path the bias-sweep driver uses).
+    voltages = {"anode": 0.25, "cathode": 0.0}
+
+    bcs_old = _legacy_build_dd_ohmic_bcs(
+        cfg, spaces, msh, facet_tags, sc, ref_mat, N_raw_fn, voltages,
+    )
+    contacts = resolve_contacts(cfg, facet_tags=facet_tags, voltages=voltages)
+    bcs_new = build_dd_dirichlet_bcs(
+        spaces, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn,
+    )
+
+    # Each ohmic contact contributes three Dirichlet entries
+    # (psi, phi_n, phi_p), so two contacts -> six BCs total.
+    assert len(bcs_old) == len(bcs_new) == 6
+    for bc_old, bc_new in zip(bcs_old, bcs_new, strict=True):
+        assert _bc_value(bc_new) == pytest.approx(_bc_value(bc_old), rel=0.0, abs=1e-14)
+        assert np.array_equal(_bc_dofs(bc_new), _bc_dofs(bc_old))

@@ -30,19 +30,22 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `dev/day4-vnv` (Day 4 V&V suite complete, PR pending)
+- Active dev branch: `dev/day5-refactor` (Day 5 refactor pass complete, PR pending)
 
 ## Current state
 
-Day 1, Day 2, Day 3, and Day 4 are delivered. Day 1-3 are merged into
-`main`. CI hardening (branch glob plus Dockerized FEM job) merged on
-`ci/docker-benchmark-matrix`. Day 3 (adaptive bias continuation,
-Sah-Noyce-Shockley verifier, reverse-bias generation check) merged via
-PR #5 from `dev/day3-bias-hardening`. Day 4 (Verification & Validation
-suite: MMS-Poisson, mesh convergence, discrete conservation, MMS for
-coupled drift-diffusion, CI integration, documentation) is complete on
-`dev/day4-vnv` and awaiting PR. The original Day-4 refactor pass is
-pushed to Day 5.
+Day 1 through Day 4 are merged into `main`. CI hardening (branch glob
+plus Dockerized FEM job) merged on `ci/docker-benchmark-matrix`.
+Day 3 (adaptive bias continuation, Sah-Noyce-Shockley verifier,
+reverse-bias generation check) merged via PR #5 from
+`dev/day3-bias-hardening`. Day 4 (Verification & Validation suite:
+MMS-Poisson, mesh convergence, discrete conservation, MMS for coupled
+drift-diffusion, CI integration, documentation) merged via PR #6 from
+`dev/day4-vnv`. Day 5 (refactor pass: `semi/bcs.py` extraction,
+`semi/run.py` split into a 74-line dispatcher plus `runners/` and
+`postprocess.py`, coverage to 96.25% with a 95% CI gate, completed
+`docs/PHYSICS.md` Section 2.5, ADR 0007) is complete on
+`dev/day5-refactor` and awaiting PR.
 
 ### What works (verified in Docker on current `main`)
 
@@ -90,7 +93,6 @@ pushed to Day 5.
 
 ### What does not work / not yet built
 
-- Refactor of `semi/run.py` and BC construction (Day 5).
 - 2D MOS capacitor benchmark (Day 6).
 - 3D doped resistor benchmark (Day 7).
 - Gmsh `.msh` mesh loader (stubbed, raises `NotImplementedError`).
@@ -100,30 +102,35 @@ pushed to Day 5.
 
 ## Next task
 
-**Day 5: Refactor pass, expanded coverage, docs update.** Ready to
-start once Day 4 merges.
+**Day 5: Refactor pass, expanded coverage, docs update.** In flight
+on `dev/day5-refactor`.
 
-- **Branch:** to be cut from `main` after `dev/day4-vnv` merges.
+- **Branch:** `dev/day5-refactor` cut from `main` at SHA 906ea99.
 - **Goal:** pay down accumulated technical debt before moving to 2D/3D
-  (Days 6-7). Break `semi/run.py` into `run_equilibrium` and
-  `run_bias_sweep` functions behind a thin `run(cfg)` dispatcher;
-  factor BC construction into `semi/bcs.py` so ohmic, gate, and
-  future Schottky contacts share a common interface.
+  (Days 6-7). Break `semi/run.py` (580 lines) into `run_equilibrium`
+  and `run_bias_sweep` functions behind a thin `run(cfg)` dispatcher;
+  factor BC construction into `semi/bcs.py` so ohmic, gate, and future
+  Schottky contacts share a common interface.
 - **Scope, in:**
-  - `semi/run.py` split with no behavioral change to `pn_1d`,
-    `pn_1d_bias`, `pn_1d_bias_reverse`.
-  - `semi/bcs.py` extraction from `_build_ohmic_bcs` and bias-contact
-    plumbing.
-  - Pure-Python coverage target: 95%+ per `pytest --cov=semi`.
-  - `docs/PHYSICS.md` scaled drift-diffusion derivation completed
-    (Section 2.5 is still a placeholder).
+  - `semi/bcs.py` extraction from `_build_ohmic_bcs_psi` and
+    `_build_dd_ohmic_bcs`, with a pure-data `ContactBC` dataclass and
+    a `resolve_contacts` resolver that does not touch dolfinx.
+  - `semi/run.py` split into a thin dispatcher plus `runners/` (or
+    flat `run_equilibrium.py` / `run_bias_sweep.py`) and a
+    `postprocess.py` for current evaluation and IV recording. No
+    behavioral change to `pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`.
+  - Coverage target: 95%+ per `pytest --cov=semi`, enforced in CI via
+    `--cov-fail-under=95`.
+  - `docs/PHYSICS.md` Section 2.5 scaled drift-diffusion derivation
+    completed (currently a placeholder).
   - Any ADR the refactor requires (ADR 0007 is free).
 - **Scope, out:**
   - 2D MOS capacitor (Day 6) and 3D resistor (Day 7).
   - Field-dependent mobility, Auger, Fermi-Dirac (Non-goals).
-- **Preconditions:** Day 4 V&V suite merged into `main`.
+- **Preconditions:** Day 4 V&V suite merged into `main` (done, PR #6).
 - **Hard invariants for this PR:** see "Invariants" below; Day-4 V&V
-  gates must stay green through the refactor.
+  gates must stay green through the refactor. `semi/bcs.py` joins the
+  pure-Python core tier and must not import dolfinx at module scope.
 
 ## Roadmap
 
@@ -133,7 +140,7 @@ start once Day 4 merges.
 | 2   | Slotboom drift-diffusion, coupled Newton, bias sweep         | Done       | 6/6 `pn_1d_bias` checks pass; PR `dev/day2-drift-diffusion`           |
 | 3   | Bias ramping continuation, Shockley IV verifier hardening    | Done       | Adaptive ramp (-26.2% iters), SNS verifier, reverse-bias gen check    |
 | 4   | Verification & Validation suite (MMS, conv, conservation)    | Done       | `dev/day4-vnv`; all four phases green, CI V&V step within 15 min      |
-| 5   | Refactor pass, expanded test coverage, physics docs updates  | Queued     | Ruff-clean, coverage target, ADR review (was Day 4)                   |
+| 5   | Refactor pass, expanded test coverage, physics docs updates  | Done       | `dev/day5-refactor`; run.py 580->74, bcs.py extracted, coverage 96.25% |
 | 6   | 2D MOS capacitor (oxide + silicon multi-region)              | Planned    | Uses submesh for carriers; verify C-V curve (was Day 5)               |
 | 7   | 3D doped resistor                                            | Planned    | Framework extension; verify Ohmic V-I linearity (was Day 6)           |
 | 8   | Final polish, submission packaging                           | Planned    | Regenerate notebooks, tag release (was Day 7)                         |
@@ -155,9 +162,10 @@ under `docs/adr/`.
    therefore `L_D^2 * eps_r`, not `lambda2 * eps_r`. See `docs/PHYSICS.md`
    and ADR 0002.
 4. **Pure-Python core must not depend on dolfinx.** The modules
-   `constants`, `materials`, `scaling`, `doping`, `schema` must import
-   without dolfinx so CI and users can run them standalone. See
-   `docs/ARCHITECTURE.md`.
+   `constants`, `materials`, `scaling`, `doping`, `schema`,
+   `continuation`, `diode_analytical`, and `bcs` must import without
+   dolfinx so CI and users can run them standalone. See
+   `docs/ARCHITECTURE.md` and ADR 0007.
 5. **Target dolfinx 0.10 API only.** Use `dolfinx.fem.petsc.NonlinearProblem`
    with `petsc_options_prefix`. The `dolfinx.nls.petsc.NewtonSolver` class
    is deprecated and must not be introduced. See
@@ -196,6 +204,37 @@ They may be added after submission as stretch goals (see
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **Day 5 (2026-04-21):** Refactor pass, coverage to 95%+, completed
+  `docs/PHYSICS.md` Section 2.5. On `dev/day5-refactor`:
+  - **`semi/bcs.py`** extracted (pure-Python core, no dolfinx at
+    module scope). Public API: `ContactBC` dataclass,
+    `resolve_contacts(cfg, facet_tags=None, voltages=None)`,
+    `build_psi_dirichlet_bcs`, `build_dd_dirichlet_bcs`. Bias-sweep
+    drivers pass `voltages={name: V_step}` rather than mutating
+    config. Validated against an embedded byte-for-byte copy of the
+    legacy inline implementation in `tests/fem/test_bcs.py`. Design
+    rationale: ADR 0007.
+  - **`semi/run.py` split** from 580 lines to a 74-line dispatcher.
+    Solver paths moved to `semi/runners/{equilibrium,bias_sweep}.py`;
+    facet/current/IV helpers moved to `semi/postprocess.py`. No module
+    in `semi/` exceeds 300 lines (max is `bias_sweep.py` at 294).
+    `SimulationResult` and `run(cfg)` stay in `semi.run`;
+    `run_equilibrium`, `run_bias_sweep`, `_fmt_tag`, `_resolve_sweep`
+    remain importable from `semi.run` via a `__getattr__` shim.
+  - **Coverage to 96.25%** across 1598 statements (60 missed). 38 new
+    tests across pure-Python and FEM matrices; total 177/177 pass.
+    CI `docker-fem` adds `pytest --cov=semi --cov-fail-under=95`.
+    `pyproject.toml` excludes pragma markers, gmsh
+    `NotImplementedError`, `__main__` guards, and TYPE_CHECKING; the
+    V&V CLI driver functions are `# pragma: no cover` because they
+    are exercised end-to-end by `scripts/run_verification.py all`.
+  - **`docs/PHYSICS.md` Section 2.5** completed with the full scaled
+    drift-diffusion derivation. ADR 0007 records the BC interface
+    design.
+  - **No behavioral regression.** `pn_1d`, `pn_1d_bias`,
+    `pn_1d_bias_reverse` byte-identical to Day 4 baseline; V&V 53
+    PASS / 0 FAIL with rates byte-identical. PR: `dev/day5-refactor`.
 
 - **Day 4 (2026-04-21):** Verification & Validation suite. Replaces
   the originally-planned refactor (pushed to Day 5) with four

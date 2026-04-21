@@ -56,6 +56,27 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short"
 
+[tool.coverage.run]
+source = ["semi"]
+branch = false
+
+[tool.coverage.report]
+# Exclude pragmas, defensive runtime checks, CLI driver scaffolding, and
+# the not-yet-implemented gmsh stub. CLI driver functions
+# (`run_cli_study`, `report_table`, `write_artifacts`, etc.) are
+# end-to-end exercised in the docker-fem CI step via
+# `scripts/run_verification.py all`; they are deliberately excluded
+# from pytest coverage to keep the threshold honest about what unit
+# tests verify versus what CI integration verifies.
+exclude_also = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING",
+]
+show_missing = true
+precision = 1
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"

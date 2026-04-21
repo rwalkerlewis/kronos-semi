@@ -68,3 +68,4 @@ Template and background: <https://github.com/joelparkerhenderson/architecture-de
 - [0004 Slotboom variables for drift-diffusion](0004-slotboom-variables-for-dd.md)
 - [0005 Docker for dev, conda and FEM-on-Colab for users](0005-docker-for-dev-conda-fem-on-colab-for-users.md)
 - [0006 Verification & Validation strategy](0006-verification-and-validation-strategy.md)
+- [0007 Contact BC interface and `semi/bcs.py` layer](0007-contact-bc-interface.md)

@@ -1,5 +1,83 @@
 # Changelog
 
+## [0.5.0] - Day 5
+
+### Added
+- `semi/bcs.py`: pure-Python boundary-condition module (joins the
+  pure-Python core tier per Invariant 4). Public API:
+  - `ContactBC` dataclass holding (name, kind, facet_tag, V_applied,
+    work_function) for one resolved contact.
+  - `resolve_contacts(cfg, facet_tags=None, voltages=None)` walks the
+    JSON config, validates kinds, resolves string facet refs via
+    `mesh.facets_by_plane`, applies an optional voltages override (the
+    bias-sweep code path), and optionally asserts the tag has facets.
+  - `build_psi_dirichlet_bcs(...)` for the equilibrium Poisson row.
+  - `build_dd_dirichlet_bcs(...)` for the coupled (psi, phi_n, phi_p)
+    block.
+- `semi/runners/` package (`equilibrium.py`, `bias_sweep.py`,
+  `_common.py`) and `semi/postprocess.py` (terminal-current evaluation,
+  IV recording, facet metadata helpers). `semi/run.py` is now a 74-line
+  thin dispatcher; `bias_sweep.py` is 294 lines; no module in `semi/`
+  exceeds 300 lines (was 580 in `run.py`).
+- `tests/test_bcs.py` (11 pure-Python tests),
+  `tests/fem/test_bcs.py` (3 FEM tests comparing the extracted
+  builders byte-for-byte against an embedded copy of the legacy
+  inline implementation),
+  `tests/fem/test_mesh.py` (7 direct unit tests for `build_mesh`),
+  `tests/fem/test_solver.py` (3 SNES-wrapper tests on linear Poisson
+  and a synthetic 2-block problem),
+  `tests/fem/test_recombination_ufl.py` (2 tests of the UFL
+  `srh_rate` helper),
+  `tests/test_convergence_helpers.py` (14 pure-Python tests for
+  `_convergence` CSV/plot/table helpers, previously at 0% coverage),
+  `tests/test_run_shim.py` (5 pure-Python tests for the
+  `semi.run` dispatcher and backward-compat `__getattr__` shim),
+  plus 7 new pure-Python tests in `tests/test_scaling.py` and
+  `tests/test_doping.py`.
+- ADR 0007 `docs/adr/0007-contact-bc-interface.md` records the BC
+  interface design (dataclass over dict, voltages override over
+  config mutation, insulating-skip semantics, optional facet-tag
+  verification).
+- `docs/PHYSICS.md` Section 2.5 completed (was a Day-2 placeholder):
+  full scaled-DD derivation showing the L_0^2 coefficient on the
+  continuity rows, scaled SRH kernel, residual-sign block summary,
+  and J_0 numerical reality check. Section 3.1 BC reference
+  redirects from the now-removed inline helpers in `run.py` to
+  `semi.bcs`.
+
+### Changed
+- `semi/run.py` reduced from 580 lines (Day 4) to 74 (Day 5).
+  `SimulationResult` and `run(cfg)` stay here; everything else moved
+  to `runners/` and `postprocess.py`.
+- `semi/run.py` exposes `run_equilibrium`, `run_bias_sweep`,
+  `_fmt_tag`, and `_resolve_sweep` via a `__getattr__` shim so the
+  V&V suite and existing pure-Python tests keep working unchanged.
+- `pyproject.toml` adds `[tool.coverage.run]` / `[tool.coverage.report]`
+  with `pragma: no cover`, `raise NotImplementedError`,
+  `if __name__ == "__main__":`, and `if TYPE_CHECKING` exclusions.
+- `to_table_rows`, `report_table`, `write_artifacts`, `run_cli_study`
+  in the verification modules and `run_bias_sweep_with_continuity`
+  in `semi/verification/conservation.py` are marked
+  `# pragma: no cover`: they exist only to drive the end-to-end V&V
+  CLI (`scripts/run_verification.py all`) which the docker-fem CI
+  step exercises on every push.
+- CI `docker-fem` job adds a coverage step that fails the build if
+  `pytest --cov=semi --cov-fail-under=95` drops below 95%.
+
+### Verified
+- `pytest`: 177 / 177 pass (139 prior + 38 new).
+- `docker compose run --rm benchmark pn_1d`: V_bi 0.8334 V, peak |E|
+  104.84 kV/cm (byte-identical to Day 4 baseline).
+- `docker compose run --rm benchmark pn_1d_bias`: J(V=0.6) 1.635e+03
+  A/m^2, J_total continuity 1.91% at V=0.6 (byte-identical).
+- `docker compose run --rm benchmark pn_1d_bias_reverse`: |J| / SRH-gen
+  worst 16.6% at V=-0.55 V (byte-identical).
+- `python scripts/run_verification.py all`: 53 PASS / 0 FAIL,
+  finest-pair MMS rates byte-identical to Day 4 baseline (no rate
+  moved by more than 0.000).
+- Coverage: 96.25% across 1598 statements, 60 missed; gate at
+  `--cov-fail-under=95`.
+
 ## [0.4.0] - Day 4
 
 ### Added

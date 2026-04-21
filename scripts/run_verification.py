@@ -109,7 +109,7 @@ def cmd_mesh_convergence(args) -> int:
         )
         print(
             f"[{'PASS' if strictly_decreasing else 'FAIL'}] {label} monotone "
-            f"on N={CLI_NS[:4]}: {['%.3e' % e for e in errs]}"
+            f"on N={CLI_NS[:4]}: {[f'{e:.3e}' for e in errs]}"
         )
         return strictly_decreasing
 
@@ -121,7 +121,7 @@ def cmd_mesh_convergence(args) -> int:
         print(
             f"[{'PASS' if passing else 'FAIL'}] {label} Cauchy rate >= "
             f"{floor:.1f}x per doubling on N={CLI_NS[1:4]}: "
-            f"ratios={['%.2f' % r for r in ratios]}"
+            f"ratios={[f'{r:.2f}' for r in ratios]}"
         )
         return bool(passing)
 
