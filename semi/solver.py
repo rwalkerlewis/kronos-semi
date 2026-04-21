@@ -74,3 +74,66 @@ def solve_nonlinear(F, u, bcs: list, prefix: str,
         "converged": bool(converged),
         "problem": problem,  # kept so caller can inspect further
     }
+
+
+def solve_nonlinear_block(
+    F_list,
+    u_list,
+    bcs: list,
+    prefix: str,
+    petsc_options: dict[str, Any] | None = None,
+    kind: str | None = None,
+):
+    """
+    Solve a coupled block nonlinear problem via SNES.
+
+    Wraps dolfinx 0.10's `NonlinearProblem` with its blocked-mode
+    signature (F and u passed as sequences, plus optional `kind`).
+    Dirichlet BCs are passed as a single flat list; each BC is tied to
+    the subspace it was built against.
+
+    Parameters
+    ----------
+    F_list : sequence of ufl.Form
+        One residual form per block (for example [F_psi, F_phi_n, F_phi_p]).
+    u_list : sequence of dolfinx.fem.Function
+        Unknown Functions for each block (updated in place on return).
+    bcs : list of dolfinx.fem.DirichletBC
+        Flat list of Dirichlet BCs.
+    prefix : str
+        PETSc options prefix (must end with `_`).
+    petsc_options : dict, optional
+        Override DEFAULT_PETSC_OPTIONS.
+    kind : str, optional
+        PETSc matrix/vector kind. `None` for monolithic blocked (default,
+        works with the MUMPS LU solver). Use `"nest"` if you supply a
+        fieldsplit preconditioner.
+
+    Returns
+    -------
+    dict
+        Same keys as :func:`solve_nonlinear`.
+    """
+    from dolfinx.fem.petsc import NonlinearProblem
+
+    opts = dict(DEFAULT_PETSC_OPTIONS)
+    if petsc_options:
+        opts.update(petsc_options)
+
+    problem = NonlinearProblem(
+        list(F_list), list(u_list),
+        bcs=list(bcs),
+        petsc_options_prefix=prefix,
+        petsc_options=opts,
+        kind=kind,
+    )
+    problem.solve()
+    reason = problem.solver.getConvergedReason()
+    n_iter = problem.solver.getIterationNumber()
+    converged = reason > 0
+    return {
+        "iterations": int(n_iter),
+        "reason": int(reason),
+        "converged": bool(converged),
+        "problem": problem,
+    }
