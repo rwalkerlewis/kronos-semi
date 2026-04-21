@@ -49,7 +49,13 @@
   },
   "solver": {
     "type": "bias_sweep",
-    "continuation": {"min_step": 1.0e-4, "max_halvings": 6}
+    "continuation": {
+      "min_step": 1.0e-4,
+      "max_halvings": 6,
+      "max_step": 0.2,
+      "easy_iter_threshold": 4,
+      "grow_factor": 2.0
+    }
   },
   "output": {
     "directory": "./results/pn_1d_bias",
