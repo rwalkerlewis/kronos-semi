@@ -34,10 +34,8 @@ from pathlib import Path
 import numpy as np
 
 from .mms_poisson import (
-    C_0_REF,
     EPS_R_DEFAULT,
     L_0_REF,
-    T_REF,
     _all_boundary_facets,
     _build_mesh,
     build_mms_scaling,
@@ -270,7 +268,6 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
     factor is `sin(k*pi*x/L)` with `k` a positive integer and so vanishes
     on the boundary; see derivation Section 4).
     """
-    import ufl
     from dolfinx import fem
     from petsc4py import PETSc
 

@@ -27,7 +27,6 @@ from semi.verification.conservation import (
     current_continuity_metric,
 )
 
-
 # ---------------------------------------------------------------------------
 # current_continuity_metric
 # ---------------------------------------------------------------------------

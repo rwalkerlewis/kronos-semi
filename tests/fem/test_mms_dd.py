@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import math
 
-
 PYTEST_NS_1D = [40, 80, 160]
 PYTEST_NS_2D = [16, 32, 64]
 
