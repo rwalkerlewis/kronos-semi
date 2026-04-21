@@ -6,10 +6,11 @@ Sister script to `scripts/run_benchmark.py`. Each subcommand runs one
 verification activity, writes CSV+PNG artifacts under `results/`, and
 exits 0 on success.
 
-Subcommands (Phase 1 implements `mms_poisson` and `all`):
+Subcommands (Phases 1 and 2 implement `mms_poisson`, `mesh_convergence`,
+and `all`):
 
     python scripts/run_verification.py mms_poisson
-    python scripts/run_verification.py mesh_convergence    # Phase 2 (placeholder)
+    python scripts/run_verification.py mesh_convergence
     python scripts/run_verification.py conservation        # Phase 3 (placeholder)
     python scripts/run_verification.py mms_dd              # Phase 4 (placeholder)
     python scripts/run_verification.py all
@@ -68,9 +69,229 @@ def cmd_mms_poisson(args) -> int:
     return 0 if all_ok else 5
 
 
+def cmd_mesh_convergence(args) -> int:
+    """Run the pn_1d mesh-convergence sweep and gate monotone error reduction."""
+    from semi.verification.mesh_convergence import (
+        CLI_NS,
+        report_table,
+        run_cli_study,
+    )
+
+    out_dir = Path(args.out) if args.out else RESULTS_DIR / "mesh_convergence"
+    print(f"[run_verification] mesh_convergence -> {out_dir.relative_to(REPO_ROOT)}")
+    print(f"[run_verification] sweeping N = {CLI_NS}")
+    rows = run_cli_study(out_dir)
+
+    print()
+    print(report_table(rows, header="=== mesh_convergence pn_1d ==="))
+    print()
+    print("Honest flag: the depletion approximation is a model, not the")
+    print("truth. The FEM solver converges to the full Poisson-Boltzmann")
+    print("solution, so relative errors against the depletion references")
+    print("plateau on fine meshes at the physics-model gap, not at zero.")
+    print("See semi/verification/mesh_convergence.py docstring.")
+
+    # Acceptance gates.
+    # V_bi is set exactly by the Ohmic BCs and is mesh-independent to
+    # machine epsilon (not a meaningful convergence indicator), so it is
+    # reported only, not gated. E_peak and W against the depletion
+    # approximation are gated for strict monotone reduction over the
+    # first four refinements (before the physics-model plateau). The
+    # Cauchy self-convergence ratio is gated at >= 1.8x per doubling on
+    # the same range, which isolates FEM discretization error from the
+    # plateau and is the mathematically meaningful convergence rate.
+    ok = True
+
+    def _monotone(key, label):
+        errs = [r[key] for r in rows[:4]]
+        strictly_decreasing = all(
+            errs[i + 1] < errs[i] for i in range(len(errs) - 1)
+        )
+        print(
+            f"[{'PASS' if strictly_decreasing else 'FAIL'}] {label} monotone "
+            f"on N={CLI_NS[:4]}: {['%.3e' % e for e in errs]}"
+        )
+        return strictly_decreasing
+
+    def _cauchy_rate(key, label, floor=1.8):
+        ratios = [r[key + "_ratio"] for r in rows[1:4]]
+        finite = [r for r in ratios if r == r and r > 0.0]
+        worst = min(finite) if finite else float("nan")
+        passing = finite and worst >= floor
+        print(
+            f"[{'PASS' if passing else 'FAIL'}] {label} Cauchy rate >= "
+            f"{floor:.1f}x per doubling on N={CLI_NS[1:4]}: "
+            f"ratios={['%.2f' % r for r in ratios]}"
+        )
+        return bool(passing)
+
+    print(
+        f"[info] V_bi err vs depletion at finest N={CLI_NS[-1]}: "
+        f"{rows[-1]['err_Vbi_rel']:.2e} (set exactly by BCs, informational only)"
+    )
+    ok = _monotone("err_Epeak_rel", "E_peak err vs depletion") and ok
+    ok = _monotone("err_W_rel", "W err vs depletion") and ok
+    ok = _cauchy_rate("err_Epeak_cauchy", "E_peak") and ok
+    ok = _cauchy_rate("err_W_cauchy", "W") and ok
+
+    finest = rows[-1]
+    print(
+        f"[info] finest level N={finest['N']}: "
+        f"solve_time = {finest['solve_time_s']:.3f} s, "
+        f"newton_iters = {finest['newton_iters']}"
+    )
+    return 0 if ok else 6
+
+
+def cmd_conservation(args) -> int:
+    """
+    Phase 3: run conservation checks at specific bias points.
+
+    Two benchmarks drive the report:
+
+      - `pn_1d` equilibrium: integrate rho(x) and assert
+        |Q_net| < 1e-10 * q * max|N_net| * L_device.
+      - `pn_1d_bias` forward (targets 0.3, 0.45, 0.6 V) and
+        `pn_1d_bias_reverse` (targets -0.5, -1.0, -2.0 V): at each
+        target sample J_total at 10 interior facets and assert
+        max |J - mean| / |mean| < 5% (forward) or 15% (reverse).
+
+    The forward and reverse studies each run a single bias sweep (not
+    one per target) with a `post_step_hook` that records the interior
+    continuity samples on every converged bias, then the report reads
+    back the rows at the target biases. That keeps runtime close to
+    the production benchmark path.
+    """
+    import time
+
+    from semi import run as semi_run
+    from semi import schema
+    from semi.verification.conservation import (
+        charge_conservation_from_result,
+        run_bias_sweep_with_continuity,
+    )
+
+    out_dir = Path(args.out) if args.out else RESULTS_DIR / "conservation"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[run_verification] conservation -> {out_dir.relative_to(REPO_ROOT)}")
+
+    all_ok = True
+
+    # ---- Charge conservation on pn_1d equilibrium ----
+    pn_1d_cfg = REPO_ROOT / "benchmarks" / "pn_1d" / "pn_junction.json"
+    cfg = schema.load(pn_1d_cfg)
+    t0 = time.perf_counter()
+    result = semi_run.run(cfg)
+    dt_eq = time.perf_counter() - t0
+    Q = charge_conservation_from_result(result)
+    print()
+    print("=== charge conservation (pn_1d equilibrium) ===")
+    print(f"  Q_net     = {Q.Q_net:.3e}  C/m^2")
+    print(f"  Q_ref     = {Q.Q_ref:.3e}  C/m^2   (= q * max|N_net| * L)")
+    print(f"  threshold = {Q.Q_ref * 1.0e-10:.3e}  C/m^2   (1e-10 * Q_ref)")
+    print(f"  rel       = {Q.rel_error:.3e}")
+    print(f"  solve_time= {dt_eq:.3f} s")
+    q_ok = Q.rel_error < 1.0e-10
+    print(f"  [{'PASS' if q_ok else 'FAIL'}] |Q_net| < 1e-10 * Q_ref")
+    all_ok = all_ok and q_ok
+
+    # ---- Current continuity: forward sweep ----
+    print()
+    print("=== current continuity: pn_1d_bias (forward, tol 5%) ===")
+    fwd_cfg_path = REPO_ROOT / "benchmarks" / "pn_1d_bias" / "pn_junction_bias.json"
+    fwd_cfg = schema.load(fwd_cfg_path)
+    t0 = time.perf_counter()
+    fwd_result = run_bias_sweep_with_continuity(fwd_cfg, n_samples=10)
+    dt_fwd = time.perf_counter() - t0
+    fwd_targets = [0.30, 0.45, 0.60]
+    fwd_ok = _report_continuity_table(fwd_result.iv, fwd_targets, tol=0.05)
+    print(f"  sweep_time = {dt_fwd:.3f} s")
+    all_ok = all_ok and fwd_ok
+
+    # ---- Current continuity: reverse sweep ----
+    print()
+    print("=== current continuity: pn_1d_bias_reverse (tol 15%) ===")
+    rev_cfg_path = (
+        REPO_ROOT / "benchmarks" / "pn_1d_bias_reverse" / "pn_junction_bias_reverse.json"
+    )
+    rev_cfg = schema.load(rev_cfg_path)
+    t0 = time.perf_counter()
+    rev_result = run_bias_sweep_with_continuity(rev_cfg, n_samples=10)
+    dt_rev = time.perf_counter() - t0
+    rev_targets = [-0.50, -1.00, -2.00]
+    rev_ok = _report_continuity_table(rev_result.iv, rev_targets, tol=0.15)
+    print(f"  sweep_time = {dt_rev:.3f} s")
+    all_ok = all_ok and rev_ok
+
+    # ---- CSV artifact ----
+    import csv
+    csv_path = out_dir / "conservation.csv"
+    with csv_path.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["benchmark", "V", "mean_J", "max_abs_dev", "max_rel_dev",
+                    "n_pts", "pass", "tol"])
+        for V in fwd_targets:
+            row = _closest_iv_row(fwd_result.iv, V)
+            w.writerow([
+                "pn_1d_bias", row.get("V", ""), row.get("continuity_mean_J", ""),
+                row.get("continuity_max_dev", ""), row.get("continuity_max_rel", ""),
+                row.get("continuity_n_pts", ""),
+                bool(row.get("continuity_max_rel", float("inf")) < 0.05), 0.05,
+            ])
+        for V in rev_targets:
+            row = _closest_iv_row(rev_result.iv, V)
+            w.writerow([
+                "pn_1d_bias_reverse", row.get("V", ""), row.get("continuity_mean_J", ""),
+                row.get("continuity_max_dev", ""), row.get("continuity_max_rel", ""),
+                row.get("continuity_n_pts", ""),
+                bool(row.get("continuity_max_rel", float("inf")) < 0.15), 0.15,
+            ])
+        w.writerow(["pn_1d_equilibrium_charge",
+                    "", Q.Q_net, "", Q.rel_error, "",
+                    Q.rel_error < 1.0e-10, 1.0e-10])
+    print()
+    print(f"[run_verification] wrote {csv_path.relative_to(REPO_ROOT)}")
+    print(f"[run_verification] total runtime: "
+          f"{dt_eq + dt_fwd + dt_rev:.1f} s "
+          f"(eq {dt_eq:.1f}s, fwd {dt_fwd:.1f}s, rev {dt_rev:.1f}s)")
+    return 0 if all_ok else 7
+
+
+def _closest_iv_row(iv_rows, V_target):
+    """Return the iv_row whose V is closest to V_target."""
+    if not iv_rows:
+        return {}
+    return min(iv_rows, key=lambda r: abs(float(r.get("V", 0.0)) - V_target))
+
+
+def _report_continuity_table(iv_rows, targets, *, tol):
+    """Print a pass/fail table at `targets` and return overall pass/fail."""
+    print(f"  {'V':>8}  {'mean_J [A/m^2]':>16}  {'max_dev [A/m^2]':>16}  "
+          f"{'max_rel':>10}  {'pts':>4}  result")
+    all_pass = True
+    for V in targets:
+        row = _closest_iv_row(iv_rows, V)
+        if not row or "continuity_max_rel" not in row:
+            print(f"  {V:>8.3f}  {'(no row)':>16}")
+            all_pass = False
+            continue
+        rel = float(row["continuity_max_rel"])
+        passed = rel < tol
+        all_pass = all_pass and passed
+        marker = "PASS" if passed else "FAIL"
+        print(
+            f"  {float(row['V']):>8.3f}  "
+            f"{float(row['continuity_mean_J']):>16.3e}  "
+            f"{float(row['continuity_max_dev']):>16.3e}  "
+            f"{rel*100:>9.2f}%  "
+            f"{int(row['continuity_n_pts']):>4d}  [{marker}]"
+        )
+    return all_pass
+
+
 def cmd_not_implemented(name: str):
     def _run(_args) -> int:
-        print(f"[run_verification] {name}: not implemented yet (Phase 2/3/4)")
+        print(f"[run_verification] {name}: not implemented yet (Phase 4)")
         return 0
     return _run
 
@@ -80,7 +301,13 @@ def cmd_all(args) -> int:
     rc = cmd_mms_poisson(args)
     if rc != 0:
         return rc
-    # Future: chain mesh_convergence, conservation, mms_dd here.
+    rc = cmd_mesh_convergence(args)
+    if rc != 0:
+        return rc
+    rc = cmd_conservation(args)
+    if rc != 0:
+        return rc
+    # Future: chain mms_dd here.
     return 0
 
 
@@ -101,9 +328,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.study == "mms_poisson":
         return cmd_mms_poisson(args)
     if args.study == "mesh_convergence":
-        return cmd_not_implemented("mesh_convergence")(args)
+        return cmd_mesh_convergence(args)
     if args.study == "conservation":
-        return cmd_not_implemented("conservation")(args)
+        return cmd_conservation(args)
     if args.study == "mms_dd":
         return cmd_not_implemented("mms_dd")(args)
     if args.study == "all":
