@@ -61,8 +61,8 @@ phi_p_e(x,y) = A_p   * sin(  pi * x/L) * sin(  pi * y/L)
 
 ```
 A_psi = 0.5     # potential swing ~ 13 mV at 300 K; keeps exp(+/-psi) ~ [0.6, 1.7]
-A_n   = 0.3     # quasi-Fermi swing
-A_p   = 0.3
+A_n   =  0.3    # electron quasi-Fermi swing
+A_p   = -0.3    # hole quasi-Fermi swing, sign-flipped vs A_n
 ```
 
 Rationale:
@@ -73,19 +73,30 @@ Rationale:
   cancellation in the combination `psi - phi_n` that appears in the
   Slotboom exponent; the two continuity blocks therefore exercise
   genuinely different gradients.
+- `A_p = -A_n` (equivalently, phi_p_e and phi_n_e share a spatial
+  profile but opposite sign) is required for Variant C to be a
+  meaningful test of the SRH code path. With `A_p = +A_n` the
+  difference `phi_p_e - phi_n_e` would vanish pointwise and the SRH
+  numerator `ni_hat^2 * (exp(phi_p_e - phi_n_e) - 1)` would be
+  identically zero, collapsing Variant C onto Variant B. The sign
+  flip also matches physical convention: under forward bias the two
+  quasi-Fermi levels split in opposite directions from equilibrium.
+  Section 7.4's worst-case analysis (`phi_p_e - phi_n_e \in [-0.6, 0.6]`)
+  is already correct for this sign choice.
 - The 2D form uses two different wavenumbers on x and y for psi
   (2*pi, 3*pi) following the existing Poisson MMS convention
   (`semi/verification/mms_poisson.py:143-164`), which guarantees the
   discretization sees a 2D function and not a tensor product of 1D
   modes hit by one axis alone.
-- Amplitudes keep `|psi_e - phi_n_e|, |phi_p_e - psi_e| <= A_psi + A_n
-  = 0.8`, so `exp(...)` stays in `[exp(-0.8), exp(0.8)] ≈ [0.45, 2.23]`.
-  Newton is well-conditioned in this range and R_hat is neither
-  machine-zero (near-equilibrium) nor catastrophically cancelling.
+- Amplitudes keep `|psi_e - phi_n_e| <= A_psi + |A_n| = 0.8` and
+  `|phi_p_e - psi_e| <= A_psi + |A_p| = 0.8`, so `exp(...)` stays in
+  `[exp(-0.8), exp(0.8)] ≈ [0.45, 2.23]`. Newton is well-conditioned
+  in this range and R_hat is neither machine-zero (near-equilibrium)
+  nor catastrophically cancelling.
 
-A second `nonlinear` amplitude set `(A_psi, A_n, A_p) = (1.0, 0.5, 0.5)`
+A second `nonlinear` amplitude set `(A_psi, A_n, A_p) = (1.0, 0.5, -0.5)`
 is reserved for the CLI sweep only (Section 6). The pytest gate runs the
-default amplitudes.
+default amplitudes. The `A_p = -A_n` sign convention carries over.
 
 ## 2. Scaling reference values (consistency with Phase 1)
 
@@ -351,9 +362,9 @@ three things go wrong:
    but the residual norms span 5+ orders of magnitude between blocks.
 
 Mitigation:
-- Pytest gate holds `(A_psi, A_n, A_p) = (0.5, 0.3, 0.3)`, keeping
+- Pytest gate holds `(A_psi, A_n, A_p) = (0.5, 0.3, -0.3)`, keeping
   `exp(...) \in [0.45, 2.23]`.
-- CLI nonlinear variant `(1.0, 0.5, 0.5)` still keeps arguments
+- CLI nonlinear variant `(1.0, 0.5, -0.5)` still keeps arguments
   bounded by 1.5, `exp \in [0.22, 4.48]`, comfortably inside PETSc
   double precision. We do not add an `A_psi = 2` case here;
   the Poisson MMS already covers that stress regime for the scalar
@@ -389,7 +400,7 @@ in scaled units h/L is the relevant factor so Pe ~ pi*0.3*0.025 ~ 0.024
 degradation.
 
 Mitigation / monitoring:
-- Keep A_n, A_p <= 0.5 in all gated runs.
+- Keep `|A_n|, |A_p| <= 0.5` in all gated runs.
 - If a future tightening to large `A_n` surfaces a rate floor at
   ~1.5 in the continuity blocks, document it here as the expected
   Galerkin signature rather than a bug, and consider SUPG or
@@ -406,8 +417,9 @@ This is the same tolerance rationale as the Poisson MMS; we reuse it.
 ### 7.4 R_e near-equilibrium cancellation
 
 In Variant C, `n_e * p_e - ni_hat^2 = ni_hat^2 * (exp(phi_p_e - phi_n_e)
-- 1)`. For `A_n = A_p = 0.3`, the worst-case argument is
-`phi_p_e - phi_n_e \in [-0.6, 0.6]`, so the numerator swings in
+- 1)`. For `A_n = -A_p = 0.3`, `phi_p_e - phi_n_e = -2*A_n * sin(pi*x/L)`
+(1D) or `-2*A_n * sin(pi*x/L)*sin(pi*y/L)` (2D), so the worst-case
+argument is `phi_p_e - phi_n_e \in [-0.6, 0.6]` and the numerator swings in
 `[exp(-0.6)-1, exp(0.6)-1] = [-0.45, 0.82]` times `ni_hat^2 ~ 1e-12`.
 The denominator is `~ 2*tau_hat * ni_hat ~ 2e-6` (at tau_hat ~ 1e-1),
 so `R_e ~ 1e-6`. This is orders of magnitude below the diffusion term
@@ -428,7 +440,9 @@ or poor kernel numerics, not as a legitimate rate degradation.
 ## Summary (for the gate reviewer)
 
 - Exact solutions are sin-products that vanish on Omega's boundary;
-  amplitudes `(0.5, 0.3, 0.3)` keep exp(...) in `[0.45, 2.23]`.
+  amplitudes `(A_psi, A_n, A_p) = (0.5, 0.3, -0.3)` keep exp(...) in
+  `[0.45, 2.23]`. `A_p = -A_n` ensures `phi_p_e - phi_n_e` is non-zero
+  pointwise so Variant C's SRH term is a genuine test of the code path.
 - Scaling reuses `build_mms_scaling(L=2e-6)` from the Poisson MMS with
   the existing `lambda2 < 1` guard. No new constants.
 - Three variants exercise Poisson-only, full coupling without R, and
