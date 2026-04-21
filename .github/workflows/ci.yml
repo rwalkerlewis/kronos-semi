@@ -90,6 +90,14 @@ jobs:
             kronos-semi:ci \
             pytest tests/ -v --tb=short
 
+      - name: Run pytest with coverage gate (>= 95% on semi/)
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
+            -w /workspaces/kronos-semi \
+            kronos-semi:ci \
+            pytest tests/ --cov=semi --cov-report=term-missing --cov-report=xml --cov-fail-under=95
+
       - name: Run pn_1d benchmark
         run: |
           docker run --rm \
