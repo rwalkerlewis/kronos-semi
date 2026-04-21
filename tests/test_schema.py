@@ -82,6 +82,52 @@ def test_dumps_strips_internal():
     assert parsed["name"] == "x"
 
 
+def test_recombination_E_t_default(minimal_cfg):
+    result = schema.validate(minimal_cfg)
+    rec = result["physics"]["recombination"]
+    assert rec["E_t"] == 0.0
+    assert rec["tau_n"] > 0.0
+    assert rec["tau_p"] > 0.0
+
+
+def test_voltage_sweep_accepted(minimal_cfg):
+    minimal_cfg["contacts"][1]["voltage_sweep"] = {
+        "start": 0.0, "stop": 0.6, "step": 0.05,
+    }
+    result = schema.validate(minimal_cfg)
+    sweep = result["contacts"][1]["voltage_sweep"]
+    assert sweep["start"] == 0.0
+    assert sweep["stop"] == pytest.approx(0.6)
+    assert sweep["step"] == pytest.approx(0.05)
+
+
+def test_voltage_sweep_rejects_nonpositive_step(minimal_cfg):
+    minimal_cfg["contacts"][1]["voltage_sweep"] = {
+        "start": 0.0, "stop": 0.5, "step": 0.0,
+    }
+    with pytest.raises(schema.SchemaError):
+        schema.validate(minimal_cfg)
+
+
+def test_solver_type_drift_diffusion(minimal_cfg):
+    minimal_cfg["solver"] = {"type": "drift_diffusion"}
+    result = schema.validate(minimal_cfg)
+    assert result["solver"]["type"] == "drift_diffusion"
+
+
+def test_solver_type_bias_sweep(minimal_cfg):
+    minimal_cfg["solver"] = {"type": "bias_sweep"}
+    result = schema.validate(minimal_cfg)
+    assert result["solver"]["type"] == "bias_sweep"
+
+
+def test_continuation_defaults(minimal_cfg):
+    result = schema.validate(minimal_cfg)
+    cont = result["solver"]["continuation"]
+    assert cont["max_halvings"] >= 0
+    assert cont["min_step"] > 0.0
+
+
 def test_doping_gaussian_schema():
     cfg = {
         "name": "g", "dimension": 2,

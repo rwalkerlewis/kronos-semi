@@ -30,11 +30,17 @@ Read `PLAN.md` for the short version and the current in-flight task.
 
 ## Day 2. Slotboom drift-diffusion, coupled Newton, bias sweep
 
-- **Status:** Planned. Branch `dev/day2-drift-diffusion` (to be created
-  after `dev/docker-day1-fix` merges).
-- **Goal:** solve the full coupled (psi, Phi_n, Phi_p) system with SRH
-  recombination under forward bias, and verify against the Shockley
-  diode equation.
+- **Status:** Done (2026-04-20). Delivered on
+  `dev/day2-drift-diffusion`; all deliverables landed, the
+  `pn_1d_bias` verifier is green (V=0.6 V within 10% of Shockley),
+  and Day 1 did not regress. The low-bias ideal-Shockley mismatch is
+  physical (SRH depletion-region recombination raises the ideality
+  factor) and is handled by the Day 2 verifier with qualitative
+  checks below 0.5 V. Day 3 will replace those qualitative checks
+  with a Sah-Noyce-Shockley term.
+- **Goal (as delivered):** solved the full coupled (psi, Phi_n, Phi_p)
+  system with SRH recombination under forward bias, verified against
+  Shockley at high bias.
 - **Deliverables:**
   - `semi/physics/drift_diffusion.py` with Slotboom continuity forms
     (electron and hole continuity as separate form builders, plus a
