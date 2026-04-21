@@ -17,5 +17,6 @@ from __future__ import annotations
 
 from .bias_sweep import run_bias_sweep
 from .equilibrium import run_equilibrium
+from .mos_cv import run_mos_cv
 
-__all__ = ["run_equilibrium", "run_bias_sweep"]
+__all__ = ["run_equilibrium", "run_bias_sweep", "run_mos_cv"]

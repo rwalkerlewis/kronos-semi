@@ -631,6 +631,386 @@ _PLOTTERS["pn_1d_bias_reverse"] = plot_pn_1d_bias_reverse
 
 
 # --------------------------------------------------------------------------- #
+# mos_2d verifier and plotter                                                 #
+# --------------------------------------------------------------------------- #
+
+def _mos_device_params(cfg, sc, mat):
+    """Return a dict of device parameters for the MOS C-V verifier.
+
+    Source of each quantity:
+      - N_A from the silicon doping entry (uniform profile)
+      - eps_s, n_i from the silicon material database
+      - eps_ox, t_ox from the oxide region + mesh extents
+      - phi_ms from the gate contact's workfunction (or 0 for ideal gate)
+      - V_t from the scaling at the config temperature
+    """
+    from semi.constants import EPS0, cm3_to_m3
+    from semi.materials import get_material
+
+    N_A = cm3_to_m3(cfg["doping"][0]["profile"]["N_A"])
+    eps_s = mat.epsilon  # Si permittivity F/m
+
+    ox_region = next(
+        r for r in cfg["regions"].values()
+        if r.get("role") == "insulator"
+    )
+    ox_mat = get_material(ox_region["material"])
+    eps_ox = ox_mat.epsilon
+
+    # Oxide thickness from the region bounds
+    ox_bounds = next(
+        rb for rb in cfg["mesh"]["regions_by_box"] if int(rb["tag"]) == int(ox_region["tag"])
+    )
+    y_bounds = ox_bounds["bounds"][1]
+    t_ox = float(y_bounds[1] - y_bounds[0])
+
+    gate = next(c for c in cfg["contacts"] if c["type"] == "gate")
+    phi_ms = float(gate.get("workfunction", 0.0) or 0.0)
+
+    V_t = sc.V0
+    phi_F = V_t * float(np.log(N_A / mat.n_i))  # Fermi potential, p-type
+    C_ox = eps_ox / t_ox
+
+    # With our BC convention (psi=0 at intrinsic, ohmic body sets
+    # psi_body = -phi_F), flatband requires psi_gate = psi_body, i.e.
+    # V_gate - phi_ms = -phi_F, so V_FB = phi_ms - phi_F.
+    V_FB = phi_ms - phi_F
+
+    # Threshold: psi_s = 2 phi_F at the surface, Q_B = sqrt(4 eps_s q N_A phi_F)
+    from semi.constants import Q as _Q
+    Q_B_threshold = float(np.sqrt(4.0 * eps_s * _Q * N_A * phi_F))
+    V_T = V_FB + 2.0 * phi_F + Q_B_threshold / C_ox
+
+    return dict(
+        N_A=N_A, eps_s=eps_s, eps_ox=eps_ox, t_ox=t_ox,
+        phi_ms=phi_ms, phi_F=phi_F, V_FB=V_FB, V_T=V_T,
+        C_ox=C_ox, V_t=V_t, n_i=mat.n_i,
+    )
+
+
+def _mos_psi_s_from_V_gate(V_gate, dp):
+    """
+    Invert the depletion-approximation control equation for psi_s.
+
+    V_gate - V_FB = psi_s + sqrt(2 eps_s q N_A psi_s) / C_ox
+
+    Valid for psi_s > 0 (depletion / weak inversion, before strong
+    inversion sets in at psi_s = 2 phi_F). Returns NaN outside
+    [0, 2 phi_F].
+    """
+    from semi.constants import Q as _Q
+
+    V_ov = V_gate - dp["V_FB"]
+    if V_ov <= 0.0:
+        return float("nan")
+    if V_ov >= 2.0 * dp["phi_F"] + float(np.sqrt(4.0 * dp["eps_s"] * _Q * dp["N_A"] * dp["phi_F"])) / dp["C_ox"] + 1.0e-9:
+        return float("nan")
+
+    a = float(np.sqrt(2.0 * dp["eps_s"] * _Q * dp["N_A"])) / dp["C_ox"]
+    # f(x) = x + a * sqrt(x) - V_ov = 0; let u = sqrt(x), quadratic in u
+    # u^2 + a u - V_ov = 0 -> u = (-a + sqrt(a^2 + 4 V_ov)) / 2
+    u = (-a + float(np.sqrt(a * a + 4.0 * V_ov))) / 2.0
+    return float(u * u)
+
+
+def _mos_C_theory(V_gate_arr, dp):
+    """
+    Depletion-approximation C(V_gate) per unit area (F/m^2).
+
+    In the verifier window (V_FB+0.1, V_T-0.1), the total capacitance
+    is the series combination of C_ox and C_dep(psi_s):
+
+        1/C = 1/C_ox + 1/C_dep      (per unit area)
+        C_dep = sqrt(eps_s q N_A / (2 psi_s))
+
+    Returns NaN outside the window where the depletion approximation
+    does not model C (accumulation / inversion regimes).
+    """
+    from semi.constants import Q as _Q
+
+    C_arr = np.full_like(V_gate_arr, np.nan, dtype=float)
+    for i, V_gate in enumerate(V_gate_arr):
+        psi_s = _mos_psi_s_from_V_gate(float(V_gate), dp)
+        if not np.isfinite(psi_s) or psi_s <= 0.0:
+            continue
+        C_dep = float(np.sqrt(dp["eps_s"] * _Q * dp["N_A"] / (2.0 * psi_s)))
+        C_tot = dp["C_ox"] * C_dep / (dp["C_ox"] + C_dep)
+        C_arr[i] = C_tot
+    return C_arr
+
+
+@register("mos_2d")
+def verify_mos_2d(result) -> list[tuple[str, bool, str]]:
+    """
+    MOS C-V verifier.
+
+    Extracts C_sim(V_gate) from Q_gate(V_gate) by centered finite
+    difference and compares against the depletion-approximation MOS
+    curve in the window (V_FB + 0.1, V_T - 0.1) V. Tolerance 10%,
+    fixed in docs/mos_derivation.md section 6.9. On failure, the
+    debugging action is to shrink the window or examine dQ/dV noise,
+    not to loosen the tolerance (see module docstring above for the
+    excluded accumulation and strong-inversion regimes).
+    """
+    from semi.materials import get_material
+
+    cfg = result.cfg
+    sc = result.scaling
+    mat = get_material(cfg["regions"]["silicon"]["material"])
+
+    iv = result.iv or []
+    if not iv:
+        return [("mos_2d: iv table non-empty", False, "no iv rows recorded")]
+
+    dp = _mos_device_params(cfg, sc, mat)
+
+    V = np.array([r["V"] for r in iv])
+    Q = np.array([r.get("Q_gate", 0.0) for r in iv])
+
+    # Sort by V_gate so gradient is well-defined on non-monotone sweeps.
+    order = np.argsort(V)
+    V = V[order]
+    Q = Q[order]
+
+    C_sim = np.gradient(Q, V)  # F / m^2
+    C_th = _mos_C_theory(V, dp)
+
+    # Verifier window: strictly inside the depletion regime. The low edge
+    # is moved 0.2 V (not 0.1 V) above V_FB because at psi_s < ~2 V_t the
+    # carrier tail reaches across a significant fraction of W_dep and the
+    # sharp depletion approximation degrades toward 10%. 0.2 V of padding
+    # buys a clean < 10% match; see docs/mos_derivation.md section 6.9
+    # (the reviewer's 10% tolerance is fixed; the fix for failure is
+    # shrinking the window, not loosening the tolerance).
+    window_lo = dp["V_FB"] + 0.2
+    window_hi = dp["V_T"] - 0.1
+
+    mask = (V >= window_lo) & (V <= window_hi) & np.isfinite(C_th)
+    # Drop the two endpoints of the array where centered FD is one-sided.
+    if len(V) >= 3:
+        endpoint_mask = np.ones_like(V, dtype=bool)
+        endpoint_mask[0] = False
+        endpoint_mask[-1] = False
+        mask = mask & endpoint_mask
+
+    checks: list[tuple[str, bool, str]] = []
+
+    checks.append((
+        f"mos_2d: sweep covers V_FB={dp['V_FB']:+.3f} V through V_T={dp['V_T']:+.3f} V "
+        f"with >=0.3 V pad on each side",
+        (V.min() <= dp["V_FB"] - 0.3) and (V.max() >= dp["V_T"] + 0.3),
+        f"V_min={V.min():+.3f}, V_max={V.max():+.3f}; V_FB={dp['V_FB']:+.3f}, V_T={dp['V_T']:+.3f}",
+    ))
+
+    n_window = int(mask.sum())
+    checks.append((
+        f"mos_2d: verifier window [V_FB+0.2, V_T-0.1] = [{window_lo:.3f}, {window_hi:.3f}] V has >=5 samples",
+        n_window >= 5,
+        f"{n_window} samples in window",
+    ))
+
+    if n_window == 0:
+        return checks
+
+    rel_err = np.abs(C_sim[mask] - C_th[mask]) / C_th[mask]
+    worst = int(np.argmax(rel_err))
+    V_worst = V[mask][worst]
+    C_sim_worst = C_sim[mask][worst]
+    C_th_worst = C_th[mask][worst]
+
+    checks.append((
+        f"mos_2d: |C_sim - C_theory|/C_theory < 10% in [{window_lo:.3f}, {window_hi:.3f}] V",
+        bool(rel_err.max() < 0.10),
+        f"worst {rel_err.max()*100:.2f}% at V_gate={V_worst:+.3f} V "
+        f"(C_sim={C_sim_worst*1e2:.4f} uF/cm^2, C_th={C_th_worst*1e2:.4f} uF/cm^2)",
+    ))
+
+    # Monotone non-increasing check: depletion C starts at C_ox in
+    # accumulation, drops through depletion, saturates at C_min near
+    # strong inversion onset. Inside the verifier window this must
+    # be strictly decreasing in V_gate (to 1% wiggle room).
+    Cw = C_sim[mask]
+    non_increasing = all(Cw[i + 1] <= Cw[i] * (1.0 + 0.01) for i in range(len(Cw) - 1))
+    checks.append((
+        "mos_2d: C_sim monotone non-increasing across the depletion window",
+        bool(non_increasing),
+        f"{len(Cw)} samples; C_min={Cw.min()*1e2:.4f} uF/cm^2, C_max={Cw.max()*1e2:.4f} uF/cm^2",
+    ))
+
+    # Stash device params and curves so the plotter can render them.
+    result._mos_params = dp
+    result._mos_curves = dict(V=V, Q=Q, C_sim=C_sim, C_th=C_th,
+                               window_lo=window_lo, window_hi=window_hi)
+    return checks
+
+
+def plot_mos_2d(result, out_dir: Path) -> list[Path]:
+    """
+    Render MOS capacitor diagnostics.
+
+    Produces four PNGs:
+      - `psi_2d.png`: tricontourf of psi(x, y) at the final V_gate,
+        with overlaid Si/SiO2 interface
+      - `potentials_1d.png`: central-column psi(y) for sanity
+      - `cv.png`: C_sim vs depletion-approximation theory with the
+        verifier window highlighted
+      - `qv.png`: Q_gate vs V_gate (the raw integrated curve)
+
+    The 2D contour uses matplotlib's triangulation so it works on any
+    dolfinx-produced unstructured mesh (triangles).
+    """
+    from matplotlib import colors as mcolors
+    from matplotlib.tri import Triangulation
+
+    cfg = result.cfg
+    paths: list[Path] = []
+
+    if result.x_dof is None or result.psi_phys is None:
+        return paths
+    if result.x_dof.shape[1] < 2:
+        return paths  # not 2D; nothing to contour
+
+    x = result.x_dof[:, 0]
+    y = result.x_dof[:, 1]
+    psi = np.asarray(result.psi_phys)
+
+    # --- 2D tricontourf of psi at the last V_gate ---
+    tri = Triangulation(x * 1e9, y * 1e9)  # nm
+    fig, ax = plt.subplots(figsize=(7, 5))
+    nlevels = 20
+    tcf = ax.tricontourf(tri, psi, levels=nlevels, cmap="viridis")
+    cbar = fig.colorbar(tcf, ax=ax)
+    cbar.set_label(r"$\psi$ (V)")
+
+    # Overlay the Si/SiO2 interface for reference.
+    ox_region = next(
+        (r for r in cfg["regions"].values() if r.get("role") == "insulator"), None,
+    )
+    if ox_region is not None:
+        ox_bounds = next(
+            rb for rb in cfg["mesh"]["regions_by_box"]
+            if int(rb["tag"]) == int(ox_region["tag"])
+        )
+        y_int_nm = float(ox_bounds["bounds"][1][0]) * 1e9
+        xmin_nm = float(cfg["mesh"]["extents"][0][0]) * 1e9
+        xmax_nm = float(cfg["mesh"]["extents"][0][1]) * 1e9
+        ax.plot([xmin_nm, xmax_nm], [y_int_nm, y_int_nm],
+                color="white", linewidth=1.0, linestyle="--",
+                label="Si/SiO$_2$ interface")
+        ax.legend(loc="upper left", fontsize=8)
+
+    V_gate_last = float(result.iv[-1]["V"]) if result.iv else 0.0
+    ax.set_xlabel("x (nm)")
+    ax.set_ylabel("y (nm)")
+    ax.set_title(f"MOS cap: $\\psi(x, y)$ at $V_{{gate}}$={V_gate_last:+.3f} V")
+    ax.set_aspect("auto")
+    fig.tight_layout()
+    p1 = out_dir / "psi_2d.png"
+    fig.savefig(p1, dpi=130)
+    plt.close(fig)
+    paths.append(p1)
+
+    # --- 1D psi(y) slice through the central column ---
+    xmid = 0.5 * (cfg["mesh"]["extents"][0][0] + cfg["mesh"]["extents"][0][1])
+    tol = 1.0e-9  # 1 nm
+    near_mid = np.abs(x - xmid) < tol
+    if not near_mid.any():
+        # Fallback: pick the closest column
+        near_mid = np.abs(x - xmid) < (np.abs(x - xmid).min() + 1.0e-15)
+    ys = y[near_mid]
+    psi_mid = psi[near_mid]
+    order = np.argsort(ys)
+    ys_nm = ys[order] * 1e9
+    psi_mid_s = psi_mid[order]
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(ys_nm, psi_mid_s, "-", linewidth=1.5)
+    ax.axvline(y_int_nm if ox_region is not None else 0.0,
+               color="red", linestyle=":", label="Si/SiO$_2$ interface")
+    ax.set_xlabel("y (nm)")
+    ax.set_ylabel(r"$\psi$ (V)")
+    ax.set_title(f"MOS cap: $\\psi(y)$ at $V_{{gate}}$={V_gate_last:+.3f} V (central column)")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    p2 = out_dir / "potentials_1d.png"
+    fig.savefig(p2, dpi=130)
+    plt.close(fig)
+    paths.append(p2)
+
+    # --- C-V and Q-V curves ---
+    # Plots run before the verifier in main(), so the _mos_curves cache
+    # set by `verify_mos_2d` may not exist yet. Recompute here if so.
+    curves = getattr(result, "_mos_curves", None)
+    if curves is None:
+        from semi.materials import get_material
+        mat = get_material(cfg["regions"]["silicon"]["material"])
+        dp_local = _mos_device_params(cfg, result.scaling, mat)
+        iv = result.iv or []
+        if not iv:
+            return paths
+        V_arr = np.array([r["V"] for r in iv])
+        Q_arr = np.array([r.get("Q_gate", 0.0) for r in iv])
+        order = np.argsort(V_arr)
+        V_arr = V_arr[order]
+        Q_arr = Q_arr[order]
+        C_sim_arr = np.gradient(Q_arr, V_arr)
+        C_th_arr = _mos_C_theory(V_arr, dp_local)
+        curves = dict(
+            V=V_arr, Q=Q_arr, C_sim=C_sim_arr, C_th=C_th_arr,
+            window_lo=dp_local["V_FB"] + 0.2,
+            window_hi=dp_local["V_T"] - 0.1,
+        )
+        result._mos_curves = curves
+        result._mos_params = dp_local
+
+    V = curves["V"]
+    C_sim = curves["C_sim"]
+    C_th = curves["C_th"]
+    Q = curves["Q"]
+    lo = curves["window_lo"]
+    hi = curves["window_hi"]
+    dp = result._mos_params
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(V, C_sim * 1e2, "o-", label="simulation", markersize=3)
+    finite = np.isfinite(C_th)
+    ax.plot(V[finite], C_th[finite] * 1e2, "r--", label="depletion-approx theory")
+    ax.axhline(dp["C_ox"] * 1e2, color="k", linestyle=":", label=r"$C_{ox}$")
+    ax.axvspan(lo, hi, alpha=0.15, color="green", label="verifier window")
+    ax.axvline(dp["V_FB"], color="grey", linestyle=":", alpha=0.6)
+    ax.axvline(dp["V_T"], color="grey", linestyle=":", alpha=0.6)
+    ax.set_xlabel(r"$V_{gate}$ (V)")
+    ax.set_ylabel(r"$C$ ($\mu$F/cm$^2$)")
+    ax.set_title("MOS C-V vs depletion-approximation theory")
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    p3 = out_dir / "cv.png"
+    fig.savefig(p3, dpi=130)
+    plt.close(fig)
+    paths.append(p3)
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(V, Q * 1e2, "o-", markersize=3)
+    ax.axvspan(lo, hi, alpha=0.15, color="green")
+    ax.set_xlabel(r"$V_{gate}$ (V)")
+    ax.set_ylabel(r"$Q_{gate}$ ($\mu$C/cm$^2$)")
+    ax.set_title("MOS $Q_{gate}$ vs $V_{gate}$ (integrated silicon space charge)")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    p4 = out_dir / "qv.png"
+    fig.savefig(p4, dpi=130)
+    plt.close(fig)
+    paths.append(p4)
+
+    return paths
+
+
+_PLOTTERS["mos_2d"] = plot_mos_2d
+
+
+# --------------------------------------------------------------------------- #
 # Driver                                                                      #
 # --------------------------------------------------------------------------- #
 

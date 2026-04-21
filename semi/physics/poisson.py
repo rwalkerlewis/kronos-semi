@@ -77,3 +77,42 @@ def build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, eps_r):
         - rho_hat * v * ufl.dx
     )
     return F
+
+
+def build_equilibrium_poisson_form_mr(
+    V, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
+):
+    """
+    Build the UFL residual for multi-region equilibrium Poisson (MOS).
+
+    Stiffness integrates over the full mesh with cellwise `eps_r_fn`;
+    the Boltzmann space-charge term is restricted to semiconductor cells
+    via a `dx(subdomain_id=semi_tag)` measure, so the oxide region
+    carries only the Laplacian (no mobile carriers, no doping). The
+    Si/SiO2 interface natural condition
+    eps_r_Si grad psi . n = eps_r_ox grad psi . n
+    is enforced automatically by the piecewise eps_r in the bilinear
+    form (docs/mos_derivation.md section 3.1).
+    """
+    import ufl
+    from dolfinx import fem
+    from petsc4py import PETSc
+
+    msh = V.mesh
+    v = ufl.TestFunction(V)
+
+    L_D2 = fem.Constant(msh, PETSc.ScalarType(sc.lambda2 * sc.L0 ** 2))
+    ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
+
+    dx_full = ufl.Measure("dx", domain=msh)
+    dx_semi = ufl.Measure(
+        "dx", domain=msh, subdomain_data=cell_tags, subdomain_id=int(semi_tag),
+    )
+
+    rho_hat = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
+
+    F = (
+        L_D2 * eps_r_fn * ufl.inner(ufl.grad(psi), ufl.grad(v)) * dx_full
+        - rho_hat * v * dx_semi
+    )
+    return F

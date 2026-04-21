@@ -46,13 +46,15 @@ class SimulationResult:
 
 def run(cfg: dict[str, Any]) -> SimulationResult:
     """Dispatch on solver.type."""
-    from .runners import run_bias_sweep, run_equilibrium
+    from .runners import run_bias_sweep, run_equilibrium, run_mos_cv
 
     stype = cfg.get("solver", {}).get("type", "equilibrium")
     if stype == "equilibrium":
         return run_equilibrium(cfg)
     if stype in ("drift_diffusion", "bias_sweep"):
         return run_bias_sweep(cfg)
+    if stype == "mos_cv":
+        return run_mos_cv(cfg)
     raise ValueError(f"Unknown solver.type {stype!r}")
 
 
@@ -71,4 +73,7 @@ def __getattr__(name: str):
     if name == "_resolve_sweep":
         from .runners.bias_sweep import _resolve_sweep
         return _resolve_sweep
+    if name == "run_mos_cv":
+        from .runners.mos_cv import run_mos_cv
+        return run_mos_cv
     raise AttributeError(f"module 'semi.run' has no attribute {name!r}")
