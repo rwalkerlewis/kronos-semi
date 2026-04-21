@@ -293,8 +293,6 @@ def test_build_psi_dirichlet_bcs_gate_honors_workfunction():
 
 def test_build_dd_dirichlet_bcs_skips_gate_contact():
     """Gate contact is on the oxide side, so DD assembly must skip it."""
-    from dolfinx import fem
-
     from semi.physics.drift_diffusion import make_dd_block_spaces
 
     cfg = _mos_like_cfg(V_gate=0.5, phi_ms=0.0)

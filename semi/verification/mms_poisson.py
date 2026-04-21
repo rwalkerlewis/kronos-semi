@@ -554,7 +554,7 @@ def _mr_all_boundary_facets(mesh, fdim: int):
     )
 
 
-def run_mms_poisson_2d_multiregion(N_x: int, N_y: int) -> "MMSPoissonResult":
+def run_mms_poisson_2d_multiregion(N_x: int, N_y: int) -> MMSPoissonResult:
     """Solve the multi-region Poisson MMS problem on one (N_x, N_y) level.
 
     Piecewise eps_r(x, y) with a Si/SiO2 coefficient jump at y = y_int.
@@ -569,7 +569,6 @@ def run_mms_poisson_2d_multiregion(N_x: int, N_y: int) -> "MMSPoissonResult":
     import numpy as _np
     import ufl
     from dolfinx import fem
-    from petsc4py import PETSc
 
     from semi.solver import solve_nonlinear
 
@@ -653,7 +652,7 @@ def run_mms_poisson_2d_multiregion(N_x: int, N_y: int) -> "MMSPoissonResult":
     )
 
 
-def run_mr_convergence_study(Ns: list[int]) -> list["MMSPoissonResult"]:
+def run_mr_convergence_study(Ns: list[int]) -> list[MMSPoissonResult]:
     """Run the multi-region MMS on a sequence of refinements.
 
     Uses a square mesh with N_x = N_y = N and requires N divisible by
