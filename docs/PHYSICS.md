@@ -202,19 +202,189 @@ of quadratic convergence.
   formulation becomes stiff as minority carrier densities underflow
   and larger jumps lose Newton convergence.
 
-### 2.5 Scaled continuity (for Day 2)
+### 2.5 Scaled drift-diffusion
 
-Under the same scaling, with the time scale $t_0 = L_0^2 / D_0$ and
-$D_0 = V_t \mu_0$ (Einstein for the reference mobility), the steady-state
-electron continuity equation becomes
+This section completes the nondimensionalization that was a placeholder
+through Day 2-4. The implementation is now in place
+(`semi/physics/drift_diffusion.py`) and the V&V suite
+(`semi/verification/mms_dd.py`) confirms theoretical L^2 = 2 / H^1 = 1
+rates on every block, so we can fix the scaled forms here without risk
+of revision.
+
+#### Dimensional starting point
+
+From Section 1, the steady-state Slotboom drift-diffusion system on a
+semiconductor region is
 
 $$
--\nabla \cdot \bigl( \mu_n V_t\, n_i \exp(\hat\psi - \hat\Phi_n) \nabla \hat\Phi_n \bigr)
-    = q\, R(n, p).
+\begin{aligned}
+-\nabla \cdot \bigl( \varepsilon_0 \varepsilon_r \nabla \psi \bigr)
+    &= q\, ( p - n + N_D - N_A ), \\
++\nabla \cdot \bigl( q\, \mu_n\, n\, \nabla \Phi_n \bigr)
+    &= +\, q\, R(n, p), \\
++\nabla \cdot \bigl( q\, \mu_p\, p\, \nabla \Phi_p \bigr)
+    &= -\, q\, R(n, p),
+\end{aligned}
 $$
 
-The current-scale becomes $J_0 = q D_0 C_0 / L_0$. Details of the Day 2
-scaled forms will be fixed when the code lands.
+with $n = n_i \exp((\psi - \Phi_n)/V_t)$ and $p = n_i
+\exp((\Phi_p - \psi)/V_t)$ from Boltzmann statistics. The continuity
+sign convention follows from $\mathbf{J}_n = -q\, \mu_n\, n\, \nabla
+\Phi_n$ and $\nabla \cdot \mathbf{J}_n = +q\, R$ (Section 1.3).
+
+#### Scales
+
+Reusing the Section 2.1 conventions and adding two derived scales for
+the continuity rows:
+
+| Quantity        | Scale                         | Definition                         |
+|-----------------|-------------------------------|------------------------------------|
+| Length          | none (mesh stays in meters)   | (Invariant 3)                      |
+| Potential       | $V_0 = V_t = k_B T / q$       |                                    |
+| Density         | $C_0 = \max\|N\|$ (floored)   |                                    |
+| Mobility        | $\mu_0 = \mu_n^\mathrm{ref}$  | reference material electron mobility |
+| Diffusivity     | $D_0 = V_t \mu_0$             | Einstein at the reference          |
+| Time            | $t_0 = L_0^2 / D_0$           | sets the recombination scale       |
+| Current density | $J_0 = q\, D_0\, C_0 / L_0$   |                                    |
+
+The substitutions are $\psi = V_t \hat\psi$, $\Phi_{n,p} = V_t
+\hat\Phi_{n,p}$, $n = C_0 \hat n$, $p = C_0 \hat p$, $N_{D,A} = C_0
+\hat N_{D,A}$, $\mu_{n,p} = \mu_0 \hat\mu_{n,p}$, $\tau_{n,p} = t_0
+\hat\tau_{n,p}$, $n_i = C_0 \hat n_i$. The mesh coordinate $x$ is
+left in physical meters per Invariant 3, which is why $L_0$ shows up
+explicitly in the coefficients below rather than being absorbed.
+
+#### Scaled Poisson row
+
+Substituting and dividing by $q C_0$ exactly as in Section 2.2:
+
+$$
+-\nabla \cdot \bigl( L_D^2\, \varepsilon_r\, \nabla \hat\psi \bigr)
+    = \hat p - \hat n + \hat N,
+\qquad L_D^2 = \frac{\varepsilon_0 V_t}{q C_0}.
+$$
+
+This is the form that lands in `build_dd_block_residual` for the psi
+row. The coefficient is `L_D^2 * eps_r`, *not* `lambda2 * eps_r` (see
+Invariant 3 and the cautionary note in Section 2.3 below).
+
+#### Scaled continuity rows
+
+Starting from the electron continuity equation,
+
+$$
+\nabla \cdot \bigl( q\, \mu_n\, n\, \nabla \Phi_n \bigr) = q\, R.
+$$
+
+Substituting $\Phi_n = V_t \hat\Phi_n$, $n = C_0 \hat n$, $\mu_n =
+\mu_0 \hat\mu_n$ leaves the gradient operator on the left in physical
+meters (Invariant 3) and yields
+
+$$
+\nabla \cdot \bigl( q\, \mu_0 V_t\, \hat\mu_n\, C_0\, \hat n\, \nabla \hat\Phi_n \bigr)
+    = q\, R.
+$$
+
+Pull the constants out and divide by $q\, C_0 / t_0 = q C_0 D_0 /
+L_0^2$ (the natural rate scale for $R$, since lifetimes scale as
+$\tau / t_0$):
+
+$$
+\nabla \cdot \bigl( \tfrac{\mu_0 V_t}{D_0/L_0^2}\, \hat\mu_n\, \hat n\,
+                    \nabla \hat\Phi_n \bigr)
+    = \hat R, \qquad
+\hat R \equiv R \cdot \tfrac{t_0}{C_0}.
+$$
+
+The coefficient simplifies via $D_0 = V_t \mu_0$:
+
+$$
+\frac{\mu_0 V_t}{D_0 / L_0^2}
+    = \frac{\mu_0 V_t L_0^2}{V_t \mu_0}
+    = L_0^2.
+$$
+
+So the scaled electron continuity row is
+
+$$
+\nabla \cdot \bigl( L_0^2\, \hat\mu_n\, \hat n\, \nabla \hat\Phi_n \bigr)
+    = \hat R,
+$$
+
+and by symmetry the hole row is
+
+$$
+\nabla \cdot \bigl( L_0^2\, \hat\mu_p\, \hat p\, \nabla \hat\Phi_p \bigr)
+    = -\, \hat R.
+$$
+
+The scaled SRH kernel (from Section 1.4 with the same C0/t0 division) is
+
+$$
+\hat R(\hat n, \hat p)
+    = \frac{\hat n \hat p - \hat n_i^2}
+           {\hat\tau_p (\hat n + \hat n_1) + \hat\tau_n (\hat p + \hat p_1)},
+$$
+
+with $\hat n_1 = \hat n_i \exp(E_t / V_t)$ and $\hat p_1 = \hat n_i
+\exp(-E_t / V_t)$. This is exactly the inline expression in
+`build_dd_block_residual` (the standalone UFL helper
+`semi.physics.recombination.srh_rate` returns the same expression).
+
+The matching residual signs in `build_dd_block_residual` are
+
+```
+-div( L_D^2 eps_r grad psi_hat ) - ( p_hat - n_hat + N_hat )         (psi row)
+-div( L_0^2 mu_n_hat n_hat grad phi_n_hat ) + R_hat                   (phi_n row)
+-div( L_0^2 mu_p_hat p_hat grad phi_p_hat ) - R_hat                   (phi_p row)
+```
+
+(Each row is rewritten as $F = 0$ for SNES.)
+
+#### Current scale
+
+The terminal-current evaluation in `semi.postprocess.evaluate_current_at_contact`
+assembles $\mathbf{J}_n = q\, \mu_n\, n\, \nabla \Phi_n$ and
+$\mathbf{J}_p = q\, \mu_p\, p\, \nabla \Phi_p$ in physical units
+(no scaling), since the test is what amperes per square meter the
+device produces. The natural scale is
+
+$$
+J_0 = q\, D_0\, C_0 / L_0,
+$$
+
+which for Si at $C_0 = 10^{17}\,\mathrm{cm}^{-3}$, $L_0 = 2\,\mu m$,
+and $\mu_0 = 1400\,\mathrm{cm^2/(V\,s)}$ comes out around
+$2.9 \times 10^4\,\mathrm{A/cm^2}$. The Day 2 `pn_1d_bias` benchmark
+reports $J(V = 0.6\,\mathrm{V}) \approx 1.6 \times 10^3\,\mathrm{A/m^2}$,
+which is several decades below $J_0$ as expected for moderate forward
+bias.
+
+#### The lambda2 / L_D^2 trap
+
+`Scaling.lambda2` returns the dimensionless ratio $\lambda^2 = L_D^2 /
+L_0^2$ (Section 2.3). Early Day-1 versions of `semi/physics/poisson.py`
+used `sc.lambda2` directly as the Laplacian coefficient. Because the
+mesh is in physical meters (Invariant 3, not $L_0$ units), this
+suppressed diffusion by $L_0^2$ ($\sim 10^{-12}$ on a micron device)
+and Newton converged on the Laplace solution. The fix was to use
+$L_D^2 \cdot \varepsilon_r = \lambda^2 \cdot L_0^2 \cdot \varepsilon_r$.
+This caveat is preserved as a historical note because the same trap
+applies to any new scaled form added to the DD block: while the mesh
+sits in meters, every $\nabla$ contributes a $1 / L_0$ in scaled units,
+so each `div(... grad ...)` operator picks up an explicit $L_0^2$ (for
+the continuity rows) or $L_D^2 = \lambda^2 L_0^2$ (for the Poisson row).
+
+See ADR 0002 (`docs/adr/0002-nondimensionalization-mandatory.md`) for
+the rationale of the scaling choice and ADR 0004
+(`docs/adr/0004-slotboom-variables-for-dd.md`) for why the DD rows are
+written in Slotboom form rather than mixed (n, p, psi) primitive
+variables.
+
+For the MMS-specific construction of the manufactured forcing terms
+on the same scaled equations (variants A / B / C, exact solutions
+$\hat\psi_e, \hat\Phi_{n,e}, \hat\Phi_{p,e}$, and the SNES tolerance
+note), see `docs/mms_dd_derivation.md`.
 
 ## 3. Boundary conditions
 
@@ -235,7 +405,7 @@ $$
 \Phi_n = \Phi_p = V_\mathrm{applied}.
 $$
 
-See `_build_ohmic_bcs` in `semi/run.py`.
+See `build_psi_dirichlet_bcs` and `build_dd_dirichlet_bcs` in `semi/bcs.py`.
 
 ### 3.2 Gate contacts
 
