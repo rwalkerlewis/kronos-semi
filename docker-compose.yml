@@ -1,0 +1,61 @@
+# Local bind-mount development: source code on the host, dolfinx + Python
+# inside the container. Edits on the host are visible immediately thanks to
+# the editable install of `semi`.
+#
+# Usage:
+#   docker compose build           # build once
+#   docker compose up -d dev       # start long-running dev container
+#   docker compose exec dev bash   # shell in
+#   docker compose run --rm test   # run the test suite
+#   docker compose up jupyter      # launch JupyterLab on :8888
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USER_UID: "${UID:-1000}"
+        USER_GID: "${GID:-1000}"
+    image: kronos-semi:dev
+    container_name: kronos-semi-dev
+    working_dir: /workspaces/kronos-semi
+    volumes:
+      - .:/workspaces/kronos-semi:cached
+    # Keep the container alive for `docker compose exec`.
+    command: sleep infinity
+    stdin_open: true
+    tty: true
+
+  test:
+    image: kronos-semi:dev
+    working_dir: /workspaces/kronos-semi
+    volumes:
+      - .:/workspaces/kronos-semi:cached
+    command: pytest
+
+  benchmark:
+    image: kronos-semi:dev
+    working_dir: /workspaces/kronos-semi
+    volumes:
+      - .:/workspaces/kronos-semi:cached
+    environment:
+      - MPLBACKEND=Agg
+    entrypoint: ["python", "scripts/run_benchmark.py"]
+    command: ["pn_1d"]
+
+  jupyter:
+    image: kronos-semi:dev
+    working_dir: /workspaces/kronos-semi
+    volumes:
+      - .:/workspaces/kronos-semi:cached
+    ports:
+      - "8888:8888"
+    command: >
+      jupyter lab
+        --ip=0.0.0.0
+        --port=8888
+        --no-browser
+        --ServerApp.token=''
+        --ServerApp.password=''
+        --ServerApp.root_dir=/workspaces/kronos-semi
