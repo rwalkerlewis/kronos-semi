@@ -152,17 +152,19 @@ def build_psi_dirichlet_bcs(
     N_raw_fn,
 ) -> list:
     """
-    Build the Dirichlet BC list for psi on each ohmic contact (the
-    equilibrium Poisson path).
+    Build the Dirichlet BC list for psi.
 
-    For each ohmic contact the scaled value is
+    Ohmic contacts: psi_hat = asinh(N_net_local / (2 n_i)) + V_applied / V_t,
+    where N_net_local is the doping evaluated at the contact facet centroid.
 
-        psi_hat = asinh(N_net_local / (2 n_i)) + V_applied / V_t
+    Gate contacts: psi_hat = (V_gate - phi_ms) / V_t, where phi_ms is the
+    metal-semiconductor work function difference carried on the ContactBC
+    as `work_function` (JSON key `workfunction`). Gate contacts sit on the
+    oxide side of the Si/SiO2 interface and contribute no Slotboom BCs;
+    `build_dd_dirichlet_bcs` therefore ignores them on purpose.
 
-    where `N_net_local` is the doping evaluated at the contact facet
-    centroid. Non-ohmic kinds are silently skipped here; gate and
-    Schottky contacts will be routed through dedicated helpers when
-    their physics lands.
+    Schottky contacts are accepted by the schema but have no physics
+    wired yet; they raise NotImplementedError here to fail loudly.
     """
     from dolfinx import fem
     from petsc4py import PETSc
@@ -170,18 +172,27 @@ def build_psi_dirichlet_bcs(
     fdim = msh.topology.dim - 1
     bcs = []
     for c in contacts:
-        if c.kind != "ohmic":
-            continue
         facets = facet_tags.find(c.facet_tag)
         if len(facets) == 0:
             raise RuntimeError(
                 f"No facets with tag {c.facet_tag} for contact {c.name!r}"
             )
-        N_net = _evaluate_doping_at_facet(msh, facets, fdim, N_raw_fn)
-        psi_eq_hat = float(np.arcsinh(N_net / (2.0 * ref_mat.n_i)))
-        psi_bc = psi_eq_hat + c.V_applied / sc.V0
         dofs = fem.locate_dofs_topological(V_psi, fdim, facets)
-        bcs.append(fem.dirichletbc(PETSc.ScalarType(psi_bc), dofs, V_psi))
+        if c.kind == "ohmic":
+            N_net = _evaluate_doping_at_facet(msh, facets, fdim, N_raw_fn)
+            psi_eq_hat = float(np.arcsinh(N_net / (2.0 * ref_mat.n_i)))
+            psi_bc = psi_eq_hat + c.V_applied / sc.V0
+            bcs.append(fem.dirichletbc(PETSc.ScalarType(psi_bc), dofs, V_psi))
+        elif c.kind == "gate":
+            phi_ms = float(c.work_function) if c.work_function is not None else 0.0
+            psi_bc = (c.V_applied - phi_ms) / sc.V0
+            bcs.append(fem.dirichletbc(PETSc.ScalarType(psi_bc), dofs, V_psi))
+        elif c.kind == "schottky":
+            raise NotImplementedError(
+                f"Schottky contact {c.name!r}: physics not yet wired."
+            )
+        else:
+            raise ValueError(f"Unknown contact kind {c.kind!r} for {c.name!r}")
     return bcs
 
 
@@ -213,6 +224,13 @@ def build_dd_dirichlet_bcs(
     fdim = msh.topology.dim - 1
     bcs = []
     for c in contacts:
+        # Gate contacts live on the oxide-side of the Si/SiO2 interface;
+        # no Slotboom variable is defined there and the continuity blocks
+        # assemble only on the semiconductor submesh, so gate facets carry
+        # no (phi_n, phi_p) DOFs. We do still apply the psi Dirichlet
+        # through build_psi_dirichlet_bcs.
+        if c.kind == "gate":
+            continue
         if c.kind != "ohmic":
             continue
         facets = facet_tags.find(c.facet_tag)
