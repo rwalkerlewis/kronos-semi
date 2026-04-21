@@ -4,6 +4,16 @@
 
 A JSON-driven finite-element semiconductor device simulator built on [FEniCSx](https://fenicsproject.org/) (dolfinx 0.10+), targeting the workflow of the COMSOL Semiconductor Module — Poisson-coupled drift-diffusion with SRH recombination, multi-region support, ohmic/gate/insulating boundary conditions — in a clean, extensible Python package.
 
+## Planning documents
+
+Before contributing (human or AI), read these in order:
+
+- [PLAN.md](PLAN.md): authoritative current state, next task, invariants, and non-goals.
+- [docs/PHYSICS.md](docs/PHYSICS.md): governing equations, nondimensionalization, and boundary-condition conventions.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): five-layer component design and dependency rules.
+- [docs/adr/](docs/adr/): architecture decision records; open a new ADR before changing any invariant.
+- [docs/ROADMAP.md](docs/ROADMAP.md): full per-day deliverables and verification criteria.
+
 ## Status
 
 **Early development.** Day 1 deliverable is the equilibrium Poisson solve, verified against the depletion-approximation of a 1D pn junction. Drift-diffusion under bias, 2D MOS capacitor, and 3D benchmarks are on the roadmap; see [Roadmap](#roadmap) below.

@@ -1,5 +1,15 @@
 # Contributing
 
+## Before you start
+
+Read these documents before writing code. They are the source of truth
+for what is done, what is next, and which design decisions are locked.
+
+- [PLAN.md](PLAN.md) for current state, the single in-flight task, and invariants.
+- [docs/PHYSICS.md](docs/PHYSICS.md) for equations, scaling conventions, and boundary conditions.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the layered design and the imports-allowed rules per layer.
+- [docs/adr/](docs/adr/) for accepted architecture decisions. If your change conflicts with any invariant in PLAN.md, open an ADR first.
+
 This is an early-stage evaluation project. If you want to run it or extend it:
 
 ## Development setup
