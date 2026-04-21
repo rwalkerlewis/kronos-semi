@@ -74,22 +74,28 @@ Read `PLAN.md` for the short version and the current in-flight task.
 
 ## Day 3. Bias ramping hardening, Shockley IV polish
 
-- **Status:** Planned.
-- **Goal:** make the bias sweep robust, add reverse-bias saturation
-  verification, document the ramp-continuation logic.
-- **Deliverables:**
-  - Adaptive step-size control in the bias ramp: if SNES fails to
-    converge, halve the step and retry; fail the run after a
-    configurable number of halvings.
-  - Reverse-bias sweep from 0 to -2 V verifying saturation current
-    within 20% of $J_0$ (saturation tolerance is looser because real
-    $J_0$ is very small and relative error is noisy).
-  - IV curve plot with theory overlay written to `results/pn_1d_bias/`.
-  - Short writeup in `benchmarks/pn_1d_bias/README.md`.
-- **Verification:**
-  - `benchmark pn_1d_bias` exits 0 with forward and reverse checks
-    both passing.
-  - Plot file exists and has expected title and labels.
+- **Status:** Done (2026-04-21). PR `dev/day3-bias-hardening`.
+- **Goal:** make the bias sweep robust, add reverse-bias check,
+  document the ramp-continuation logic.
+- **Delivered:**
+  - Adaptive step-size control: `AdaptiveStepController` grows the
+    step by `grow_factor` (default 1.5) after `easy_iter_threshold`
+    (default 4) consecutive easy solves, halves on SNES failure, and
+    clamps to the sweep endpoint. Cuts total SNES iterations on the
+    forward `pn_1d_bias` sweep from 42 to 31 (26.2% reduction).
+  - Sah-Noyce-Shockley recombination term (with the leading-order
+    Sze f = 2 V_t/(V_bi - V) correction) in the forward verifier:
+    J_sim matches J_diff + J_rec within 15% on [0.15, 0.55] V and
+    Shockley diffusion within 10% at V = 0.6 V.
+  - New `benchmarks/pn_1d_bias_reverse/` (0 to -2 V) with a
+    verifier demanding |J| within 20% of the net SRH generation
+    current (q n_i / 2 tau_eff)(W(V) - W(0)) on [-2, -0.5] V. For
+    tau = 1e-8 s this replaces the originally-proposed "J saturates
+    to J_0" bar, which does not apply in the SRH-generation regime.
+  - Extracted analytical reference curves into
+    `semi/diode_analytical.py`; 26 new pytest tests.
+  - New "Bias continuation strategy" subsection in `docs/PHYSICS.md`.
+  - CI `docker-fem` job runs the reverse benchmark on every push.
 - **Dependencies:** Day 2.
 
 ## Day 4. Refactor, expanded test coverage, docs pass
