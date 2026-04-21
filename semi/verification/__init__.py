@@ -9,4 +9,5 @@ MMS necessarily exercises the full FEM stack.
 
 Public submodules:
     mms_poisson       MMS for the equilibrium Poisson equation
+    mms_dd            MMS for the coupled drift-diffusion block residual
 """
