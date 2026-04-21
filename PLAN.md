@@ -30,14 +30,19 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `dev/day4-refactor` (Day 4 to be cut after Day 3 PR merges)
+- Active dev branch: `dev/day4-vnv` (Day 4 V&V suite complete, PR pending)
 
 ## Current state
 
-Day 1 and Day 2 are merged into `main`. CI hardening (branch glob plus
-Dockerized FEM job) merged on `ci/docker-benchmark-matrix`. Day 3
-(adaptive bias continuation, Sah-Noyce-Shockley verifier, reverse-bias
-check) is in flight on `dev/day3-bias-hardening`.
+Day 1, Day 2, Day 3, and Day 4 are delivered. Day 1-3 are merged into
+`main`. CI hardening (branch glob plus Dockerized FEM job) merged on
+`ci/docker-benchmark-matrix`. Day 3 (adaptive bias continuation,
+Sah-Noyce-Shockley verifier, reverse-bias generation check) merged via
+PR #5 from `dev/day3-bias-hardening`. Day 4 (Verification & Validation
+suite: MMS-Poisson, mesh convergence, discrete conservation, MMS for
+coupled drift-diffusion, CI integration, documentation) is complete on
+`dev/day4-vnv` and awaiting PR. The original Day-4 refactor pass is
+pushed to Day 5.
 
 ### What works (verified in Docker on current `main`)
 
@@ -64,18 +69,30 @@ check) is in flight on `dev/day3-bias-hardening`.
 - `pn_1d` benchmark (equilibrium): V_bi, peak |E|, bulk densities, mass
   action, all within 5-10% of depletion-approximation theory.
 - `pn_1d_bias` benchmark (forward bias): J at V = 0.6 V within 10% of
-  Shockley long-diode theory. Low-bias behaviour is qualitative in Day 2
-  because depletion-region SRH recombination raises ideality toward 2;
-  Day 3 will make that regime quantitative by adding the Sah-Noyce-
-  Shockley term.
+  Shockley long-diode theory; J_sim within 15% of the Sah-Noyce-Shockley
+  total (J_diff + J_rec, with the Sze f = 2 V_t/(V_bi - V) correction)
+  on V in [0.15, 0.55] V. The original Day 2 "qualitative below 0.5 V"
+  caveat was retired by the Day 3 SNS verifier.
+- `pn_1d_bias_reverse` benchmark (reverse bias): |J| within 20% of the
+  net SRH generation current (q n_i / 2 tau_eff)(W(V) - W(0)) on V in
+  [-2, -0.5] V.
 - GitHub Actions runs pure-Python tests on 3.10/3.11/3.12, ruff, and a
-  Dockerized FEM job that runs pytest plus both benchmark verifiers on
-  every push to `main`, `dev/**`, `ci/**`, `docs/**`.
+  Dockerized FEM job that runs pytest, three benchmark verifiers, and
+  the full V&V suite on every push to `main`, `dev/**`, `ci/**`,
+  `docs/**`. Job timeout is 15 minutes once the dolfinx image is cached.
+- Verification & Validation suite (Day 4): MMS for Poisson (1D linear,
+  1D nonlinear, 2D triangles, 2D quad smoke) with finest-pair rates at
+  theoretical 2.0/1.0; mesh convergence on `pn_1d` with Cauchy ratios
+  >= 1.99x per doubling; discrete conservation (charge on `pn_1d`
+  equilibrium at relative 1.5e-17; current continuity on forward and
+  reverse bias sweeps); MMS for coupled drift-diffusion (three variants
+  x three grids) with all gated block rates >= 1.99.
 
 ### What does not work / not yet built
 
-- 2D MOS capacitor benchmark (Day 5).
-- 3D doped resistor benchmark (Day 6).
+- Refactor of `semi/run.py` and BC construction (Day 5).
+- 2D MOS capacitor benchmark (Day 6).
+- 3D doped resistor benchmark (Day 7).
 - Gmsh `.msh` mesh loader (stubbed, raises `NotImplementedError`).
 - Gate contacts (`type: "gate"`), Schottky contacts.
 - Field-dependent mobility, Auger/radiative recombination, Fermi-Dirac
@@ -83,37 +100,43 @@ check) is in flight on `dev/day3-bias-hardening`.
 
 ## Next task
 
-**Day 4: Refactor, expanded test coverage, physics docs updates.**
-Planned.
+**Day 5: Refactor pass, expanded coverage, docs update.** Ready to
+start once Day 4 merges.
 
-- **Branch:** `dev/day4-refactor` (to be cut from `main` after the
-  Day 3 PR merges).
-- **Scope, in (per `docs/ROADMAP.md` Day 4):**
-  - Break `semi/run.py` into `run_equilibrium` and `run_bias_sweep`
-    modules with a thin `run(cfg)` dispatcher (partially done; extract
-    BC construction into `semi/bcs.py`).
-  - Raise pure-Python coverage to 95%+; add in-memory integration
-    tests for `run` itself.
-  - Update `docs/PHYSICS.md` with the scaled drift-diffusion
-    derivation now that all Day 2/3 terms are implemented.
-  - Add `docs/adr/0006-bc-construction-interface.md` if the BC refactor
-    introduces a new decision.
+- **Branch:** to be cut from `main` after `dev/day4-vnv` merges.
+- **Goal:** pay down accumulated technical debt before moving to 2D/3D
+  (Days 6-7). Break `semi/run.py` into `run_equilibrium` and
+  `run_bias_sweep` functions behind a thin `run(cfg)` dispatcher;
+  factor BC construction into `semi/bcs.py` so ohmic, gate, and
+  future Schottky contacts share a common interface.
+- **Scope, in:**
+  - `semi/run.py` split with no behavioral change to `pn_1d`,
+    `pn_1d_bias`, `pn_1d_bias_reverse`.
+  - `semi/bcs.py` extraction from `_build_ohmic_bcs` and bias-contact
+    plumbing.
+  - Pure-Python coverage target: 95%+ per `pytest --cov=semi`.
+  - `docs/PHYSICS.md` scaled drift-diffusion derivation completed
+    (Section 2.5 is still a placeholder).
+  - Any ADR the refactor requires (ADR 0007 is free).
 - **Scope, out:**
-  - 2D or 3D benchmarks (Days 5-6).
-  - Colab notebook updates.
-- **Preconditions:** Day 3 PR merged into `main`.
+  - 2D MOS capacitor (Day 6) and 3D resistor (Day 7).
+  - Field-dependent mobility, Auger, Fermi-Dirac (Non-goals).
+- **Preconditions:** Day 4 V&V suite merged into `main`.
+- **Hard invariants for this PR:** see "Invariants" below; Day-4 V&V
+  gates must stay green through the refactor.
 
 ## Roadmap
 
-| Day | Milestone                                                    | Status  | Notes                                                                 |
-|----:|--------------------------------------------------------------|---------|-----------------------------------------------------------------------|
-| 1   | Equilibrium Poisson, 1D pn junction, Docker env              | Done    | 6/6 verifier checks pass; PR `dev/docker-day1-fix`                    |
-| 2   | Slotboom drift-diffusion, coupled Newton, bias sweep         | Done    | 6/6 `pn_1d_bias` checks pass; PR `dev/day2-drift-diffusion`           |
-| 3   | Bias ramping continuation, Shockley IV verifier hardening    | Done    | Adaptive ramp (-26.2% iters), SNS verifier, reverse-bias gen check    |
-| 4   | Refactor pass, expanded test coverage, physics docs updates  | Planned | Ruff-clean, coverage target, ADR review                               |
-| 5   | 2D MOS capacitor (oxide + silicon multi-region)              | Planned | Uses submesh for carriers; verify C-V curve                           |
-| 6   | 3D doped resistor                                            | Planned | Framework extension; verify Ohmic V-I linearity                       |
-| 7   | Final polish, submission packaging                           | Planned | Regenerate notebooks, tag release                                     |
+| Day | Milestone                                                    | Status     | Notes                                                                 |
+|----:|--------------------------------------------------------------|------------|-----------------------------------------------------------------------|
+| 1   | Equilibrium Poisson, 1D pn junction, Docker env              | Done       | 6/6 verifier checks pass; PR `dev/docker-day1-fix`                    |
+| 2   | Slotboom drift-diffusion, coupled Newton, bias sweep         | Done       | 6/6 `pn_1d_bias` checks pass; PR `dev/day2-drift-diffusion`           |
+| 3   | Bias ramping continuation, Shockley IV verifier hardening    | Done       | Adaptive ramp (-26.2% iters), SNS verifier, reverse-bias gen check    |
+| 4   | Verification & Validation suite (MMS, conv, conservation)    | Done       | `dev/day4-vnv`; all four phases green, CI V&V step within 15 min      |
+| 5   | Refactor pass, expanded test coverage, physics docs updates  | Queued     | Ruff-clean, coverage target, ADR review (was Day 4)                   |
+| 6   | 2D MOS capacitor (oxide + silicon multi-region)              | Planned    | Uses submesh for carriers; verify C-V curve (was Day 5)               |
+| 7   | 3D doped resistor                                            | Planned    | Framework extension; verify Ohmic V-I linearity (was Day 6)           |
+| 8   | Final polish, submission packaging                           | Planned    | Regenerate notebooks, tag release (was Day 7)                         |
 
 See `docs/ROADMAP.md` for the full per-day breakdown.
 
@@ -173,6 +196,46 @@ They may be added after submission as stretch goals (see
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **Day 4 (2026-04-21):** Verification & Validation suite. Replaces
+  the originally-planned refactor (pushed to Day 5) with four
+  verification activities, each gated in CI via
+  `scripts/run_verification.py`:
+  - **MMS for equilibrium Poisson** (`semi/verification/mms_poisson.py`):
+    1D linear, 1D nonlinear, 2D triangles sweep with UFL weak-form
+    forcing. Finest-pair L^2 rates at theoretical 2.000, H^1 at
+    0.999-1.000. `2d_quad_smoke` sanity ratio 0.394.
+  - **Mesh convergence on `pn_1d`** (`semi/verification/mesh_convergence.py`):
+    N in [50..1600] sweep; Cauchy self-convergence >= 1.99x per
+    doubling on E_peak and W over the first four levels; honest-flag
+    plateau documented because the depletion-approximation reference
+    is itself approximate.
+  - **Conservation** (`semi/verification/conservation.py`): charge
+    conservation on `pn_1d` equilibrium at rel 1.5e-17; current
+    continuity on `pn_1d_bias` (V in {0.30, 0.45, 0.60} V) and
+    `pn_1d_bias_reverse` (V in {-0.50, -1.00, -2.00} V) with worst
+    max_rel 1.91% forward / 0.020% reverse, inside the 5% / 15% tols.
+  - **MMS for coupled drift-diffusion** (`semi/verification/mms_dd.py`):
+    three variants (psi-only / full coupling no R / full coupling with
+    SRH) x three grids (1D default, 1D nonlinear, 2D); every gated
+    block rate >= 1.99 L^2 and >= 0.996 H^1. Derivation artifact:
+    `docs/mms_dd_derivation.md`. Implementation-time amendment to the
+    derivation: SNES `atol = 0.0`, `stol = 1e-12` (the originally-
+    proposed `atol = 1e-16` was below the 2D continuity-block initial
+    residual and terminated Newton prematurely).
+  - **CLI driver** `scripts/run_verification.py` with subcommands
+    `mms_poisson`, `mesh_convergence`, `conservation`, `mms_dd`, `all`.
+  - **CI integration:** `docker-fem` job adds a V&V step running
+    `run_verification.py all` inside the dolfinx image; timeout
+    tightened from 30 to 15 minutes; `benchmark-plots` artifact
+    renamed `fem-results` and keeps uploading the full `results/`
+    tree.
+  - **Documentation:** new "Verification & Validation" section in
+    `docs/PHYSICS.md` with current finest-pair rates and honest flags
+    (depletion plateau, Variant A scope, block residual scale
+    disparity); new ADR
+    `docs/adr/0006-verification-and-validation-strategy.md`. PR:
+    `dev/day4-vnv`.
 
 - **Day 3 (2026-04-21):** adaptive bias continuation, Sah-Noyce-
   Shockley recombination in the forward verifier, and a dedicated

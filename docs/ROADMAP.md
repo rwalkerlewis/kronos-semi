@@ -98,9 +98,96 @@ Read `PLAN.md` for the short version and the current in-flight task.
   - CI `docker-fem` job runs the reverse benchmark on every push.
 - **Dependencies:** Day 2.
 
-## Day 4. Refactor, expanded test coverage, docs pass
+## Day 4. Verification & Validation suite
 
-- **Status:** Planned.
+- **Status:** Done (2026-04-21). PR `dev/day4-vnv`.
+- **Goal:** replace single-point physical sanity tests with proper
+  verification (Roache / Oberkampf-Roy sense): manufactured solutions,
+  mesh-refinement convergence studies, and discrete conservation
+  checks. The originally-planned refactor moves to Day 5.
+- **Rationale:** the existing benchmark "verifiers" prove the code
+  reproduces analytical reference values at one mesh resolution. They
+  do not prove convergence, do not exercise the discretization away
+  from operating points, and do not catch sign or coefficient errors
+  that happen to cancel at a single resolution. MMS is the standard
+  remedy.
+- **Deliverables:**
+  - **Phase 1: MMS for Poisson.**
+    - `semi/verification/mms_poisson.py`: 1D and 2D smooth
+      manufactured solutions, UFL-based forcing, mesh sweep,
+      L^2 / H^1 error and observed-rate computation, CSV+PNG output.
+    - `tests/fem/test_mms_poisson.py` with `tests/fem/conftest.py`
+      that skips when dolfinx is missing.
+  - **Phase 2: Mesh convergence on `pn_1d`.**
+    - `semi/verification/mesh_convergence.py`: sweep N in
+      [50, 100, 200, 400, 800, 1600], record V_bi error, peak |E|
+      error, depletion-width error, Newton iterations, solve time.
+    - `tests/fem/test_mesh_convergence.py` (3 levels for speed).
+    - Documented convergence order, including any plateau caused by
+      the depletion-approximation reference itself being
+      approximate.
+  - **Phase 3: Conservation checks.**
+    - Current continuity check (max |J_total(x) - mean| / mean)
+      added to the `pn_1d_bias` and `pn_1d_bias_reverse` verifiers.
+      Threshold +-5% forward, +-15% reverse.
+    - Charge conservation check (integrated rho over the device
+      bounded by solver tolerance) added to `pn_1d`.
+    - Unit tests on the check functions in isolation, with mock
+      `SimulationResult` objects.
+  - **Phase 4: MMS for coupled drift-diffusion.**
+    - `semi/verification/mms_dd.py`: manufactured psi, Phi_n, Phi_p
+      with three forcing terms in UFL.
+    - Three pytest tests: psi-only with frozen quasi-Fermis;
+      full three-block coupling; full coupling with nonzero SRH.
+    - Acceptance: L^2 rate >= 1.75 on each field on the finest pair.
+  - **Phase 5: CI integration.**
+    - `scripts/run_verification.py` CLI parallel to
+      `scripts/run_benchmark.py` (subcommands `mms_poisson`,
+      `mms_dd`, `mesh_convergence`, `conservation`, `all`).
+    - `.github/workflows/ci.yml`: run V&V step inside `docker-fem`,
+      upload `results/mms_*` and `results/mesh_convergence/`
+      artifacts. Total CI runtime under 15 minutes.
+  - **Final phase: Documentation.**
+    - New "Verification & Validation" section in `docs/PHYSICS.md`.
+    - New ADR `docs/adr/0006-verification-and-validation-strategy.md`.
+    - PLAN.md, ROADMAP.md, CHANGELOG.md final update.
+- **Delivered:**
+  - MMS-Poisson 1D linear / 1D nonlinear / 2D triangles with
+    finest-pair L^2 at theoretical 2.000 and H^1 at 0.999-1.000;
+    `2d_quad_smoke` sanity ratio 0.394.
+  - Mesh convergence on `pn_1d` over N in [50..1600] with
+    self-convergence Cauchy ratios at >= 1.99x per doubling for
+    E_peak and W over the first four levels (before the
+    physics-model plateau from the depletion-approximation
+    reference, which is honest-flagged in both the runner output
+    and in `docs/PHYSICS.md`). V_bi is set by the Ohmic BCs and
+    so is reported but not gated.
+  - Conservation: charge on `pn_1d` equilibrium at rel 1.5e-17
+    (threshold 1e-10); current continuity on `pn_1d_bias` V in
+    {0.30, 0.45, 0.60} V and `pn_1d_bias_reverse` V in {-0.50,
+    -1.00, -2.00} V, worst max_rel 1.91% forward / 0.020%
+    reverse inside the 5% / 15% tolerances.
+  - MMS-DD nine studies (three variants x three grids) with
+    every gated block rate >= 1.99 L^2 and >= 0.996 H^1.
+    Variant A gates only the psi block because the continuity
+    rows collapse to machine roundoff when the quasi-Fermis are
+    identically zero (documented in `mms_dd_derivation.md`
+    Amendment section).
+  - `scripts/run_verification.py` with subcommands `mms_poisson`,
+    `mesh_convergence`, `conservation`, `mms_dd`, `all`.
+  - CI `docker-fem` job now runs V&V inside the dolfinx image,
+    timeout tightened to 15 minutes, artifacts uploaded as
+    `fem-results` (renamed from `benchmark-plots`).
+  - New ADR `0006-verification-and-validation-strategy.md`, new
+    "Verification & Validation" section in `docs/PHYSICS.md`,
+    derivation artifact `docs/mms_dd_derivation.md` amended with
+    the SNES atol-0 fix rationale.
+- **Dependencies:** Day 3 (PR #5) merged into `main`.
+
+## Day 5. Refactor, expanded test coverage, docs pass
+
+- **Status:** Planned. Was originally Day 4; pushed back one slot to
+  make room for the V&V suite.
 - **Goal:** pay down technical debt accumulated across Days 1-3 and
   expand coverage before moving to higher dimensions.
 - **Deliverables:**
@@ -113,17 +200,18 @@ Read `PLAN.md` for the short version and the current in-flight task.
     configs.
   - Update `docs/PHYSICS.md` with the scaled drift-diffusion
     derivation now that it is implemented.
-  - Add `docs/adr/0006-bc-construction-interface.md` if the BC refactor
-    introduces a new decision.
+  - Add `docs/adr/0007-bc-construction-interface.md` if the BC
+    refactor introduces a new decision (note: ADR 0006 is reserved
+    for the Day 4 V&V strategy).
 - **Verification:**
   - `pytest --cov=semi --cov-report=term-missing` shows core coverage
     at or above 95%.
   - No behavioral regressions in `pn_1d` or `pn_1d_bias`.
-- **Dependencies:** Days 2 and 3.
+- **Dependencies:** Day 4 V&V suite merged.
 
-## Day 5. 2D MOS capacitor
+## Day 6. 2D MOS capacitor
 
-- **Status:** Planned.
+- **Status:** Planned. Was originally Day 5.
 - **Goal:** extend to 2D and multi-region (oxide plus silicon).
 - **Deliverables:**
   - `benchmarks/mos_2d/mos_cap.json` with a gate, oxide, silicon
@@ -137,11 +225,11 @@ Read `PLAN.md` for the short version and the current in-flight task.
 - **Verification:**
   - `benchmark mos_2d` exits 0.
   - 2D plots rendered (psi contour, |E| contour, n and p contours).
-- **Dependencies:** Day 4 refactor.
+- **Dependencies:** Day 5 refactor.
 
-## Day 6. 3D doped resistor
+## Day 7. 3D doped resistor
 
-- **Status:** Planned.
+- **Status:** Planned. Was originally Day 6.
 - **Goal:** confirm the framework extends to 3D unstructured meshes
   with no physics changes.
 - **Deliverables:**
@@ -153,11 +241,11 @@ Read `PLAN.md` for the short version and the current in-flight task.
 - **Verification:**
   - `benchmark resistor_3d` exits 0.
   - At least two 3D slice plots (current density magnitude, potential).
-- **Dependencies:** Day 4.
+- **Dependencies:** Day 5.
 
-## Day 7. Final polish and submission packaging
+## Day 8. Final polish and submission packaging
 
-- **Status:** Planned.
+- **Status:** Planned. Was originally Day 7.
 - **Goal:** make the submission presentation-ready.
 - **Deliverables:**
   - Regenerate `notebooks/01_pn_junction_1d.ipynb` using
@@ -170,7 +258,7 @@ Read `PLAN.md` for the short version and the current in-flight task.
 - **Verification:**
   - Both notebooks execute top-to-bottom on Colab with no errors.
   - README and CHANGELOG accurately describe final state.
-- **Dependencies:** Days 5 and 6.
+- **Dependencies:** Days 6 and 7.
 
 ## Post-submission (stretch goals)
 

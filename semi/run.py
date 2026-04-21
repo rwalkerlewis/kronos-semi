@@ -99,8 +99,24 @@ def run_equilibrium(cfg: dict[str, Any]) -> SimulationResult:
     )
 
 
-def run_bias_sweep(cfg: dict[str, Any]) -> SimulationResult:
-    """Coupled drift-diffusion solver with optional bias ramping."""
+def run_bias_sweep(
+    cfg: dict[str, Any],
+    *,
+    post_step_hook=None,
+) -> SimulationResult:
+    """
+    Coupled drift-diffusion solver with optional bias ramping.
+
+    `post_step_hook`, if provided, is called after every successful
+    bias step with the signature
+
+        post_step_hook(V_applied, spaces, iv_row)
+
+    where `iv_row` is the freshly-appended dict in `result.iv`. The
+    hook is expected to mutate `iv_row` in place (e.g. to record
+    Phase 3 V&V continuity samples on top of the V / J the sweep
+    already records). No return value is inspected.
+    """
     from dolfinx import fem
 
     from .doping import build_profile
@@ -253,6 +269,8 @@ def run_bias_sweep(cfg: dict[str, Any]) -> SimulationResult:
     V_prev = V_seed
     _record_iv(iv_rows, V_seed, spaces, sc, ref_mat,
                sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI)
+    if post_step_hook is not None:
+        post_step_hook(V_seed, spaces, iv_rows[-1])
 
     V_end = float(v_sweep_list[-1])
     if abs(V_end - V_seed) > 0.0 and max_step_abs > 0.0:
@@ -293,6 +311,8 @@ def run_bias_sweep(cfg: dict[str, Any]) -> SimulationResult:
                 V_prev = V_try
                 _record_iv(iv_rows, V_try, spaces, sc, ref_mat,
                            sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI)
+                if post_step_hook is not None:
+                    post_step_hook(V_try, spaces, iv_rows[-1])
                 halvings = 0
                 controller.on_success(int(info.get("iterations", 0)))
                 continue

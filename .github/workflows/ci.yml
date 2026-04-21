@@ -51,10 +51,11 @@ jobs:
 
   docker-fem:
     # FEM integration: build the dolfinx dev image, run pytest inside,
-    # and execute both benchmark verifiers. Slow (~10-12 min once cached)
-    # but this is the only place the dolfinx code paths actually run.
+    # and execute the benchmark verifiers plus the full V&V suite. The
+    # job stays inside a 15-minute budget once the image is cached.
+    # This is the only place the dolfinx code paths actually run.
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -116,10 +117,19 @@ jobs:
             kronos-semi:ci \
             python scripts/run_benchmark.py pn_1d_bias_reverse
 
-      - name: Upload benchmark plots
+      - name: Run V&V suite (MMS Poisson, mesh convergence, conservation, MMS DD)
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
+            -w /workspaces/kronos-semi \
+            -e MPLBACKEND=Agg \
+            kronos-semi:ci \
+            python scripts/run_verification.py all
+
+      - name: Upload results (benchmarks + V&V artifacts)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-plots
+          name: fem-results
           path: results/
           retention-days: 14

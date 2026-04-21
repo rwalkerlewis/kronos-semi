@@ -166,6 +166,16 @@ def verify_pn_1d(result) -> list[tuple[str, bool, str]]:
         f"<np>_right={np_right:.3e}, n_i^2={ni2:.3e}, rel_err={err_right:.2%}",
     ))
 
+    # 5. Global charge conservation (Phase 3 V&V)
+    from semi.verification.conservation import charge_conservation_from_result
+    Q_check = charge_conservation_from_result(result)
+    checks.append((
+        "charge conservation: |Q_net| < 1e-10 * q * max|N_net| * L",
+        Q_check.rel_error < 1.0e-10,
+        f"Q_net={Q_check.Q_net:.3e} C/m^2, "
+        f"Q_ref={Q_check.Q_ref:.3e} C/m^2, rel={Q_check.rel_error:.3e}",
+    ))
+
     # Stash analytical references for the plotter
     result._analytical = {
         "V_bi": V_bi_theory,
@@ -390,6 +400,17 @@ def verify_pn_1d_bias(result) -> list[tuple[str, bool, str]]:
             f"sim={J_sim_06:.3e}, Shockley={J_sh_06:.3e}, rel_err={err06*100:.1f}%",
         ))
 
+    # Phase 3 V&V: interior current continuity at the final forward bias.
+    from semi.verification.conservation import current_continuity_from_result
+    cc = current_continuity_from_result(result, n_samples=10)
+    V_end = iv[-1]["V"] if iv else 0.0
+    checks.append((
+        f"pn_1d_bias: J_total continuity within 5% at V={V_end:.2f} V",
+        bool(np.isfinite(cc.max_rel_dev)) and (cc.max_rel_dev < 0.05),
+        f"{cc.xs.size} samples; mean J={cc.mean_J:.3e} A/m^2, "
+        f"max dev={cc.max_abs_dev:.3e} ({cc.max_rel_dev*100:.2f}%)",
+    ))
+
     return checks
 
 
@@ -480,6 +501,20 @@ def verify_pn_1d_bias_reverse(result) -> list[tuple[str, bool, str]]:
         f"{len(V_arr)} pts; worst {rel_err[worst_i]*100:.1f}% at V="
         f"{V_arr[worst_i]:.2f} V (|sim|={J_abs_arr[worst_i]:.3e}, "
         f"ref={J_total_ref[worst_i]:.3e})",
+    ))
+
+    # Phase 3 V&V: interior current continuity at the final reverse bias.
+    # Reverse |J| is ~5 orders smaller than forward, so the absolute
+    # Newton-tolerance leakage shows up as a larger relative deviation
+    # (15% vs the 5% gate used on the forward branch).
+    from semi.verification.conservation import current_continuity_from_result
+    cc = current_continuity_from_result(result, n_samples=10)
+    V_end = iv[-1]["V"] if iv else 0.0
+    checks.append((
+        f"pn_1d_bias_reverse: J_total continuity within 15% at V={V_end:.2f} V",
+        bool(np.isfinite(cc.max_rel_dev)) and (cc.max_rel_dev < 0.15),
+        f"{cc.xs.size} samples; mean J={cc.mean_J:.3e} A/m^2, "
+        f"max dev={cc.max_abs_dev:.3e} ({cc.max_rel_dev*100:.2f}%)",
     ))
 
     return checks
