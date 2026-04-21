@@ -289,11 +289,43 @@ def _report_continuity_table(iv_rows, targets, *, tol):
     return all_pass
 
 
-def cmd_not_implemented(name: str):
-    def _run(_args) -> int:
-        print(f"[run_verification] {name}: not implemented yet (Phase 4)")
-        return 0
-    return _run
+def cmd_mms_dd(args) -> int:
+    """
+    Phase 4: MMS for the coupled drift-diffusion block residual.
+
+    Runs nine studies (three variants x {1D linear, 1D nonlinear, 2D})
+    and gates the finest-pair L^2 and H^1 rates of every meaningful
+    block per variant (psi only for Variant A; psi + phi_n + phi_p for
+    Variants B and C). See docs/mms_dd_derivation.md for the
+    rate-threshold rationale; this CLI enforces the same floors the
+    pytest gate uses.
+    """
+    from semi.verification.mms_dd import report_table, run_cli_study
+
+    out_dir = Path(args.out) if args.out else RESULTS_DIR / "mms_dd"
+    print(f"[run_verification] mms_dd -> {out_dir.relative_to(REPO_ROOT)}")
+    studies = run_cli_study(out_dir)
+
+    all_ok = True
+    for label, rows in studies.items():
+        variant = "A" if "_A_" in label or label.endswith("_A") else (
+            "B" if "_B_" in label or label.endswith("_B") else "C"
+        )
+        blocks = ("psi",) if variant == "A" else ("psi", "phi_n", "phi_p")
+        print()
+        print(report_table(rows, header=f"=== mms_dd {label} ==="))
+        for b in blocks:
+            ok_l2, msg_l2 = _gate_finest_pair_rate(
+                rows, f"rate_L2_{b}", 1.75, f"{label} L2[{b}]",
+            )
+            ok_h1, msg_h1 = _gate_finest_pair_rate(
+                rows, f"rate_H1_{b}", 0.80, f"{label} H1[{b}]",
+            )
+            print(msg_l2)
+            print(msg_h1)
+            all_ok = all_ok and ok_l2 and ok_h1
+
+    return 0 if all_ok else 8
 
 
 def cmd_all(args) -> int:
@@ -307,7 +339,9 @@ def cmd_all(args) -> int:
     rc = cmd_conservation(args)
     if rc != 0:
         return rc
-    # Future: chain mms_dd here.
+    rc = cmd_mms_dd(args)
+    if rc != 0:
+        return rc
     return 0
 
 
@@ -332,7 +366,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.study == "conservation":
         return cmd_conservation(args)
     if args.study == "mms_dd":
-        return cmd_not_implemented("mms_dd")(args)
+        return cmd_mms_dd(args)
     if args.study == "all":
         return cmd_all(args)
     parser.error(f"Unknown study {args.study!r}")
