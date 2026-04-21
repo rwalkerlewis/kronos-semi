@@ -30,12 +30,15 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `dev/docker-day1-fix` (Day 1 complete, pending merge)
-- Docs branch: `docs/planning-scaffolding` (this change)
+- Active dev branch: `dev/day2-drift-diffusion` (Day 2 in flight)
 
 ## Current state
 
-### What works (verified in Docker)
+Day 1 is merged into `main`. Day 2 (Slotboom drift-diffusion, coupled
+block Newton, forward-bias sweep) is in flight on
+`dev/day2-drift-diffusion`.
+
+### What works (verified in Docker on current `main`)
 
 - Docker dev environment on `ghcr.io/fenics/dolfinx/dolfinx:stable`
   (dolfinx 0.10). `docker compose run --rm test` runs 36/36 pytest.
@@ -79,14 +82,15 @@ recombination for 1D/2D/3D devices.
 
 ## Next task
 
-**Day 2: Slotboom drift-diffusion and bias support.**
+**Day 2: Slotboom drift-diffusion and bias support.** In flight on
+`dev/day2-drift-diffusion`.
 
-- **Branch:** `dev/day2-drift-diffusion` (to be created off `main` after
-  `dev/docker-day1-fix` merges).
-- **Preconditions:**
-  - `dev/docker-day1-fix` is merged to `main`.
-  - `docker compose run --rm benchmark pn_1d` exits 0 on the fresh `main`.
-  - `docker compose run --rm test` is 36/36 green on the fresh `main`.
+- **Branch:** `dev/day2-drift-diffusion` (created off `main` at
+  commit 32dcafd, the Day 1 merge).
+- **Preconditions (satisfied):**
+  - `dev/docker-day1-fix` merged to `main` (PR #2).
+  - `docker compose run --rm benchmark pn_1d` exits 0 on `main`.
+  - `docker compose run --rm test` is 36/36 green on `main`.
 - **Scope, in:**
   - Implement Slotboom quasi-Fermi variables (Phi_n, Phi_p) with
     Boltzmann carrier expressions `n = n_i exp((psi - Phi_n) / V_t)`,
