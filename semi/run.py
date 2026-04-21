@@ -195,17 +195,26 @@ def run_bias_sweep(cfg: dict[str, Any]) -> SimulationResult:
         bcs = _build_dd_ohmic_bcs(
             cfg, spaces, msh, facet_tags, sc, ref_mat, N_raw_fn, V_by_contact,
         )
+        space_to_fn = {
+            id(spaces.V_psi): spaces.psi,
+            id(spaces.V_phi_n): spaces.phi_n,
+            id(spaces.V_phi_p): spaces.phi_p,
+        }
         for bc in bcs:
-            for fn in (spaces.psi, spaces.phi_n, spaces.phi_p):
-                try:
-                    bc.set(fn.x.array)
-                except Exception:
-                    pass
+            fn = space_to_fn.get(id(bc.function_space))
+            if fn is not None:
+                bc.set(fn.x.array)
         for fn in (spaces.psi, spaces.phi_n, spaces.phi_p):
             fn.x.scatter_forward()
         return solve_nonlinear_block(
             F_list, [spaces.psi, spaces.phi_n, spaces.phi_p],
             bcs, prefix=f"{cfg['name']}_dd_{tag}_",
+            petsc_options={
+                "snes_rtol": 1.0e-14,
+                "snes_atol": 1.0e-14,
+                "snes_stol": 1.0e-14,
+                "snes_max_it": 60,
+            },
         )
 
     sweep_facet_info = None
@@ -310,55 +319,70 @@ def _record_iv(iv_rows, V_applied, spaces, sc, ref_mat,
 def _evaluate_current_at_contact(spaces, sc, ref_mat, facet_info,
                                  mu_n_SI, mu_p_SI) -> float:
     """
-    Finite-difference J = J_n + J_p at a contact in 1D.
+    Evaluate J = J_n + J_p at a contact via a UFL weak form:
 
-    J_n = q mu_n n (d phi_n / dx), J_p = q mu_p p (d phi_p / dx).
-    Positive J = current flowing outward across the contact.
+        J_n = q mu_n n (grad phi_n . n_outward)
+        J_p = q mu_p p (grad phi_p . n_outward)
+
+    Integrated over the contact facet and divided by its measure.
+    Positive J = current flowing outward (out of the device through
+    the contact).
     """
+    import ufl
+    from dolfinx import fem
+    from mpi4py import MPI
+    from petsc4py import PETSc
+
     from .constants import Q
+    from .physics.slotboom import n_from_slotboom, p_from_slotboom
 
-    x_dof = spaces.V_psi.tabulate_dof_coordinates()
-    x = x_dof[:, 0]
-    psi_hat = spaces.psi.x.array
-    phi_n_hat = spaces.phi_n.x.array
-    phi_p_hat = spaces.phi_p.x.array
+    msh = spaces.V_psi.mesh
+    tag = int(facet_info["tag"])
+    facets = facet_info["facets"]
+    fdim = msh.topology.dim - 1
 
-    ni_hat = ref_mat.n_i / sc.C0
-    n_hat = ni_hat * np.exp(psi_hat - phi_n_hat)
-    p_hat = ni_hat * np.exp(phi_p_hat - psi_hat)
-
-    dofs = facet_info["dofs"]
-    outward_sign = facet_info["outward_sign"]
-    if len(dofs) == 0:
+    if len(facets) == 0:
         return 0.0
 
-    contact_dof = int(dofs[0])
-    x_c = x[contact_dof]
-    direction = -outward_sign
-    order = np.argsort(np.abs(x - x_c))
-    neighbor_dof = None
-    for idx in order[1:]:
-        if (x[idx] - x_c) * direction > 0.0:
-            neighbor_dof = int(idx)
-            break
-    if neighbor_dof is None:
-        return 0.0
+    import numpy as _np
+    from dolfinx.mesh import meshtags
+    values = _np.full(len(facets), tag, dtype=_np.int32)
+    indices = _np.asarray(facets, dtype=_np.int32)
+    sort = _np.argsort(indices)
+    facet_mt = meshtags(msh, fdim, indices[sort], values[sort])
+    ds = ufl.Measure("ds", domain=msh, subdomain_data=facet_mt, subdomain_id=tag)
+    n_vec = ufl.FacetNormal(msh)
 
-    dx = x[neighbor_dof] - x[contact_dof]
-    d_phi_n_hat = (phi_n_hat[neighbor_dof] - phi_n_hat[contact_dof]) / dx
-    d_phi_p_hat = (phi_p_hat[neighbor_dof] - phi_p_hat[contact_dof]) / dx
+    ni_hat = fem.Constant(msh, PETSc.ScalarType(ref_mat.n_i / sc.C0))
+    psi = spaces.psi
+    phi_n = spaces.phi_n
+    phi_p = spaces.phi_p
 
-    n_mid_hat = 0.5 * (n_hat[contact_dof] + n_hat[neighbor_dof])
-    p_mid_hat = 0.5 * (p_hat[contact_dof] + p_hat[neighbor_dof])
-    n_mid = n_mid_hat * sc.C0
-    p_mid = p_mid_hat * sc.C0
+    n_ufl = n_from_slotboom(psi, phi_n, ni_hat) * sc.C0
+    p_ufl = p_from_slotboom(psi, phi_p, ni_hat) * sc.C0
+    grad_phi_n_phys = sc.V0 * ufl.grad(phi_n)
+    grad_phi_p_phys = sc.V0 * ufl.grad(phi_p)
 
-    grad_phi_n = sc.V0 * d_phi_n_hat
-    grad_phi_p = sc.V0 * d_phi_p_hat
-    J_n = Q * mu_n_SI * n_mid * grad_phi_n
-    J_p = Q * mu_p_SI * p_mid * grad_phi_p
-    J_total = J_n + J_p
-    return float(J_total * outward_sign)
+    Jn = Q * mu_n_SI * n_ufl * ufl.dot(grad_phi_n_phys, n_vec)
+    Jp = Q * mu_p_SI * p_ufl * ufl.dot(grad_phi_p_phys, n_vec)
+    current_form = fem.form((Jn + Jp) * ds)
+    area_form = fem.form(1.0 * ds)
+
+    I_local = fem.assemble_scalar(current_form)
+    A_local = fem.assemble_scalar(area_form)
+    I = msh.comm.allreduce(I_local, op=MPI.SUM)
+    A = msh.comm.allreduce(A_local, op=MPI.SUM)
+
+    if msh.topology.dim == 1:
+        if A == 0.0:
+            A = 1.0
+        J_total = I / A
+    else:
+        if A == 0.0:
+            return 0.0
+        J_total = I / A
+
+    return float(J_total)
 
 
 def _resolve_contact_facets(cfg, msh, facet_tags, contact_name):
