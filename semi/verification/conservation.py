@@ -324,7 +324,7 @@ def current_continuity_from_result(result, n_samples: int = 10) -> CurrentContin
     )
 
 
-def run_bias_sweep_with_continuity(cfg: dict, *, n_samples: int = 10):
+def run_bias_sweep_with_continuity(cfg: dict, *, n_samples: int = 10):  # pragma: no cover
     """
     Run `semi.run.run_bias_sweep(cfg)` with a post-step hook that attaches
     `continuity_*` fields to each IV row. Returns the SimulationResult

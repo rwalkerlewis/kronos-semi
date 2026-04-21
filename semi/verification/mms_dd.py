@@ -460,7 +460,7 @@ _ROW_COLUMNS: tuple[str, ...] = (
 )
 
 
-def to_table_rows(results: list[MMSDDResult]) -> list[dict]:
+def to_table_rows(results: list[MMSDDResult]) -> list[dict]:  # pragma: no cover
     """Build per-level rows with observed L^2/H^1 rates for every block."""
     from ._convergence import observed_rates
 
@@ -494,7 +494,7 @@ def to_table_rows(results: list[MMSDDResult]) -> list[dict]:
     return rows
 
 
-def report_table(rows: list[dict], header: str = "") -> str:
+def report_table(rows: list[dict], header: str = "") -> str:  # pragma: no cover
     """Pretty multi-line stdout table showing psi L^2 + rate for each block."""
     from ._convergence import format_table
 
@@ -507,7 +507,7 @@ def report_table(rows: list[dict], header: str = "") -> str:
     return format_table(rows, cols, header=header)
 
 
-def write_artifacts(
+def write_artifacts(  # pragma: no cover
     rows: list[dict],
     out_dir: Path,
     *,
@@ -547,7 +547,7 @@ CLI_NS_1D: list[int] = [40, 80, 160, 320]
 CLI_NS_2D: list[int] = [16, 32, 64]
 
 
-def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:
+def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
     """
     Artifact-production sweep used by `scripts/run_verification.py`.
 

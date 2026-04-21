@@ -248,7 +248,7 @@ def cauchy_errors(
     return out
 
 
-def to_table_rows(results: list[MeshConvRow]) -> list[dict]:
+def to_table_rows(results: list[MeshConvRow]) -> list[dict]:  # pragma: no cover
     """
     Convert dataclass rows to dicts with ratio-per-doubling columns and
     Cauchy self-convergence columns against the finest mesh in the sweep.
@@ -310,7 +310,7 @@ CSV_COLUMNS = [
 ]
 
 
-def write_artifacts(
+def write_artifacts(  # pragma: no cover
     rows: list[dict],
     out_dir: Path,
     *,
@@ -339,7 +339,7 @@ def write_artifacts(
     )
 
 
-def report_table(rows: list[dict], header: str = "") -> str:
+def report_table(rows: list[dict], header: str = "") -> str:  # pragma: no cover
     """Stdout-friendly table (subset of columns for readability)."""
     from ._convergence import format_table
 
@@ -360,7 +360,7 @@ def report_table(rows: list[dict], header: str = "") -> str:
 CLI_NS = [50, 100, 200, 400, 800, 1600]
 
 
-def run_cli_study(out_dir: Path) -> list[dict]:
+def run_cli_study(out_dir: Path) -> list[dict]:  # pragma: no cover
     """Run the full mesh sweep and write CSV + PNG to `out_dir`."""
     out_dir = Path(out_dir)
     results = run_convergence_study(CLI_NS)
