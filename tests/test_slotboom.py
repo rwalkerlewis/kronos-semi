@@ -6,7 +6,6 @@ import pytest
 
 from semi.physics import slotboom
 
-
 # The UFL helpers are covered indirectly by the drift-diffusion Form
 # builder tests that run in Docker; here we exercise the pure-NumPy
 # pointwise helpers that do not require dolfinx to be importable.

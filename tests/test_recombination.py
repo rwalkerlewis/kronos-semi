@@ -6,7 +6,6 @@ import pytest
 
 from semi.physics import recombination
 
-
 N_I = 1.0e16              # m^-3, Si at 300 K (order of magnitude)
 TAU_N = 1.0e-7            # s
 TAU_P = 1.0e-7            # s
@@ -109,7 +108,7 @@ def test_srh_vector_input_matches_scalar():
     n = rng.uniform(1.0e16, 1.0e20, size=20)
     p = rng.uniform(1.0e10, 1.0e16, size=20)
     R_vec = _np_rate(n, p)
-    R_loop = np.array([_np_rate(float(nn), float(pp)) for nn, pp in zip(n, p)])
+    R_loop = np.array([_np_rate(float(nn), float(pp)) for nn, pp in zip(n, p, strict=True)])
     np.testing.assert_allclose(R_vec, R_loop, rtol=1e-12)
 
 

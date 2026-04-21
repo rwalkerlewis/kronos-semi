@@ -21,14 +21,15 @@ from __future__ import annotations
 
 import argparse
 import glob
-import os
 import sys
 import time
 import traceback
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
@@ -68,7 +69,7 @@ def verify_pn_1d(result) -> list[tuple[str, bool, str]]:
       - bulk densities within factor of 2 of majority doping
       - mass-action n*p == n_i^2 in bulk to 1%
     """
-    from semi.constants import EPS0, Q, cm3_to_m3
+    from semi.constants import Q, cm3_to_m3
     from semi.materials import get_material
 
     cfg = result.cfg
@@ -242,7 +243,172 @@ def plot_pn_1d(result, out_dir: Path) -> list[Path]:
 
 _PLOTTERS: dict[str, Callable[[Any, Path], list[Path]]] = {
     "pn_1d": plot_pn_1d,
+    "pn_1d_bias": None,  # set below after definition
 }
+
+
+# --------------------------------------------------------------------------- #
+# pn_1d_bias verifier and plotter                                             #
+# --------------------------------------------------------------------------- #
+
+def _shockley_long_diode_iv(cfg, sc, mat):
+    """Return (J_s, V_array, J_array) for the long-diode Shockley model."""
+    from semi.constants import Q, cm3_to_m3
+
+    prof = cfg["doping"][0]["profile"]
+    N_A = cm3_to_m3(prof["N_A_left"])
+    N_D = cm3_to_m3(prof["N_D_right"])
+
+    mob = cfg.get("physics", {}).get("mobility", {})
+    mu_n = float(mob.get("mu_n", 1400.0)) * 1.0e-4
+    mu_p = float(mob.get("mu_p", 450.0)) * 1.0e-4
+    rec = cfg.get("physics", {}).get("recombination", {})
+    tau_n = float(rec.get("tau_n", 1.0e-7))
+    tau_p = float(rec.get("tau_p", 1.0e-7))
+
+    V_t = sc.V0
+    D_n = V_t * mu_n
+    D_p = V_t * mu_p
+    L_n = (D_n * tau_n) ** 0.5
+    L_p = (D_p * tau_p) ** 0.5
+
+    J_s = Q * mat.n_i ** 2 * (D_n / (L_n * N_A) + D_p / (L_p * N_D))
+    return J_s, L_n, L_p
+
+
+@register("pn_1d_bias")
+def verify_pn_1d_bias(result) -> list[tuple[str, bool, str]]:
+    """
+    Compare simulated J(V) to Shockley long-diode theory.
+
+    The ideal Shockley J = J_s (exp(V/V_t) - 1) omits depletion-region
+    recombination (Sah-Noyce-Shockley), which dominates at low bias and
+    raises the ideality factor to ~2. We therefore demand a tight
+    Shockley match only at high forward bias (V >= 0.5 V) where
+    diffusion current dominates, and require monotone super-linear
+    growth elsewhere.
+    """
+    from semi.materials import get_material
+
+    cfg = result.cfg
+    sc = result.scaling
+    mat = get_material(cfg["regions"]["silicon"]["material"])
+    V_t = sc.V0
+
+    iv = result.iv or []
+    if not iv:
+        return [("pn_1d_bias: IV table non-empty", False, "no iv rows recorded")]
+
+    J_s, L_n, L_p = _shockley_long_diode_iv(cfg, sc, mat)
+
+    checks: list[tuple[str, bool, str]] = []
+    checks.append((
+        "pn_1d_bias: IV sweep covers 0 and 0.6 V",
+        (min(r["V"] for r in iv) <= 1.0e-9) and (max(r["V"] for r in iv) >= 0.5999),
+        f"V_min={min(r['V'] for r in iv):.4f} V_max={max(r['V'] for r in iv):.4f}",
+    ))
+
+    zero_row = min(iv, key=lambda r: abs(r["V"]))
+    checks.append((
+        "pn_1d_bias: J(V=0) near zero",
+        abs(zero_row["J"]) < 1.0e-6,
+        f"J(V=0)={zero_row['J']:.3e} A/m^2",
+    ))
+
+    by_v = sorted(iv, key=lambda r: r["V"])
+    mono = all(
+        abs(by_v[i + 1]["J"]) >= abs(by_v[i]["J"]) - 1.0e-12
+        for i in range(len(by_v) - 1)
+    )
+    checks.append((
+        "pn_1d_bias: |J(V)| non-decreasing",
+        mono,
+        f"{len(by_v)} samples",
+    ))
+
+    for V_hi, tol in ((0.5, 0.40), (0.6, 0.10)):
+        row = min(iv, key=lambda r: abs(r["V"] - V_hi))
+        J_sim = abs(float(row["J"]))
+        J_theory = J_s * (float(np.exp(row["V"] / V_t)) - 1.0)
+        rel_err = abs(J_sim - J_theory) / J_theory if J_theory > 0 else 1.0
+        checks.append((
+            f"pn_1d_bias: J at V={row['V']:.2f}V within {int(tol*100)}% of Shockley",
+            rel_err < tol,
+            f"sim={J_sim:.3e}, theory={J_theory:.3e}, rel_err={rel_err*100:.1f}%",
+        ))
+
+    hi = next((r for r in iv if abs(r["V"] - 0.6) < 0.026), None)
+    mid = next((r for r in iv if abs(r["V"] - 0.5) < 0.026), None)
+    if hi is not None and mid is not None and abs(mid["J"]) > 0:
+        sim_ratio = abs(hi["J"]) / abs(mid["J"])
+        theory_ratio = float(np.exp((hi["V"] - mid["V"]) / V_t))
+        checks.append((
+            "pn_1d_bias: J ratio J(0.6)/J(0.5) within 2x of exp(0.1/V_t)",
+            0.5 * theory_ratio < sim_ratio < 2.0 * theory_ratio,
+            f"sim={sim_ratio:.2f}, theory={theory_ratio:.2f}",
+        ))
+
+    return checks
+
+
+def plot_pn_1d_bias(result, out_dir: Path) -> list[Path]:
+    from semi.materials import get_material
+
+    cfg = result.cfg
+    sc = result.scaling
+    mat = get_material(cfg["regions"]["silicon"]["material"])
+    V_t = sc.V0
+
+    iv = result.iv or []
+    paths: list[Path] = []
+    if not iv:
+        return paths
+
+    V = np.array([r["V"] for r in iv])
+    J = np.array([abs(r["J"]) for r in iv])
+
+    J_s, _L_n, _L_p = _shockley_long_diode_iv(cfg, sc, mat)
+    J_theory = J_s * (np.exp(V / V_t) - 1.0)
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    mask = V > 0.05
+    ax.semilogy(V[mask], J[mask], "o-", label="simulation")
+    ax.semilogy(V[mask], np.maximum(J_theory[mask], 1e-30), "k--", label="Shockley (long diode)")
+    ax.set_xlabel("V (V)")
+    ax.set_ylabel("|J| (A/m^2)")
+    ax.set_title("Forward-bias IV")
+    ax.grid(True, which="both", alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    p1 = out_dir / "iv.png"
+    fig.savefig(p1, dpi=130)
+    plt.close(fig)
+    paths.append(p1)
+
+    if result.x_dof is not None and result.phi_n_phys is not None:
+        x = result.x_dof[:, 0]
+        order = np.argsort(x)
+        x_um = x[order] * 1e6
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.plot(x_um, result.psi_phys[order], label=r"$\psi$")
+        ax.plot(x_um, result.phi_n_phys[order], label=r"$\phi_n$")
+        ax.plot(x_um, result.phi_p_phys[order], label=r"$\phi_p$")
+        ax.set_xlabel("x (um)")
+        ax.set_ylabel("potentials (V)")
+        V_end = V[-1] if len(V) else 0.0
+        ax.set_title(f"Quasi-Fermi potentials at V={V_end:.3f} V")
+        ax.grid(True, alpha=0.3)
+        ax.legend()
+        fig.tight_layout()
+        p2 = out_dir / "quasi_fermi.png"
+        fig.savefig(p2, dpi=130)
+        plt.close(fig)
+        paths.append(p2)
+
+    return paths
+
+
+_PLOTTERS["pn_1d_bias"] = plot_pn_1d_bias
 
 
 # --------------------------------------------------------------------------- #

@@ -2,8 +2,9 @@
 Build the Day 1 Colab notebook that uses the kronos-semi package via git clone.
 Replaces the inline version with a thin notebook that imports from semi/.
 """
-import nbformat as nbf
 from pathlib import Path
+
+import nbformat as nbf
 
 nb = nbf.v4.new_notebook()
 cells = []
