@@ -67,7 +67,7 @@ def build_dd_block_residual(
     spaces: DDBlockSpaces,
     N_hat_fn,
     sc,
-    eps_r_value: float,
+    eps_r,
     mu_n_over_mu0: float,
     mu_p_over_mu0: float,
     tau_n_hat: float,
@@ -85,8 +85,10 @@ def build_dd_block_residual(
         Scaled net doping interpolated in V_psi or a compatible space.
     sc : semi.scaling.Scaling
         Scaling object; provides lambda2, L0, n_i/C0 ratio.
-    eps_r_value : float
-        Uniform relative permittivity (1D assumption for Day 2).
+    eps_r : float | dolfinx.fem.Function
+        Relative permittivity. Scalar (single-region fast path,
+        byte-identical with Day 2-5) or a DG0 cellwise Function on the
+        parent mesh for the multi-region Poisson coefficient jump.
     mu_n_over_mu0, mu_p_over_mu0 : float
         Ratios of carrier mobility to the scaling reference mobility.
     tau_n_hat, tau_p_hat : float
@@ -116,7 +118,10 @@ def build_dd_block_residual(
 
     L_D2 = fem.Constant(msh, PETSc.ScalarType(sc.lambda2 * sc.L0 ** 2))
     L0_sq = fem.Constant(msh, PETSc.ScalarType(sc.L0 ** 2))
-    eps_r = fem.Constant(msh, PETSc.ScalarType(eps_r_value))
+    if isinstance(eps_r, (int, float)):
+        eps_r_ufl = fem.Constant(msh, PETSc.ScalarType(float(eps_r)))
+    else:
+        eps_r_ufl = eps_r
     ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
     mu_n_hat = fem.Constant(msh, PETSc.ScalarType(mu_n_over_mu0))
     mu_p_hat = fem.Constant(msh, PETSc.ScalarType(mu_p_over_mu0))
@@ -138,7 +143,7 @@ def build_dd_block_residual(
     rho_hat = p_hat - n_hat + N_hat_fn
 
     F_psi = (
-        L_D2 * eps_r * ufl.inner(ufl.grad(psi), ufl.grad(v_psi)) * ufl.dx
+        L_D2 * eps_r_ufl * ufl.inner(ufl.grad(psi), ufl.grad(v_psi)) * ufl.dx
         - rho_hat * v_psi * ufl.dx
     )
     F_phi_n = (
