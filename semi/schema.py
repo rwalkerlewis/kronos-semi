@@ -165,6 +165,16 @@ SCHEMA: dict[str, Any] = {
                     },
                     "type": {"type": "string", "enum": ["ohmic", "gate", "insulating"]},
                     "voltage": {"type": "number"},
+                    "voltage_sweep": {
+                        "type": "object",
+                        "description": "Forward bias ramp on this contact.",
+                        "required": ["start", "stop", "step"],
+                        "properties": {
+                            "start": {"type": "number"},
+                            "stop": {"type": "number"},
+                            "step": {"type": "number", "exclusiveMinimum": 0.0},
+                        },
+                    },
                     "workfunction": {"type": "number"},
                     "oxide_region": {"type": "string"},
                 },
@@ -181,6 +191,10 @@ SCHEMA: dict[str, Any] = {
                         "srh": {"type": "boolean"},
                         "tau_n": {"type": "number"},
                         "tau_p": {"type": "number"},
+                        "E_t": {
+                            "type": "number",
+                            "description": "Trap level measured from the intrinsic level, eV. Zero for a mid-gap trap.",
+                        },
                         "auger": {"type": "boolean"},
                     },
                 },
@@ -199,7 +213,15 @@ SCHEMA: dict[str, Any] = {
         "solver": {
             "type": "object",
             "properties": {
-                "type": {"type": "string", "enum": ["newton_block", "equilibrium"]},
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "newton_block",
+                        "equilibrium",
+                        "drift_diffusion",
+                        "bias_sweep",
+                    ],
+                },
                 "max_iterations": {"type": "integer"},
                 "atol": {"type": "number"},
                 "rtol": {"type": "number"},
@@ -210,6 +232,8 @@ SCHEMA: dict[str, Any] = {
                     "properties": {
                         "steps": {"type": "integer"},
                         "adaptive": {"type": "boolean"},
+                        "min_step": {"type": "number", "exclusiveMinimum": 0.0},
+                        "max_halvings": {"type": "integer", "minimum": 0},
                     },
                 },
             },
@@ -277,6 +301,7 @@ def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     rec.setdefault("srh", True)
     rec.setdefault("tau_n", 1.0e-7)
     rec.setdefault("tau_p", 1.0e-7)
+    rec.setdefault("E_t", 0.0)
     rec.setdefault("auger", False)
     mob = phys.setdefault("mobility", {})
     mob.setdefault("model", "constant")
@@ -297,6 +322,8 @@ def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     cont = solver.setdefault("continuation", {})
     cont.setdefault("steps", 10)
     cont.setdefault("adaptive", True)
+    cont.setdefault("min_step", 1.0e-4)
+    cont.setdefault("max_halvings", 6)
 
     out = cfg.setdefault("output", {})
     out.setdefault("directory", "./results")
