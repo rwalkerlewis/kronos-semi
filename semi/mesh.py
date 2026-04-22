@@ -4,17 +4,21 @@ Mesh construction and tagging.
 Supports:
     - Builtin meshes: interval (1D), rectangle (2D), box (3D)
       with region tagging via axis-aligned boxes and facet tagging via planes
-    - File-based meshes: gmsh .msh via dolfinx.io.gmshio (deferred; not needed for 1D)
+    - File-based meshes: gmsh .msh via `dolfinx.io.gmsh.read_from_msh`.
+      Physical groups stored in the .msh are returned directly as
+      cell_tags and facet_tags; the JSON box/plane tagger is bypassed.
 
 The output of `build_mesh` is a tuple (mesh, cell_tags, facet_tags) where
 the tag meshtag objects follow the convention used throughout dolfinx.
-Integer tags are assigned from the JSON config's 'tag' fields.
+Integer tags are assigned from the JSON config's 'tag' fields for builtin
+meshes, and from the .msh physical-group IDs for file-source meshes.
 
 This module requires dolfinx and is imported lazily. The non-FEM code in
 this package (schema, materials, doping, scaling) does NOT import this.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -37,14 +41,16 @@ def build_mesh(cfg: dict[str, Any]):
 
     if source == "builtin":
         msh = _build_builtin(mesh_cfg, cfg["dimension"])
-    elif source == "file":
-        msh = _build_from_file(mesh_cfg)
-    else:
-        raise ValueError(f"Unknown mesh source {source!r}")
-
-    cell_tags  = _tag_regions(msh, mesh_cfg.get("regions_by_box", []))
-    facet_tags = _tag_facets(msh, mesh_cfg.get("facets_by_plane", []))
-    return msh, cell_tags, facet_tags
+        cell_tags = _tag_regions(msh, mesh_cfg.get("regions_by_box", []))
+        facet_tags = _tag_facets(msh, mesh_cfg.get("facets_by_plane", []))
+        return msh, cell_tags, facet_tags
+    if source == "file":
+        return _build_from_file(
+            mesh_cfg,
+            dim=int(cfg["dimension"]),
+            source_dir=cfg.get("_source_dir"),
+        )
+    raise ValueError(f"Unknown mesh source {source!r}")
 
 
 def _build_builtin(mesh_cfg: dict, dim: int):
@@ -80,10 +86,37 @@ def _build_builtin(mesh_cfg: dict, dim: int):
     raise ValueError(f"Unsupported dimension {dim}")
 
 
-def _build_from_file(mesh_cfg: dict):
-    """Read gmsh .msh or XDMF mesh. Returns only the mesh; tags come from file."""
-    # Deferred; will implement for 2D MOS and 3D cases
-    raise NotImplementedError("File-based mesh loading not yet wired up. Use builtin for now.")
+def _build_from_file(mesh_cfg: dict, dim: int, source_dir: str | None = None):
+    """
+    Load a mesh from disk.
+
+    Supports gmsh `.msh` via `dolfinx.io.gmsh.read_from_msh`; physical
+    groups stored in the file are returned verbatim as `cell_tags` and
+    `facet_tags`, so `build_mesh` skips the box/plane tagger for
+    file-source meshes. XDMF is reserved for a future PR.
+
+    The `path` field is resolved relative to the JSON source directory
+    when it is not absolute, matching the convention used by other
+    file-relative references loaded via `semi.schema.load`.
+    """
+    fmt = mesh_cfg.get("format", "gmsh")
+    raw_path = Path(mesh_cfg["path"])
+    if not raw_path.is_absolute() and source_dir is not None:
+        raw_path = Path(source_dir) / raw_path
+
+    if fmt == "gmsh":
+        from dolfinx.io import gmsh as _gmsh_io
+        from mpi4py import MPI
+
+        meshdata = _gmsh_io.read_from_msh(
+            str(raw_path), MPI.COMM_WORLD, gdim=dim,
+        )
+        return meshdata.mesh, meshdata.cell_tags, meshdata.facet_tags
+    if fmt == "xdmf":
+        raise NotImplementedError(
+            "XDMF mesh loading not yet wired; use gmsh '.msh' instead."
+        )
+    raise ValueError(f"Unknown mesh file format {fmt!r}")
 
 
 def _tag_regions(msh, boxes: list[dict]):

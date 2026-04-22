@@ -134,6 +134,26 @@ jobs:
             kronos-semi:ci \
             python scripts/run_benchmark.py mos_2d
 
+      - name: Run resistor_3d benchmark (3D Ohmic V-I, builtin box)
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
+            -w /workspaces/kronos-semi \
+            -e MPLBACKEND=Agg \
+            kronos-semi:ci \
+            python scripts/run_benchmark.py resistor_3d \
+              --input benchmarks/resistor_3d/resistor.json
+
+      - name: Run resistor_3d benchmark (3D Ohmic V-I, gmsh fixture)
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
+            -w /workspaces/kronos-semi \
+            -e MPLBACKEND=Agg \
+            kronos-semi:ci \
+            python scripts/run_benchmark.py resistor_3d \
+              --input benchmarks/resistor_3d/resistor_gmsh.json
+
       - name: Run V&V suite (MMS Poisson, mesh convergence, conservation, MMS DD)
         run: |
           docker run --rm \

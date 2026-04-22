@@ -93,10 +93,17 @@ def test_build_mesh_unknown_source_raises():
         build_mesh(cfg)
 
 
-def test_build_mesh_file_source_raises_notimplemented():
+def test_build_mesh_file_source_xdmf_raises_notimplemented():
     cfg = _interval_cfg()
-    cfg["mesh"]["source"] = "file"
-    with pytest.raises(NotImplementedError):
+    cfg["mesh"] = {"source": "file", "path": "dummy.xdmf", "format": "xdmf"}
+    with pytest.raises(NotImplementedError, match="XDMF"):
+        build_mesh(cfg)
+
+
+def test_build_mesh_file_source_unknown_format_raises():
+    cfg = _interval_cfg()
+    cfg["mesh"] = {"source": "file", "path": "whatever.stl", "format": "stl"}
+    with pytest.raises(ValueError, match="Unknown mesh file format"):
         build_mesh(cfg)
 
 

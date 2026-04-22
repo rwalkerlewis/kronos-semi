@@ -1011,6 +1011,330 @@ _PLOTTERS["mos_2d"] = plot_mos_2d
 
 
 # --------------------------------------------------------------------------- #
+# resistor_3d verifier and plotter                                            #
+# --------------------------------------------------------------------------- #
+
+def _resistor_device_params(cfg, mat):
+    """Extract analytical resistance R = L / (q N_D mu_n A) for a 3D bar.
+
+    Reads N_D from the uniform doping profile, mu_n from the JSON (or the
+    1400 cm^2/(V s) default that mirrors `semi.materials.Si`), and the
+    geometry from the mesh (builtin extents when present, else the loaded
+    mesh's bounding box if `mesh_obj` is supplied).
+    """
+    from semi.constants import Q, cm3_to_m3
+
+    prof = cfg["doping"][0]["profile"]
+    if prof.get("type") != "uniform":
+        raise ValueError(
+            "resistor_3d: doping must be uniform for the V-I verifier"
+        )
+    N_D_cm3 = float(prof.get("N_D", 0.0))
+    N_A_cm3 = float(prof.get("N_A", 0.0))
+    if N_A_cm3 != 0.0 or N_D_cm3 <= 0.0:
+        raise ValueError(
+            "resistor_3d: V-I verifier expects pure n-type uniform doping"
+        )
+    N_D = cm3_to_m3(N_D_cm3)
+
+    mu_n_cm2 = float(cfg.get("physics", {}).get("mobility", {}).get("mu_n", 1400.0))
+    mu_n_SI = mu_n_cm2 * 1.0e-4
+
+    return dict(N_D=N_D, mu_n_SI=mu_n_SI, q=Q, n_i=mat.n_i)
+
+
+def _resistor_geometry(cfg, mesh_obj=None) -> tuple[float, float]:
+    """Return (L_x, A_contact) for the 3D bar.
+
+    Uses `mesh.extents` for builtin meshes; for file meshes falls back to
+    the loaded mesh's bounding box.
+    """
+    mesh_cfg = cfg["mesh"]
+    if mesh_cfg.get("source") == "builtin":
+        ext = mesh_cfg["extents"]
+        Lx = float(ext[0][1] - ext[0][0])
+        Wy = float(ext[1][1] - ext[1][0])
+        Wz = float(ext[2][1] - ext[2][0])
+        return Lx, Wy * Wz
+    if mesh_obj is None:
+        raise ValueError(
+            "resistor_3d: file-source mesh requires mesh_obj to read geometry"
+        )
+    x = mesh_obj.geometry.x
+    Lx = float(x[:, 0].max() - x[:, 0].min())
+    Wy = float(x[:, 1].max() - x[:, 1].min())
+    Wz = float(x[:, 2].max() - x[:, 2].min())
+    return Lx, Wy * Wz
+
+
+@register("resistor_3d")
+def verify_resistor_3d(result) -> list[tuple[str, bool, str]]:
+    """V-I linearity verifier for the 3D ohmic resistor (Day 7).
+
+    Steps (see docs/resistor_derivation.md section 3):
+      1. Sweep covers 5 points in [-0.01, +0.01] V.
+      2. R_theory = L / (q N_D mu_n A) from uniform doping + mesh geometry.
+      3. R_sim(V) = V / I(V), where I(V) = J(V) * A_contact and J is the
+         facet-averaged current density recorded by the sweep runner.
+      4. PASS iff max_over_V_neq_0 |R_sim - R_theory| / R_theory < 1%.
+      5. Sanity: |I(V=0)| < R_theory * 1e-6 and sign(I(V)) == sign(V).
+    """
+    from semi.materials import get_material
+
+    cfg = result.cfg
+    mat = get_material(cfg["regions"]["silicon"]["material"])
+    iv = result.iv or []
+    if not iv:
+        return [("resistor_3d: IV table non-empty", False, "no iv rows recorded")]
+
+    dp = _resistor_device_params(cfg, mat)
+    L_x, A_contact = _resistor_geometry(cfg, result.mesh)
+    R_theory = L_x / (dp["q"] * dp["N_D"] * dp["mu_n_SI"] * A_contact)
+
+    V_raw = np.array([r["V"] for r in iv])
+    J_raw = np.array([r["J"] for r in iv])
+    I_raw = J_raw * A_contact
+
+    # The bipolar bias_sweep walks 0 -> -V_max -> +V_max and so revisits
+    # the intermediate points. Keep the last recorded I for each unique V
+    # (later visits used the same converged BC; values match to SNES tol).
+    by_V: dict[float, float] = {}
+    for v, i in zip(V_raw, I_raw, strict=True):
+        v_round = round(float(v), 9)
+        by_V[v_round] = float(i)
+    V = np.array(sorted(by_V.keys()))
+    I = np.array([by_V[v] for v in V])  # noqa: E741
+
+    checks: list[tuple[str, bool, str]] = []
+
+    expected_V = np.array([-0.010, -0.005, 0.0, 0.005, 0.010])
+    sweep_ok = (
+        len(V) == len(expected_V)
+        and bool(np.allclose(V, expected_V, atol=1e-9))
+    )
+    checks.append((
+        "resistor_3d: sweep covers 5 points in [-0.01, +0.01] V",
+        sweep_ok,
+        f"V_points={[float(v) for v in V]}",
+    ))
+
+    zero_idx = int(np.argmin(np.abs(V)))
+    I_zero = float(I[zero_idx])
+    tol_zero = R_theory * 1.0e-6  # placeholder; redefined as current below
+    # Zero-bias current floor: should be numerical noise. Theory-anchored
+    # tolerance: I_tol = (V_t / R_theory) * 1e-6 corresponds to ~1 ppm of
+    # the thermal short-circuit reference; for R_theory ~ 1.1 kOhm and
+    # V_t ~ 26 mV this gives ~2e-11 A, well above SNES residual leakage.
+    V_t = result.scaling.V0
+    I_tol = (V_t / R_theory) * 1.0e-6
+    tol_zero = I_tol  # alias for the message below
+    checks.append((
+        "resistor_3d: |I(V=0)| < (V_t / R_theory) * 1e-6",
+        abs(I_zero) < I_tol,
+        f"I(0)={I_zero:+.3e} A, tol={tol_zero:.3e} A "
+        f"(R_theory={R_theory:.3e} Ohm)",
+    ))
+
+    nonzero = np.where(np.abs(V) > 1.0e-12)[0]
+    sign_ok = all(
+        np.sign(I[k]) == np.sign(V[k]) for k in nonzero if abs(I[k]) > 0.0
+    )
+    checks.append((
+        "resistor_3d: sign(I(V)) == sign(V) for every nonzero V",
+        bool(sign_ok),
+        f"signs V={[int(np.sign(V[k])) for k in nonzero]}, "
+        f"I={[int(np.sign(I[k])) for k in nonzero]}",
+    ))
+
+    if nonzero.size == 0:
+        return checks
+
+    R_sim = V[nonzero] / I[nonzero]
+    rel_err = np.abs(R_sim - R_theory) / R_theory
+    worst = int(np.argmax(rel_err))
+    V_worst = float(V[nonzero][worst])
+    R_worst = float(R_sim[worst])
+    err_worst = float(rel_err[worst])
+
+    checks.append((
+        "resistor_3d: V-I linearity within 1% (max |R_sim - R_theory| / R_theory)",
+        bool(rel_err.max() < 0.01),
+        f"R_theory={R_theory:.3e} Ohm; worst {err_worst*100:.3f}% at "
+        f"V={V_worst:+.4f} V (R_sim={R_worst:.3e} Ohm); "
+        f"L={L_x*1e6:.3f} um, A={A_contact*1e18:.3f} (nm)^2, "
+        f"mu_n={dp['mu_n_SI']*1e4:.0f} cm^2/(V s)",
+    ))
+
+    result._resistor_curve = dict(
+        V=V, I=I, R_theory=R_theory, R_sim_at_nonzero=R_sim,
+        L=L_x, A=A_contact, mu_n_SI=dp["mu_n_SI"], N_D=dp["N_D"],
+    )
+    return checks
+
+
+def _project_J_n_magnitude(result):
+    """Interpolate |J_n| onto the parent P1 space and return (V_p1, J_mag)."""
+    import ufl
+    from dolfinx import fem
+    from petsc4py import PETSc
+
+    from semi.constants import Q
+    from semi.materials import get_material
+    from semi.physics.slotboom import n_from_slotboom
+
+    cfg = result.cfg
+    mat = get_material(cfg["regions"]["silicon"]["material"])
+    sc = result.scaling
+    mu_n_SI = float(cfg["physics"]["mobility"].get("mu_n", 1400.0)) * 1.0e-4
+
+    msh = result.mesh
+    ni_hat = fem.Constant(msh, PETSc.ScalarType(mat.n_i / sc.C0))
+    n_ufl = n_from_slotboom(result.psi, result.phi_n, ni_hat) * sc.C0
+    grad_phi_n = sc.V0 * ufl.grad(result.phi_n)
+    Jn_vec = Q * mu_n_SI * n_ufl * grad_phi_n
+    Jn_mag_ufl = ufl.sqrt(ufl.dot(Jn_vec, Jn_vec))
+
+    V_p1 = fem.functionspace(msh, ("Lagrange", 1))
+    J_mag = fem.Function(V_p1, name="J_n_mag")
+    expr = fem.Expression(Jn_mag_ufl, V_p1.element.interpolation_points)
+    J_mag.interpolate(expr)
+    return V_p1, J_mag
+
+
+def _slice_y_midplane(x_dof, values, ymid, half_thickness):
+    """Pick (xs, zs, vs) at dofs near y=ymid; widen tolerance if needed."""
+    mask = np.abs(x_dof[:, 1] - ymid) < half_thickness
+    if mask.sum() < 50:
+        # Fall back to a thicker slab so unstructured tetra meshes have data.
+        mask = np.abs(x_dof[:, 1] - ymid) < (half_thickness * 3.0)
+    return x_dof[mask, 0], x_dof[mask, 2], values[mask]
+
+
+def plot_resistor_3d(result, out_dir: Path) -> list[Path]:
+    """Render psi(x, z) and |J_n|(x, z) slices at the y=W/2 midplane.
+
+    The slice is built from P1 dof values at vertices whose y coordinate is
+    within half a cell of W/2. For the builtin [64, 16, 16] mesh this lands
+    on the exact y-midplane vertex slab. For the gmsh tetrahedral fixture it
+    selects whichever vertices happen to be in a thin slab around W/2.
+    Visual regression only -- not gated by the verifier.
+    """
+    from matplotlib.tri import Triangulation
+
+    cfg = result.cfg
+    paths: list[Path] = []
+    if result.x_dof is None or result.x_dof.shape[1] != 3:
+        return paths
+    if result.psi_phys is None or result.psi is None or result.phi_n is None:
+        return paths
+
+    msh = result.mesh
+    geom_x = msh.geometry.x
+    y_min = float(geom_x[:, 1].min())
+    y_max = float(geom_x[:, 1].max())
+    W = y_max - y_min
+    ymid = 0.5 * (y_min + y_max)
+    half_thickness = max(W / 32.0, 1.0e-9)
+
+    # --- psi slice ---
+    xs, zs, psi_s = _slice_y_midplane(
+        result.x_dof, result.psi_phys, ymid, half_thickness,
+    )
+    if xs.size >= 3:
+        try:
+            tri = Triangulation(xs * 1e9, zs * 1e9)
+            fig, ax = plt.subplots(figsize=(7, 4))
+            tcf = ax.tricontourf(tri, psi_s, levels=20, cmap="viridis")
+            cbar = fig.colorbar(tcf, ax=ax)
+            cbar.set_label(r"$\psi$ (V)")
+            ax.set_xlabel("x (nm)")
+            ax.set_ylabel("z (nm)")
+            V_end = float(result.iv[-1]["V"]) if result.iv else 0.0
+            ax.set_title(
+                f"Resistor: $\\psi(x, z)$ at y=W/2, "
+                f"$V_{{right}}$={V_end:+.4f} V"
+            )
+            ax.set_aspect("auto")
+            fig.tight_layout()
+            p = out_dir / "psi_slice_y_midplane.png"
+            fig.savefig(p, dpi=130)
+            plt.close(fig)
+            paths.append(p)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[plot_resistor_3d] psi slice skipped: {exc}")
+
+    # --- |J_n| slice (project then re-extract on the same P1 grid) ---
+    try:
+        V_p1, J_mag = _project_J_n_magnitude(result)
+        x_dof_J = V_p1.tabulate_dof_coordinates()
+        xs_J, zs_J, J_vals = _slice_y_midplane(
+            x_dof_J, np.asarray(J_mag.x.array), ymid, half_thickness,
+        )
+        if xs_J.size >= 3:
+            tri = Triangulation(xs_J * 1e9, zs_J * 1e9)
+            fig, ax = plt.subplots(figsize=(7, 4))
+            tcf = ax.tricontourf(tri, J_vals, levels=20, cmap="magma")
+            cbar = fig.colorbar(tcf, ax=ax)
+            cbar.set_label(r"$|J_n|$ (A/m$^2$)")
+            ax.set_xlabel("x (nm)")
+            ax.set_ylabel("z (nm)")
+            V_end = float(result.iv[-1]["V"]) if result.iv else 0.0
+            ax.set_title(
+                f"Resistor: $|J_n|(x, z)$ at y=W/2, "
+                f"$V_{{right}}$={V_end:+.4f} V"
+            )
+            ax.set_aspect("auto")
+            fig.tight_layout()
+            p = out_dir / "jn_slice_y_midplane.png"
+            fig.savefig(p, dpi=130)
+            plt.close(fig)
+            paths.append(p)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[plot_resistor_3d] |J_n| slice skipped: {exc}")
+
+    # --- I-V scatter with theory line ---
+    iv = result.iv or []
+    if iv:
+        from semi.materials import get_material
+        mat = get_material(cfg["regions"]["silicon"]["material"])
+        try:
+            dp = _resistor_device_params(cfg, mat)
+            L_x, A_c = _resistor_geometry(cfg, msh)
+            R_theory = L_x / (dp["q"] * dp["N_D"] * dp["mu_n_SI"] * A_c)
+            V_raw = np.array([r["V"] for r in iv])
+            J_raw = np.array([r["J"] for r in iv])
+            I_raw = J_raw * A_c
+            by_V: dict[float, float] = {}
+            for v, i in zip(V_raw, I_raw, strict=True):
+                by_V[round(float(v), 9)] = float(i)
+            V = np.array(sorted(by_V.keys()))
+            I = np.array([by_V[v] for v in V])  # noqa: E741
+            fig, ax = plt.subplots(figsize=(6, 4))
+            ax.plot(V * 1e3, I * 1e6, "o-", label="simulation")
+            ax.plot(V * 1e3, V / R_theory * 1e6, "k--",
+                    label=f"theory $V/R$, R={R_theory:.1f} $\\Omega$")
+            ax.axhline(0.0, color="grey", linewidth=0.5)
+            ax.axvline(0.0, color="grey", linewidth=0.5)
+            ax.set_xlabel("V (mV)")
+            ax.set_ylabel(r"I ($\mu$A)")
+            ax.set_title("Resistor V-I (linearity check)")
+            ax.grid(True, alpha=0.3)
+            ax.legend()
+            fig.tight_layout()
+            p = out_dir / "iv.png"
+            fig.savefig(p, dpi=130)
+            plt.close(fig)
+            paths.append(p)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[plot_resistor_3d] I-V plot skipped: {exc}")
+
+    return paths
+
+
+_PLOTTERS["resistor_3d"] = plot_resistor_3d
+
+
+# --------------------------------------------------------------------------- #
 # Driver                                                                      #
 # --------------------------------------------------------------------------- #
 

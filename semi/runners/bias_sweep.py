@@ -119,6 +119,8 @@ def run_bias_sweep(
         if not v_sweep_list or v_sweep_list[0] != 0.0:
             v_sweep_list = [0.0] + [v for v in v_sweep_list if v != 0.0]
 
+    bipolar_legs = compute_bipolar_legs(v_sweep_list)
+
     # Nominal step size from the sweep spacing (e.g., voltage_sweep.step).
     # continuation.max_step defaults to this, which preserves the Day 2
     # halving-only behaviour when growth cannot exceed the initial step.
@@ -195,12 +197,18 @@ def run_bias_sweep(
     if post_step_hook is not None:
         post_step_hook(V_seed, spaces, iv_rows[-1])
 
-    V_end = float(v_sweep_list[-1])
-    if abs(V_end - V_seed) > 0.0 and max_step_abs > 0.0:
-        sign = 1.0 if V_end > V_seed else -1.0
-        # Start at the nominal sweep spacing (voltage_sweep.step); the
-        # adaptive controller grows toward max_step_abs on consecutive
-        # easy solves and halves on failure.
+    def ramp_leg(V_start: float, V_target: float):
+        """Adaptive single-direction ramp from V_start to V_target.
+
+        Mutates `spaces` in place, appends one iv row per successful step,
+        and returns the SNES info from the last accepted solve. The
+        AdaptiveStepController is local to the leg, so a bipolar sweep
+        re-seeds growth/halving state at each turning point.
+        """
+        nonlocal last_info, V_prev
+        if abs(V_target - V_start) <= 1.0e-12 or max_step_abs <= 0.0:
+            return
+        sign = 1.0 if V_target > V_start else -1.0
         initial_abs = nominal_step_abs if nominal_step_abs > 0.0 else max_step_abs
         initial_abs = min(initial_abs, max_step_abs)
         initial_step = sign * initial_abs
@@ -214,8 +222,8 @@ def run_bias_sweep(
         )
 
         halvings = 0
-        while abs(V_end - V_prev) > 1.0e-12:
-            remaining = V_end - V_prev
+        while abs(V_target - V_prev) > 1.0e-12:
+            remaining = V_target - V_prev
             step = controller.clamp_to_endpoint(remaining)
             V_try = V_prev + step
             voltages = dict(static_voltages)
@@ -254,6 +262,13 @@ def run_bias_sweep(
                     f"{halvings} halvings (min_step={min_step})."
                 )
 
+    if bipolar_legs:
+        # Walk: V_seed (=0) -> most-negative -> most-positive.
+        for V_target in bipolar_legs:
+            ramp_leg(V_prev, float(V_target))
+    else:
+        ramp_leg(V_prev, float(v_sweep_list[-1]))
+
     x_dof = V_psi.tabulate_dof_coordinates()
     psi_hat = spaces.psi.x.array
     phi_n_hat = spaces.phi_n.x.array
@@ -272,6 +287,22 @@ def run_bias_sweep(
         x_dof=x_dof, N_hat=N_hat_fn, scaling=sc,
         solver_info=last_info, iv=iv_rows, bias_contact=sweep_contact,
     )
+
+
+def compute_bipolar_legs(v_sweep_list: list[float]) -> list[float]:
+    """Endpoints for a sign-spanning bias walk, empty for unipolar sweeps.
+
+    A sweep list that contains both a negative entry and a positive entry
+    (ignoring numerical-noise values within 1e-12 V of zero) is walked
+    in two single-direction legs: V = 0 -> min(V) -> max(V). Unipolar
+    sweeps return `[]`, preserving the original single-endpoint ramp
+    path used by the pn-junction and MOS benchmarks.
+    """
+    has_neg = any(v < -1.0e-12 for v in v_sweep_list)
+    has_pos = any(v > 1.0e-12 for v in v_sweep_list)
+    if has_neg and has_pos:
+        return [float(min(v_sweep_list)), float(max(v_sweep_list))]
+    return []
 
 
 def _resolve_sweep(cfg):

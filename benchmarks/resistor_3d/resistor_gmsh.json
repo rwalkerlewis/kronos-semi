@@ -1,0 +1,49 @@
+{
+  "name": "resistor_3d_gmsh",
+  "description": "3D doped silicon resistor on a gmsh fixture mesh (Day 7). Identical device geometry to `resistor.json` (1 um x 200 nm x 200 nm n-type bar, N_D=1e18 cm^-3, 5-point sweep in [-0.01, +0.01] V) but loads the unstructured tetrahedral mesh from `fixtures/box.msh` to exercise the gmsh `.msh` loader and the file-source mesh path. Same 1% V-I linearity tolerance.",
+  "dimension": 3,
+  "mesh": {
+    "source": "file",
+    "path": "fixtures/box.msh",
+    "format": "gmsh"
+  },
+  "regions": {
+    "silicon": {"material": "Si", "tag": 1, "role": "semiconductor"}
+  },
+  "doping": [
+    {
+      "region": "silicon",
+      "profile": {"type": "uniform", "N_D": 1.0e18, "N_A": 0.0}
+    }
+  ],
+  "contacts": [
+    {"name": "contact_left",  "facet": 10, "type": "ohmic", "voltage": 0.0},
+    {
+      "name": "contact_right",
+      "facet": 20,
+      "type": "ohmic",
+      "voltage": 0.0,
+      "voltage_sweep": {"start": -0.01, "stop": 0.01, "step": 0.005}
+    }
+  ],
+  "physics": {
+    "temperature": 300.0,
+    "statistics": "boltzmann",
+    "mobility": {"mu_n": 1400.0, "mu_p": 450.0},
+    "recombination": {"srh": false, "tau_n": 1.0e-8, "tau_p": 1.0e-8, "E_t": 0.0}
+  },
+  "solver": {
+    "type": "bias_sweep",
+    "continuation": {
+      "min_step": 1.0e-4,
+      "max_halvings": 6,
+      "max_step": 0.005,
+      "easy_iter_threshold": 4,
+      "grow_factor": 2.0
+    }
+  },
+  "output": {
+    "directory": "./results/resistor_3d_gmsh",
+    "fields": ["potential", "n", "p", "phi_n", "phi_p", "iv"]
+  }
+}

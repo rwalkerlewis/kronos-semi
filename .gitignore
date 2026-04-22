@@ -40,6 +40,8 @@ scratch/
 # Mesh files (keep benchmark-defining ones via git-lfs later if needed)
 *.msh
 *.geo.bak
+# Whitelist committed gmsh fixtures (Day 7 resistor loader tests).
+!benchmarks/**/fixtures/*.msh
 
 # Local config overrides
 *.local.json

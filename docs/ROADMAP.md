@@ -265,23 +265,64 @@ Read `PLAN.md` for the short version and the current in-flight task.
 
 ## Day 7. 3D doped resistor
 
-- **Status:** Planned. Was originally Day 6.
-- **Goal:** confirm the framework extends to 3D unstructured meshes
-  with no physics changes.
-- **Deliverables:**
-  - `benchmarks/resistor_3d/resistor.json` with a doped bar.
-  - Gmsh `.msh` loading via `dolfinx.io.gmshio` (currently stubbed
-    out in `semi/mesh.py`).
-  - Ohmic V-I linearity verifier: current scales linearly with
-    applied voltage to within 1% over a small voltage range.
+- **Status:** Done (2026-04-21). Delivered on `dev/day7-resistor-3d`.
+  All deliverables landed; the `resistor_3d` benchmark exits 0 on
+  both the builtin `create_box` mesh and the committed gmsh fixture
+  with worst |R_sim - R_theory|/R_theory well inside the fixed 1%
+  tolerance on both paths; Day 1-6 benchmarks (`pn_1d`,
+  `pn_1d_bias`, `pn_1d_bias_reverse`, `mos_2d`) stay byte-identical;
+  the Day 4-6 V&V suite stays green (every MMS rate within 0.01 of
+  the post-Day-6 values, including `2d_multiregion`).
+- **Goal (as delivered):** confirmed the simulator framework extends
+  to 3D with no physics changes. Equilibrium Poisson and the
+  Slotboom drift-diffusion forms (`semi/physics/poisson.py`,
+  `semi/physics/drift_diffusion.py`) are dimension agnostic and
+  were left untouched. The only new machinery is the gmsh `.msh`
+  loader, a 3D benchmark device, a bipolar-sweep driver path, a
+  V-I linearity verifier, and 3D slice plots.
+- **Delivered:**
+  - `docs/resistor_derivation.md` (derivation-lite gate; 466a820):
+    device geometry, analytical ohmic resistance, 1% V-I linearity
+    rationale, 3D slice-plot strategy, gmsh loader test strategy.
+  - `semi/mesh.py::_build_from_file` wired via
+    `dolfinx.io.gmsh.read_from_msh` (e395830, docs alignment in
+    3abd170). Physical groups stored in the `.msh` file are
+    returned verbatim as `cell_tags` and `facet_tags`; the JSON
+    box-tagger is bypassed for file-source meshes.
+  - `semi/runners/bias_sweep.py` two-leg walk for bipolar sweeps
+    (7c947b2): when `v_sweep_list` spans zero, the ramp runs from
+    `V = 0 -> min(V) -> max(V)` with a fresh
+    `AdaptiveStepController` on each leg; unipolar sweeps behave
+    exactly as before.
+  - `benchmarks/resistor_3d/resistor.json`: 3D rectangular bar
+    (1 um x 200 nm x 200 nm), uniform n-type N_D = 1e18 cm^-3,
+    ohmic contacts on x=0 and x=L, 5-point sweep in
+    [-0.01, +0.01] V (62f52d2).
+  - `benchmarks/resistor_3d/resistor_gmsh.json` plus a committed
+    fixture `fixtures/box.geo`/`box.msh` (reproducible via
+    `gmsh -3 box.geo -o box.msh`). Same device on an unstructured
+    tetrahedral mesh.
+  - `scripts/run_benchmark.py`: `verify_resistor_3d` V-I linearity
+    verifier (1% tol, zero-bias-noise and sign-consistency sanity
+    checks); 3D slice plotters for psi and |J_n| at the y = W/2
+    midplane plus an I-V scatter.
+  - Tests: `tests/fem/test_mesh_gmsh.py` (round-trip + physical
+    group preservation) and `tests/fem/test_resistor_3d.py`
+    (coarse smoke plus builtin/gmsh production-JSON theory match).
+  - `docs/PHYSICS.md` Section 7 (3D extension notes, ~1 page)
+    citing `docs/resistor_derivation.md` for the full derivation.
 - **Verification:**
-  - `benchmark resistor_3d` exits 0.
-  - At least two 3D slice plots (current density magnitude, potential).
-- **Dependencies:** Day 5.
+  - `docker compose run --rm benchmark resistor_3d` exits 0 with
+    V-I linearity within 1% on both builtin and gmsh variants;
+    three plots written (`psi_slice_y_midplane.png`,
+    `jn_slice_y_midplane.png`, IV scatter).
+  - All prior benchmarks byte-identical; all prior V&V gates
+    green; coverage stays >= 95%.
+- **Dependencies:** Day 6 MOS merged (PR #8).
 
 ## Day 8. Final polish and submission packaging
 
-- **Status:** Planned. Was originally Day 7.
+- **Status:** Queued (next). Was originally Day 7.
 - **Goal:** make the submission presentation-ready.
 - **Deliverables:**
   - Regenerate `notebooks/01_pn_junction_1d.ipynb` using
