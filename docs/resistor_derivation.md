@@ -15,7 +15,7 @@ What is new in Day 7 is structural, not physical:
 2. A new verifier, V-I linearity, that checks the simulated current
    scales linearly with applied voltage to within 1 percent.
 3. A gmsh `.msh` loader wired into `semi/mesh.py::_build_from_file`
-   via `dolfinx.io.gmshio`, with a committed fixture mesh for
+   via `dolfinx.io.gmsh`, with a committed fixture mesh for
    regression testing.
 
 No implementation code (other than PLAN.md and this document) is
@@ -217,7 +217,7 @@ plot dispatcher.
 
 The gmsh `.msh` loader is implemented in `_build_from_file` in
 `semi/mesh.py`. It reads a `.msh` file via
-`dolfinx.io.gmshio.read_from_msh` and returns `(mesh, cell_tags,
+`dolfinx.io.gmsh.read_from_msh` and returns `(mesh, cell_tags,
 facet_tags)`. When the caller is `build_mesh`, the returned tags are
 used directly; the box-tagger is skipped for file-sourced meshes
 because the gmsh physical groups are authoritative.

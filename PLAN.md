@@ -129,14 +129,14 @@ target #9 against `main`.
   at facet centroids. What is new is a 3D doped rectangular-bar
   benchmark with a V-I linearity verifier, a gmsh `.msh` loader
   wired through `semi/mesh.py::_build_from_file` via
-  `dolfinx.io.gmshio`, and 3D slice plots for psi and |J_n|.
+  `dolfinx.io.gmsh`, and 3D slice plots for psi and |J_n|.
 - **Scope, in:**
   - `docs/resistor_derivation.md`: derivation-lite gate covering
     device geometry, analytical ohmic resistance, the V-I linearity
     metric with 1% tolerance and rationale, 3D slice plot strategy,
     and gmsh loader test strategy.
   - `semi/mesh.py`: implement `_build_from_file` for the `"gmsh"`
-    format via `dolfinx.io.gmshio.read_from_msh`; return cell_tags
+    format via `dolfinx.io.gmsh.read_from_msh`; return cell_tags
     and facet_tags from the file so `build_mesh` can skip the
     box/plane tagger when the mesh brings its own physical groups.
   - `benchmarks/resistor_3d/resistor.json`: 3D rectangular bar
