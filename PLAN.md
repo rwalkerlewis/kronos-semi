@@ -237,6 +237,36 @@ They may be added after submission as stretch goals (see
 - FinFET or any 3D transistor geometry. **Post-submission stretch goal only.**
 - GUI or web frontend.
 
+## Day 9+ cleanups
+
+Pre-existing doc/code inconsistencies discovered during the Day 8
+polish pass and deferred per the Day 8 anti-pattern rule against
+expanding scope on the final submission PR. None of these affect any
+verifier or benchmark result; they are all surface-level alignment
+items.
+
+- **`docs/mos_derivation.md` §6 ψ-reference convention.** Section 6
+  derives `psi_s = psi(x, y_int) - psi(x, y_bulk)` (psi referenced to
+  the bulk Fermi level), but the shipped MOS code uses the project-
+  wide `psi = 0` at the intrinsic Fermi level convention enforced by
+  the ohmic-contact equilibrium BC. Both conventions yield the same
+  C(V) curve once V_FB is computed against the matching reference;
+  the Day 6 verifier uses the shipped code's convention and passes
+  at 9.25 percent worst-case in [V_FB + 0.2, V_T - 0.1] V. Action:
+  rewrite §6 in the intrinsic-reference convention so the derivation
+  reads against the same baseline as the code, and add a short
+  appendix mapping between the two conventions for readers who learn
+  MOS from textbooks (Sze, Pierret) that use the bulk reference.
+- **`semi/__init__.py::__version__` still reads `"0.1.0"`.** This was
+  the Day 1 placeholder and never bumped through Days 2 through 7.
+  Action: bump to `"0.8.0"` as part of Phase 9 (CHANGELOG `[0.8.0] -
+  Day 8` entry) so the package version, the changelog header, and
+  the eventual `v0.2.0` tag (post-merge per the Day 8 prompt's
+  Phase 11) are internally consistent. Note the discrepancy between
+  package SemVer `0.8.0` and release tag `v0.2.0`: the tag tracks
+  the *submission* version (v0.1.0 = Day 1 baseline, v0.2.0 = Day 8
+  submission), the package SemVer tracks days-of-work shipped.
+
 ## Completed work log
 
 Append-only. Newest entries on top.

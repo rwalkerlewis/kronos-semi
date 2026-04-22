@@ -31,7 +31,7 @@ Before contributing (human or AI), read these in order:
 | 3D ohmic V–I linearity             | 3D            | shipped | V–I linearity within 1%                                      |
 | Benchmarks                         | 5             | shipped | pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d   |
 | Conservation / mesh convergence    | 1D            | shipped | charge neutrality, Cauchy rates ≥ 1.8/doubling               |
-| Test suite                         | pure + FEM    | shipped | 202 tests, 95.58% coverage                                   |
+| Test suite                         | pure + FEM    | shipped | 206 tests, 95.58% coverage                                   |
 | V&V                                | 10 studies    | shipped | 62/62 PASS                                                   |
 | CI                                 | lint+test+FEM | shipped | green on dev and main                                        |
 

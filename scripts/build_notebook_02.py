@@ -27,8 +27,8 @@ This is the second of four Colab walkthroughs that exercise the [end-of-Day-7 ca
 |----------|--------|
 | [01 — Equilibrium Poisson on a 1D pn junction](./01_pn_junction_1d.ipynb) | Nonlinear Poisson with Boltzmann carriers; depletion-approximation comparison |
 | **02 — Bias sweep on the 1D pn junction** (this one) | Coupled Slotboom drift-diffusion with SRH; Shockley forward + SNS reverse |
-| 03 — MOS capacitor C-V (2D multi-region) | Gate contact BCs with $\phi_{ms}$; Si/SiO₂ multi-region; depletion-approximation C-V |
-| 04 — 3D doped resistor V-I | Ohmic V-I linearity; builtin box mesh vs. gmsh `.msh` fixture |
+| [03 — MOS capacitor C-V (2D multi-region)](./03_mos_cv.ipynb) | Gate contact BCs with $\phi_{ms}$; Si/SiO₂ multi-region; depletion-approximation C-V |
+| [04 — 3D doped resistor V-I](./04_resistor_3d.ipynb) | Ohmic V-I linearity; builtin box mesh vs. gmsh `.msh` fixture |
 
 **What this notebook does:**
 1. Installs `dolfinx` on Colab via [FEM on Colab](https://fem-on-colab.github.io/) (one wget, ~30 s)

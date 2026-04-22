@@ -29,7 +29,7 @@ This is the third of four Colab walkthroughs that exercise the [end-of-Day-7 cap
 | [01 — Equilibrium Poisson on a 1D pn junction](./01_pn_junction_1d.ipynb) | Nonlinear Poisson with Boltzmann carriers; depletion-approximation comparison |
 | [02 — Bias sweep on the 1D pn junction](./02_pn_junction_bias.ipynb) | Coupled Slotboom drift-diffusion with SRH; Shockley forward + SNS reverse |
 | **03 — MOS capacitor C-V** (this one) | Gate contact BCs with $\phi_{ms}$; Si/SiO$_2$ multi-region; depletion-approximation C-V |
-| 04 — 3D doped resistor V-I | Ohmic V-I linearity; builtin box mesh vs. gmsh `.msh` fixture |
+| [04 — 3D doped resistor V-I](./04_resistor_3d.ipynb) | Ohmic V-I linearity; builtin box mesh vs. gmsh `.msh` fixture |
 
 **What this notebook does:**
 1. Installs `dolfinx` on Colab via [FEM on Colab](https://fem-on-colab.github.io/) (one wget, ~30 s)
@@ -108,9 +108,7 @@ Run a single-point "sweep" at $V_{gate} = 0$ so the runner returns the equilibri
 
 - The dolfinx mesh is already a 2D triangulation, and `tricontourf` accepts the dof coordinates directly — no resampling, no export step.
 - Matplotlib is already a Colab dependency. The alternative (VTX export + `pyvista`) would pull in VTK + trame on top of FEM-on-Colab's fenicsx install, adding 30-60 s of install time and a second rendering backend to maintain for a plot that `tricontourf` handles in one call.
-- `pyvista` is the right tool for 3D surfaces / isosurfaces / interactive rotation, none of which apply to a 2D contour plot on a rectangular domain.
-
-For 3D (Notebook 04) the tradeoff flips the other way; see Notebook 04 for that discussion."""))
+- `pyvista` is the right tool for 3D surfaces / isosurfaces / interactive rotation, none of which apply to a 2D contour plot on a rectangular domain."""))
 
 cells.append(nbf.v4.new_code_cell(r"""# Clone the config with a single-point sweep at V_gate = 0 so we can
 # render the 2D psi field at equilibrium before running the full sweep.
