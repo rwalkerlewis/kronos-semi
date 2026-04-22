@@ -16,16 +16,45 @@ Before contributing (human or AI), read these in order:
 
 ## Status
 
-**Early development.** Day 1 deliverable is the equilibrium Poisson solve, verified against the depletion-approximation of a 1D pn junction. Drift-diffusion under bias, 2D MOS capacitor, and 3D benchmarks are on the roadmap; see [Roadmap](#roadmap) below.
+**End-of-Day-7 capability matrix**, shipped across PRs #2–#9:
 
-What works today:
-- Full JSON input schema with validation (jsonschema Draft-07)
-- Material database (Si, Ge, GaAs; SiO₂, HfO₂, Si₃N₄ insulators)
-- Nondimensional scaling (essential — the raw equations give a Jacobian condition number > 10³⁰)
-- Doping profile evaluators: uniform, step, Gaussian
-- Builtin mesh generation with axis-aligned region and facet tagging
-- Equilibrium Poisson under Boltzmann statistics, solved via PETSc SNES
-- 1D pn junction benchmark: V_bi, depletion width, peak field all match analytical to within a few percent
+| Capability                         | Dimensions    | Status  | Verifier                                                     |
+|------------------------------------|---------------|---------|--------------------------------------------------------------|
+| Equilibrium Poisson                | 1D / 2D / 3D  | shipped | MMS finest-pair rates L2 = 2.0, H1 = 1.0                     |
+| Coupled Slotboom drift-diffusion   | 1D / 2D       | shipped | MMS finest-pair rates L2 ≥ 1.99 across variants              |
+| SRH recombination                  | 1D / 2D       | shipped | verified against SNS analytical at reverse bias              |
+| Ohmic contact BCs                  | 1D / 2D / 3D  | shipped | Shockley diode within 10% at forward bias                    |
+| Gate contact BCs with φ_ms         | 2D            | shipped | MOS C–V within 10% in depletion window                       |
+| Multi-region Poisson (Si/SiO₂)     | 2D            | shipped | multi-region MMS L2 = 2.0                                    |
+| File-sourced gmsh .msh meshes      | 3D            | shipped | builtin vs gmsh R-match within 1%                            |
+| Adaptive bias continuation         | uni + bipolar | shipped | pn junction forward + reverse, 3D resistor                   |
+| 3D ohmic V–I linearity             | 3D            | shipped | V–I linearity within 1%                                      |
+| Benchmarks                         | 5             | shipped | pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d   |
+| Conservation / mesh convergence    | 1D            | shipped | charge neutrality, Cauchy rates ≥ 1.8/doubling               |
+| Test suite                         | pure + FEM    | shipped | 202 tests, 95.58% coverage                                   |
+| V&V                                | 10 studies    | shipped | 62/62 PASS                                                   |
+| CI                                 | lint+test+FEM | shipped | green on dev and main                                        |
+
+### Scope
+
+kronos-semi is a **seven-day FEM-framework demonstration** targeting the quasi-static, steady-state subset of the COMSOL Semiconductor Module: equilibrium Poisson and coupled drift-diffusion with SRH recombination over 1D/2D/3D meshes, multi-region dielectrics, and ohmic/gate/insulating boundary conditions. The verifier suite proves the numerics against analytical (Shockley, SNS, depletion-approx C–V, ohmic V–I) and manufactured (MMS) solutions.
+
+What it deliberately does **not** implement, relative to a full commercial Semiconductor Module:
+
+- Transient (time-dependent) solver — steady-state only.
+- Impact ionization and avalanche generation.
+- Heterojunction band-offset models and position-dependent band structure.
+- Trap-assisted and band-to-band tunneling.
+- Fermi–Dirac statistics (Boltzmann throughout; valid below ~10¹⁹ cm⁻³).
+- Mobility models beyond constant — no Caughey–Thomas, no Lombardi surface mobility.
+- Non-equilibrium Green's function (NEGF) or quantum-corrected transport.
+- Schottky contacts, tunnel junctions, or contact resistance models.
+- Thermal coupling (self-heating, lattice temperature).
+- Optical generation and photovoltaic carrier sources.
+
+These are deferred as out-of-scope for the seven-day framework demonstration; the architecture accommodates them as follow-on work (see [docs/ROADMAP.md](docs/ROADMAP.md) Week 2+).
+
+For a breakdown of what each day shipped, see the capability matrix above and [CHANGELOG.md](CHANGELOG.md).
 
 ## Quick start on Colab (zero setup)
 
