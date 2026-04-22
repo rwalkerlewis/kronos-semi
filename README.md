@@ -164,8 +164,3 @@ Every analytical result is regenerated at import time by `tests/check_day1_math.
 
 MIT. See [LICENSE](LICENSE).
 
-## Author
-
-Robert "Bud" Walker · [Rainbow Seismic](https://github.com/rwalkerlewis) · computational geophysics and device simulation consulting.
-
-Built as an evaluation task for KronosAI; extended from prior finite-element work on [PyLith](https://github.com/geodynamics/pylith) (crustal deformation, poroelastic coupling).
