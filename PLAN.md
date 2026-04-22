@@ -30,12 +30,12 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `dev/day6-mos-2d` (Day 6 MOS capacitor Phase 6 +
-  Phase 8 complete, awaiting review before merging)
+- Active dev branch: `dev/day7-resistor-3d` (Day 7 3D doped resistor in
+  flight; Day 6 merged via PR #8)
 
 ## Current state
 
-Day 1 through Day 5 are merged into `main`. CI hardening (branch glob
+Day 1 through Day 6 are merged into `main`. CI hardening (branch glob
 plus Dockerized FEM job) merged on `ci/docker-benchmark-matrix`.
 Day 3 (adaptive bias continuation, Sah-Noyce-Shockley verifier,
 reverse-bias generation check) merged via PR #5 from
@@ -49,8 +49,10 @@ drift-diffusion, CI integration, documentation) merged via PR #6 from
 `dev/day5-refactor`. Day 6 (2D MOS capacitor: multi-region Poisson
 over oxide plus silicon, gate contact, continuity on a semiconductor
 submesh, C-V verifier matching depletion-approximation MOS theory
-within 10% in [V_FB + 0.2, V_T - 0.1] V, multi-region MMS) is
-complete on `dev/day6-mos-2d` and awaiting review.
+within 10% in [V_FB + 0.2, V_T - 0.1] V, multi-region MMS) merged
+via PR #8 from `dev/day6-mos-2d`. Day 7 (3D doped resistor with
+gmsh `.msh` loader and V-I linearity verifier) is in flight on
+`dev/day7-resistor-3d`.
 
 ### What works (verified in Docker on current `main`)
 
@@ -113,57 +115,65 @@ complete on `dev/day6-mos-2d` and awaiting review.
 
 ## Next task
 
-**Day 7: 3D doped resistor.** Planned, starts after Day 6 merges.
+**Day 7: 3D doped resistor.** In flight on `dev/day7-resistor-3d`, PR
+target #9 against `main`.
 
-**Day 6 complete recap (awaiting review on `dev/day6-mos-2d`).**
-
-- **Branch:** `dev/day6-mos-2d` cut from `main` at SHA 64010c4 (Day 5
-  merge).
-- **Goal:** first 2D benchmark and first multi-region device. Poisson
-  assembles over the full mesh (silicon plus SiO2 gate oxide);
-  continuity equations assemble only over the semiconductor submesh.
-  A gate contact applies a Dirichlet BC on psi at the oxide top facet
-  and imposes no Slotboom BC. A C-V verifier differentiates gate
-  charge with respect to V_gate and matches depletion-region MOS
-  theory within 10%. A new multi-region Poisson MMS test protects the
-  coefficient-jump assembly with the same rigor Day 4 applied to the
-  single-region case.
+- **Branch:** `dev/day7-resistor-3d` cut from `main` at the Day 6
+  merge commit (PR #8).
+- **Goal:** confirm the simulator framework extends to 3D with no
+  physics changes, and add a gmsh `.msh` loader for unstructured
+  meshes. Structurally this is the simplest remaining day: Poisson
+  and the Slotboom drift-diffusion forms are already dimension
+  independent, doping profiles and facet/region box tagging already
+  generalize to 3D coordinates, and the ohmic BC helper evaluates
+  at facet centroids. What is new is a 3D doped rectangular-bar
+  benchmark with a V-I linearity verifier, a gmsh `.msh` loader
+  wired through `semi/mesh.py::_build_from_file` via
+  `dolfinx.io.gmshio`, and 3D slice plots for psi and |J_n|.
 - **Scope, in:**
-  - `docs/mos_derivation.md`: derivation-first gate (device geometry,
-    per-region equations, Si/SiO2 interface conditions, submesh
-    formulation, gate BC, MOS C-V theory, multi-region MMS
-    construction).
-  - `semi/mesh.py`: `build_submesh_by_role` via
-    `dolfinx.mesh.create_submesh`; cellwise DG0 eps_r Function on the
-    full mesh.
-  - `semi/bcs.py`: fill in the `"gate"` branch in
-    `build_psi_dirichlet_bcs` (Dirichlet psi with optional phi_ms);
-    `build_dd_dirichlet_bcs` continues to skip gate contacts.
-  - `semi/physics/poisson.py`: cellwise eps_r path for multi-region,
-    scalar fast path preserved for single region.
-  - `semi/physics/drift_diffusion.py`: V_phi_n, V_phi_p on the
-    semiconductor submesh via dolfinx 0.10 `entity_maps`.
-  - `benchmarks/mos_2d/mos_cap.json` device spec; 2D contour plotting
-    (psi, |E|, n, p) in `scripts/run_benchmark.py`; C-V verifier
-    restricted to the depletion regime with a comment documenting
-    the exclusion of accumulation and strong inversion.
-  - `semi/verification/mms_poisson.py`:
-    `mms_poisson_2d_multiregion` variant; wired into
-    `scripts/run_verification.py all`.
-  - `docs/PHYSICS.md` Section 6 (condensed MOS reference);
-    `docs/ROADMAP.md` Day 6 done; `CHANGELOG.md` Day 6 entry;
-    optional ADR 0008 if the submesh approach needs a design record.
+  - `docs/resistor_derivation.md`: derivation-lite gate covering
+    device geometry, analytical ohmic resistance, the V-I linearity
+    metric with 1% tolerance and rationale, 3D slice plot strategy,
+    and gmsh loader test strategy.
+  - `semi/mesh.py`: implement `_build_from_file` for the `"gmsh"`
+    format via `dolfinx.io.gmshio.read_from_msh`; return cell_tags
+    and facet_tags from the file so `build_mesh` can skip the
+    box/plane tagger when the mesh brings its own physical groups.
+  - `benchmarks/resistor_3d/resistor.json`: 3D rectangular bar
+    (1 um long, 200 nm square cross-section) with uniform n-type
+    doping, two ohmic contacts on the x=0 and x=L faces, and a
+    5-point bias sweep in [-0.01, 0.01] V.
+  - `benchmarks/resistor_3d/resistor_gmsh.json`: same device
+    loaded from a committed gmsh fixture `box.msh` with paired
+    `.geo` source.
+  - `scripts/run_benchmark.py`: `verify_resistor_3d` V-I linearity
+    verifier (1% tol); 3D slice plotters for psi and |J_n| at the
+    y = W/2 midplane.
+  - Tests: `tests/fem/test_mesh_gmsh.py` (round-trip, physical
+    group preservation, equivalent V-I result vs `create_box`) and
+    `tests/fem/test_resistor_3d.py` (smoke + theory-match).
+  - Docs: `docs/PHYSICS.md` Section 7 (3D extension notes);
+    `docs/ROADMAP.md` Day 7 done; `CHANGELOG.md` Day 7 entry;
+    optional ADR 0009 only if gmsh loader design warrants one.
 - **Scope, out:**
-  - 3D doped resistor (Day 7) and submission polish (Day 8).
-  - Full MOSFET (source/drain/gate/body). Post-submission stretch.
+  - Full MOSFET and FinFET geometry (Non-goals, post-submission).
   - Field-dependent mobility, Auger, Fermi-Dirac (Non-goals).
-- **Preconditions:** Day 5 refactor merged into `main` (done, PR #7).
-- **Hard invariants for this PR:** see "Invariants" below. Day 4 V&V
-  gates stay green (every MMS rate within 0.01 of Day 4 values);
-  1D benchmarks (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`) stay
-  green; coverage stays >= 95%. `semi/bcs.py` remains pure-Python.
-  Mesh coordinates stay in meters; Poisson LHS uses
-  `L_D^2 * eps_r(x)` with cellwise eps_r.
+  - XDMF loader (raise a clear `NotImplementedError` and defer).
+  - MMS in 3D: the Poisson and DD assembly is dimension agnostic
+    and has been MMS-verified in 1D and 2D; a 3D ohmic-resistor
+    theory match on an unstructured mesh is sufficient evidence
+    for Day 7.
+- **Preconditions:** Day 6 MOS capacitor merged into `main` (done,
+  PR #8). Post-Day-6 V&V suite green on this machine (Phase 0
+  verified before cutting this branch).
+- **Hard invariants for this PR:** see "Invariants" below. All
+  prior V&V gates stay green (every MMS rate within 0.01 of the
+  post-Day-6 values, including `2d_multiregion`); all prior
+  benchmarks (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`,
+  `mos_2d`) stay green; coverage stays >= 95%. No changes to
+  `semi/physics/poisson.py` or `semi/physics/drift_diffusion.py`
+  should be required (both are already dimension agnostic).
+  V-I linearity verifier tolerance stays at 1%.
 
 ## Roadmap
 
@@ -239,7 +249,7 @@ They may be added after submission as stretch goals (see
 Append-only. Newest entries on top.
 
 - **Day 6 (2026-04-21):** 2D MOS capacitor (first 2D benchmark, first
-  multi-region device). Delivered on `dev/day6-mos-2d`:
+  multi-region device). Merged via PR #8 from `dev/day6-mos-2d`:
   - **`docs/mos_derivation.md`** (pre-approved derivation gate):
     device geometry, per-region equations, Si/SiO2 interface
     conditions, submesh formulation, gate BC, MOS C-V theory with
