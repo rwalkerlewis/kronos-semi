@@ -265,7 +265,8 @@ Read `PLAN.md` for the short version and the current in-flight task.
 
 ## Day 7. 3D doped resistor
 
-- **Status:** Done (2026-04-21). Delivered on `dev/day7-resistor-3d`.
+- **Status:** Completed (2026-04-21). Merged via PR #9 from
+  `dev/day7-resistor-3d` at `a604b12`.
   All deliverables landed; the `resistor_3d` benchmark exits 0 on
   both the builtin `create_box` mesh and the committed gmsh fixture
   with worst |R_sim - R_theory|/R_theory well inside the fixed 1%
@@ -322,19 +323,45 @@ Read `PLAN.md` for the short version and the current in-flight task.
 
 ## Day 8. Final polish and submission packaging
 
-- **Status:** Queued (next). Was originally Day 7.
-- **Goal:** make the submission presentation-ready.
+- **Status:** In flight. In progress on `dev/day8-polish`, targeting
+  PR #10 against `main`. Was originally Day 7 in the pre-resistor
+  roadmap.
+- **Goal:** make the submission presentation-ready. No new physics,
+  no new benchmarks; this is a documentation, notebook, and release
+  pass only.
 - **Deliverables:**
-  - Regenerate `notebooks/01_pn_junction_1d.ipynb` using
-    `scripts/build_notebook_01.py` after all Docker tests pass.
-  - Add `notebooks/02_pn_junction_bias.ipynb` for the Day 2-3 content.
-  - Update `README.md` status section with the final capability
-    matrix.
-  - Tag release `v0.2.0` (or similar) on `main` after final review.
-  - Update `CHANGELOG.md`.
+  - Sync `PLAN.md` "Current state" and this roadmap to reflect the
+    Day 7 merge and Day 8 in flight.
+  - Rewrite the `README.md` status section as an end-of-Day-7
+    capability matrix (Days 1-7 shipped across PRs #2-#9), with a
+    short scope-out prose block enumerating COMSOL Semiconductor-Module
+    features that are deliberately out of scope.
+  - Regenerate `notebooks/01_pn_junction_1d.ipynb` via
+    `scripts/build_notebook_01.py` with current-state framing (no
+    "Day 1" heading).
+  - Author `notebooks/02_pn_junction_bias.ipynb` (Day 2-3 content:
+    forward Shockley + reverse SNS sweeps).
+  - Author `notebooks/03_mos_cv.ipynb` (Day 6 content: MOS C-V, with
+    the `V_FB + 0.2` verifier-window disclosure surfaced in the
+    narrative).
+  - Author `notebooks/04_resistor_3d.ipynb` (Day 7 content: bipolar
+    sweep, builtin-vs-gmsh comparison).
+  - Add a README "Notebooks" catalog with Colab badges.
+  - Append `[0.8.0] - Day 8` to `CHANGELOG.md`.
+  - Open PR #10, wait for CI, do not self-merge.
+  - Post-merge and only on explicit human prompt, create annotated
+    tag `v0.2.0`.
 - **Verification:**
-  - Both notebooks execute top-to-bottom on Colab with no errors.
-  - README and CHANGELOG accurately describe final state.
+  - Every notebook executed on a real Colab runtime (not just
+    `jupyter nbconvert --execute` locally) with wall time and
+    final-cell observation recorded in the PR body.
+  - README and CHANGELOG accurately describe the end-of-Day-7
+    capability set.
+  - CI green on every commit on the branch
+    (`gh run list --branch dev/day8-polish` verbatim).
+  - All five benchmarks (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`,
+    `mos_2d`, `resistor_3d`) stay green; coverage stays >= 95%;
+    V&V suite stays green; no physics, schema, or verifier changes.
 - **Dependencies:** Days 6 and 7.
 
 ## Post-submission (stretch goals)

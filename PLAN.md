@@ -30,13 +30,13 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `dev/day7-resistor-3d` (Day 7 3D doped resistor in
-  flight; Day 6 merged via PR #8)
+- Active dev branch: `dev/day8-polish` (Day 8 final polish and
+  submission packaging in flight; Day 7 merged via PR #9, `a604b12`)
 
 ## Current state
 
-Day 1 through Day 7 are delivered. Days 1-6 are merged into `main`;
-Day 7 is on `dev/day7-resistor-3d` and is the subject of PR #9.
+Days 1 through 7 are merged into `main`. Day 8 (final polish and
+submission packaging) is in flight on `dev/day8-polish`.
 CI hardening (branch glob plus Dockerized FEM job) merged on
 `ci/docker-benchmark-matrix`. Day 3 (adaptive bias continuation,
 Sah-Noyce-Shockley verifier, reverse-bias generation check) merged
@@ -53,8 +53,8 @@ on a semiconductor submesh, C-V verifier matching depletion-approximation
 MOS theory within 10% in [V_FB + 0.2, V_T - 0.1] V, multi-region MMS)
 merged via PR #8 from `dev/day6-mos-2d`. Day 7 (3D doped resistor with
 gmsh `.msh` loader, bipolar-sweep driver path, V-I linearity verifier
-at 1%, and 3D slice plots) awaits merge via PR #9 from
-`dev/day7-resistor-3d`.
+at 1%, and 3D slice plots) merged via PR #9 from
+`dev/day7-resistor-3d` at `a604b12`.
 
 ### What works (verified in Docker on current `main`)
 
@@ -133,21 +133,40 @@ at 1%, and 3D slice plots) awaits merge via PR #9 from
 
 ## Next task
 
-**Day 8: final polish and submission packaging.** Queued on `main`
-once PR #9 (Day 7) merges.
+**Day 8: final polish and submission packaging.** In flight on
+`dev/day8-polish`, targeting PR #10 against `main`.
 
 - **Goal:** make the submission presentation-ready. No new physics,
-  no new benchmarks; this is regenerate-notebooks, capability-matrix
-  pass, release tag.
+  no new benchmarks; this is a documentation, notebook, and release
+  pass only. Scope creep on the final PR is the submission-day
+  failure mode to avoid.
 - **Scope, in:**
-  - Regenerate `notebooks/01_pn_junction_1d.ipynb` against the
-    Day 1-7 codebase using `scripts/build_notebook_01.py`.
-  - Add `notebooks/02_pn_junction_bias.ipynb` for Day 2-3 content.
-  - Update `README.md` capability matrix to reflect Day 7 (3D bar,
-    gmsh loader, V-I verifier) and the final feature set.
-  - Update `CHANGELOG.md` with the final tag entry.
-  - Tag release `v0.2.0` (or similar) on `main` after final review.
-- **Preconditions:** Day 7 (PR #9) merged into `main`.
+  - Sync `PLAN.md` "Current state" and `docs/ROADMAP.md` statuses to
+    reflect the Day 7 merge and Day 8 in flight.
+  - Rewrite the `README.md` status section as an end-of-Day-7
+    capability matrix (Days 1-7 shipped across PRs #2-#9).
+  - Regenerate `notebooks/01_pn_junction_1d.ipynb` using
+    `scripts/build_notebook_01.py` (current-state framing, not
+    "Day 1").
+  - Author `notebooks/02_pn_junction_bias.ipynb` (Day 2-3 content:
+    forward Shockley + reverse SNS sweeps).
+  - Author `notebooks/03_mos_cv.ipynb` (Day 6 content: MOS C-V with
+    the V_FB + 0.2 verifier-window disclosure in the narrative).
+  - Author `notebooks/04_resistor_3d.ipynb` (Day 7 content: bipolar
+    sweep, builtin-vs-gmsh comparison).
+  - Verify every notebook by actually executing it on Colab; record
+    wall time and final plot observation in the PR body. Local
+    `jupyter nbconvert --execute` is a convenience check, not a
+    verification, because FEM-on-Colab's dolfinx pin can drift from
+    the local Docker pin.
+  - Add a README "Notebooks" catalog with Colab badges.
+  - Append `[0.8.0] - Day 8` to `CHANGELOG.md`.
+  - Open PR #10, wait for CI, do not self-merge.
+  - Post-merge and only on explicit human prompt, tag `v0.2.0`.
+- **Scope, out:** any new physics code, new verifier, new benchmark
+  JSON, or schema change. If a notebook reveals a bug, note it in
+  the PR body and defer the fix to a Day 9 PR.
+- **Preconditions:** Day 7 (PR #9) merged into `main` at `a604b12`.
 
 ## Roadmap
 
@@ -159,8 +178,8 @@ once PR #9 (Day 7) merges.
 | 4   | Verification & Validation suite (MMS, conv, conservation)    | Done       | `dev/day4-vnv`; all four phases green, CI V&V step within 15 min      |
 | 5   | Refactor pass, expanded test coverage, physics docs updates  | Done       | `dev/day5-refactor`; run.py 580->74, bcs.py extracted, coverage 96.25% |
 | 6   | 2D MOS capacitor (oxide + silicon multi-region)              | Done       | `dev/day6-mos-2d`; mos_cv runner, 4/4 C-V checks green, coverage 95.43% |
-| 7   | 3D doped resistor                                            | Done       | `dev/day7-resistor-3d` (PR #9): gmsh loader, bipolar sweep, V-I 1%    |
-| 8   | Final polish, submission packaging                           | Queued     | Regenerate notebooks, tag release                                     |
+| 7   | 3D doped resistor                                            | Done       | Merged via PR #9 (`a604b12`): gmsh loader, bipolar sweep, V-I 1%      |
+| 8   | Final polish, submission packaging                           | In flight  | `dev/day8-polish` (PR #10): README, 4 notebooks, CHANGELOG, tag prep  |
 
 See `docs/ROADMAP.md` for the full per-day breakdown.
 
