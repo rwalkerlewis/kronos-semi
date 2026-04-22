@@ -1,0 +1,57 @@
+{
+  "name": "resistor_3d",
+  "description": "3D doped silicon resistor (Day 7). 1 um x 200 nm x 200 nm rectangular bar, uniform n-type N_D=1e18 cm^-3, two ohmic contacts on the x=0 and x=L faces, 5-point bias sweep on contact_right in [-0.01, +0.01] V. Verifier checks V-I linearity within 1% (R_sim vs analytical R = L / (q N_D mu_n A)).",
+  "dimension": 3,
+  "mesh": {
+    "source": "builtin",
+    "extents": [[0.0, 1.0e-6], [0.0, 2.0e-7], [0.0, 2.0e-7]],
+    "resolution": [64, 16, 16],
+    "regions_by_box": [
+      {"name": "silicon", "tag": 1,
+       "bounds": [[0.0, 1.0e-6], [0.0, 2.0e-7], [0.0, 2.0e-7]]}
+    ],
+    "facets_by_plane": [
+      {"name": "contact_left",  "tag": 10, "axis": 0, "value": 0.0},
+      {"name": "contact_right", "tag": 20, "axis": 0, "value": 1.0e-6}
+    ]
+  },
+  "regions": {
+    "silicon": {"material": "Si", "tag": 1, "role": "semiconductor"}
+  },
+  "doping": [
+    {
+      "region": "silicon",
+      "profile": {"type": "uniform", "N_D": 1.0e18, "N_A": 0.0}
+    }
+  ],
+  "contacts": [
+    {"name": "contact_left",  "facet": "contact_left",  "type": "ohmic", "voltage": 0.0},
+    {
+      "name": "contact_right",
+      "facet": "contact_right",
+      "type": "ohmic",
+      "voltage": 0.0,
+      "voltage_sweep": {"start": -0.01, "stop": 0.01, "step": 0.005}
+    }
+  ],
+  "physics": {
+    "temperature": 300.0,
+    "statistics": "boltzmann",
+    "mobility": {"mu_n": 1400.0, "mu_p": 450.0},
+    "recombination": {"srh": false, "tau_n": 1.0e-8, "tau_p": 1.0e-8, "E_t": 0.0}
+  },
+  "solver": {
+    "type": "bias_sweep",
+    "continuation": {
+      "min_step": 1.0e-4,
+      "max_halvings": 6,
+      "max_step": 0.005,
+      "easy_iter_threshold": 4,
+      "grow_factor": 2.0
+    }
+  },
+  "output": {
+    "directory": "./results/resistor_3d",
+    "fields": ["potential", "n", "p", "phi_n", "phi_p", "iv"]
+  }
+}

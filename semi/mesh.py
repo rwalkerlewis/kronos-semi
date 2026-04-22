@@ -105,9 +105,8 @@ def _build_from_file(mesh_cfg: dict, dim: int, source_dir: str | None = None):
         raw_path = Path(source_dir) / raw_path
 
     if fmt == "gmsh":
-        from mpi4py import MPI
-
         from dolfinx.io import gmsh as _gmsh_io
+        from mpi4py import MPI
 
         meshdata = _gmsh_io.read_from_msh(
             str(raw_path), MPI.COMM_WORLD, gdim=dim,
