@@ -168,6 +168,31 @@ at 1%, and 3D slice plots) merged via PR #9 from
   the PR body and defer the fix to a Day 9 PR.
 - **Preconditions:** Day 7 (PR #9) merged into `main` at `a604b12`.
 
+## Day 8 execution
+
+The full Day 8 narrative, per-phase commit history, reviewer-caught
+decisions (MOS ψ-reference convention, verifier window shift, Option-A
+Colab gmsh install plus the `libGLU` apt dependency), verification
+status (CI, local Docker, Colab QA), and deferred Day 9+ cleanups live
+in [`docs/day8-submission-log.md`](docs/day8-submission-log.md). This
+PLAN section carries only the phase index; the log is the reference
+document.
+
+| Phase | Scope                                                                 | Commit SHA   | Status                          |
+|------:|-----------------------------------------------------------------------|--------------|---------------------------------|
+| 0     | Verify `main` baseline (pytest 206, V&V 62/62, ruff clean)            | N/A          | N/A (verification-only)         |
+| 1     | Sync `PLAN.md` "Current state" and `docs/ROADMAP.md` statuses         | `1d86504`    | Done                            |
+| 2     | Rewrite `README.md` status section as end-of-Day-7 capability matrix  | `c7343c9`    | Done                            |
+| 3     | Regenerate `notebooks/01_pn_junction_1d.ipynb` (end-of-Day-7 framing) | `8ce6b10`    | Done                            |
+| 4     | Author `notebooks/02_pn_junction_bias.ipynb` (Day 2-3 content)        | `f7c83b0`    | Done                            |
+| 5     | Author `notebooks/03_mos_cv.ipynb` (Day 6 C-V content)                | `bc3409b`    | Done                            |
+| 6     | Author `notebooks/04_resistor_3d.ipynb` (Day 7 content)               | `365da06`    | Done                            |
+| 7     | Cross-notebook consistency pass (headings, install cells, artifacts)  | `d52ca20`    | Done                            |
+| 8     | Colab QA on all four notebooks, record wall times                     | pending      | In flight (NB04 outstanding)    |
+| 9     | CHANGELOG `[0.8.0] - Day 8`, `semi/__init__.py` version bump          | pending      | Pending                         |
+| 10    | Open PR #10, wait for CI, do not self-merge                           | pending      | Pending                         |
+| 11    | Post-merge and only on explicit prompt, tag `v0.2.0`                  | pending      | Pending                         |
+
 ## Roadmap
 
 | Day | Milestone                                                    | Status     | Notes                                                                 |
