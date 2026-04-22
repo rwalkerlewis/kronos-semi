@@ -119,20 +119,7 @@ def run_bias_sweep(
         if not v_sweep_list or v_sweep_list[0] != 0.0:
             v_sweep_list = [0.0] + [v for v in v_sweep_list if v != 0.0]
 
-    # Bipolar (sign-spanning) sweeps: walk to the most-negative endpoint,
-    # then back across zero to the most-positive endpoint. Each leg is a
-    # single-direction ramp the AdaptiveStepController can handle. For
-    # unipolar sweeps `bipolar_legs` is empty and the original
-    # single-endpoint ramp below runs unchanged.
-    has_neg = any(v < -1.0e-12 for v in v_sweep_list)
-    has_pos = any(v > 1.0e-12 for v in v_sweep_list)
-    if has_neg and has_pos:
-        bipolar_legs = [
-            float(min(v_sweep_list)),
-            float(max(v_sweep_list)),
-        ]
-    else:
-        bipolar_legs = []
+    bipolar_legs = compute_bipolar_legs(v_sweep_list)
 
     # Nominal step size from the sweep spacing (e.g., voltage_sweep.step).
     # continuation.max_step defaults to this, which preserves the Day 2
@@ -300,6 +287,22 @@ def run_bias_sweep(
         x_dof=x_dof, N_hat=N_hat_fn, scaling=sc,
         solver_info=last_info, iv=iv_rows, bias_contact=sweep_contact,
     )
+
+
+def compute_bipolar_legs(v_sweep_list: list[float]) -> list[float]:
+    """Endpoints for a sign-spanning bias walk, empty for unipolar sweeps.
+
+    A sweep list that contains both a negative entry and a positive entry
+    (ignoring numerical-noise values within 1e-12 V of zero) is walked
+    in two single-direction legs: V = 0 -> min(V) -> max(V). Unipolar
+    sweeps return `[]`, preserving the original single-endpoint ramp
+    path used by the pn-junction and MOS benchmarks.
+    """
+    has_neg = any(v < -1.0e-12 for v in v_sweep_list)
+    has_pos = any(v > 1.0e-12 for v in v_sweep_list)
+    if has_neg and has_pos:
+        return [float(min(v_sweep_list)), float(max(v_sweep_list))]
+    return []
 
 
 def _resolve_sweep(cfg):

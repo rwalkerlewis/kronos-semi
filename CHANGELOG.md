@@ -1,5 +1,98 @@
 # Changelog
 
+## [0.7.0] - Day 7
+
+### Added
+- `benchmarks/resistor_3d/resistor.json`: 3D doped rectangular bar
+  (1 um x 200 nm x 200 nm), uniform n-type N_D = 1e18 cm^-3, two
+  ohmic contacts on the x=0 and x=L faces, 5-point bias sweep on
+  `contact_right` in [-0.01, +0.01] V. First benchmark in the
+  project to exercise the solver stack in 3D.
+- `benchmarks/resistor_3d/resistor_gmsh.json` plus a committed
+  `fixtures/box.geo` / `fixtures/box.msh` pair. The `.geo` is the
+  reproducible source; `gmsh -3 box.geo -o box.msh` regenerates
+  the `.msh` under 100 KB. Same device on an unstructured
+  tetrahedral mesh, exercised by the end-to-end test matrix.
+- `semi/mesh.py::_build_from_file`: `.msh` loader wired via
+  `dolfinx.io.gmsh.read_from_msh`. Physical groups stored in the
+  file are returned verbatim as `cell_tags` and `facet_tags`, so
+  `build_mesh` skips the JSON box/plane tagger when the mesh
+  brings its own tags. XDMF is left as a clear
+  `NotImplementedError` for a future PR.
+- `semi/runners/bias_sweep.py`: two-leg walk for bipolar sweeps.
+  When the resolved `v_sweep_list` spans zero, the bias ramp runs
+  from `V = 0 -> min(V) -> max(V)` with a fresh
+  `AdaptiveStepController` on each leg. Unipolar sweeps (the
+  pn-junction and MOS benchmarks) fall through to the original
+  single-endpoint ramp unchanged, so 1D/2D numerics are
+  byte-identical to Day 6.
+- `scripts/run_benchmark.py`: `verify_resistor_3d` V-I linearity
+  verifier (max |R_sim - R_theory|/R_theory < 1% tolerance;
+  sanity checks: |I(V=0)| under numerical-noise floor, and
+  `sign(I(V)) == sign(V)` at every nonzero V). 3D slice plotters
+  for psi and |J_n| at the `y = W/2` midplane, plus an I-V
+  scatter against the theoretical line; the 1D and 2D plotters
+  are untouched.
+- `docs/resistor_derivation.md` (derivation-lite gate, approved
+  before any Day 7 implementation): device geometry, analytical
+  ohmic resistance `R = L / (q N_D mu_n A) = 1115 Ohm`, 1% V-I
+  linearity rationale tied to the `V -> 0, uniform-everything`
+  limit, 3D slice-plot strategy, gmsh loader test strategy.
+- `docs/PHYSICS.md` Section 7 (3D extension notes, ~1 page):
+  cites that Poisson and drift-diffusion are dimension-independent
+  and that 3D is a recipe-level extension, not a physics change;
+  references `docs/resistor_derivation.md` for the full
+  derivation. Covers the device, analytical R, bipolar-sweep
+  driver, V-I verifier, and gmsh loader.
+- `tests/fem/test_mesh_gmsh.py`: round-trip load of `box.msh`,
+  physical-group preservation, and equivalent-V-I result vs the
+  builtin `create_box` path.
+- `tests/fem/test_resistor_3d.py`: coarsened smoke test
+  (16x4x4 mesh, shrunken sweep) plus builtin and gmsh
+  production-JSON tests that run the verifier end-to-end and
+  assert max |R_sim - R_theory|/R_theory < 1%.
+- `tests/test_bipolar_sweep.py`: pure-Python test that constructs
+  a `v_sweep_list` crossing zero and asserts the bias-sweep
+  driver populates `bipolar_legs` at the expected endpoints; a
+  companion unipolar test asserts `bipolar_legs` stays empty so
+  1D/2D numerics remain on the single-endpoint ramp path.
+
+### Changed
+- `semi/mesh.py` module docstring promotes the gmsh loader from
+  "stubbed / NotImplementedError" to a supported file source.
+- `docs/ROADMAP.md`: Day 7 moves from Planned to Done; Day 8 is
+  queued next.
+
+### Verified
+- `docker compose run --rm benchmark resistor_3d` exits 0 on both
+  builtin and gmsh variants; V-I linearity well inside the fixed
+  1% tolerance. Three plots written per variant.
+- 1D and 2D benchmarks (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`,
+  `mos_2d`) byte-identical to Day 6.
+- `python scripts/run_verification.py all` clears all gates;
+  finest-pair MMS rates (including `2d_multiregion`) within 0.01
+  of the post-Day-6 values.
+- `pytest --cov=semi --cov-fail-under=95` exits 0.
+
+### Notes
+- No changes to `semi/physics/poisson.py` or
+  `semi/physics/drift_diffusion.py` were required on this branch:
+  both forms are written against the abstract `nabla` operator
+  and the cell measure `dx` and are dimension agnostic. The
+  scaled coefficients `L_D^2 eps_r` (Poisson) and `L_0^2 mu_hat`
+  (continuity) pick up no new dimensional factors in 3D; every
+  `nabla` still contributes one `1 / L_0` and every `dx` still
+  contributes `L_0^d`, with the `d` cancelling once the weak
+  form is divided through by the reference density rate.
+- On this branch two commits landed a first pass of the gmsh
+  loader that failed the Dockerized FEM CI job (e395830 wired
+  the loader against a wrong dolfinx namespace; 3abd170 aligned
+  the docstrings but did not fix the import). Both runs failed
+  in the `docker-fem` step before any V-I verifier ran; the fix
+  landed in 62f52d2, which re-wired `_build_from_file` against
+  `dolfinx.io.gmsh.read_from_msh` and greens the full benchmark
+  matrix. No `main`-branch artifact ever saw a failing build.
+
 ## [0.6.0] - Day 6
 
 ### Added

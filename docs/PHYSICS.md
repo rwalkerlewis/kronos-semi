@@ -741,3 +741,112 @@ qv}.png`. Monotone non-increasing C in the window is also checked
 (C starts near C_ox in accumulation, drops through depletion, rises
 back toward C_ox in inversion; inside the window it is strictly
 decreasing up to ~1% noise).
+
+## 7. 3D doped resistor (Day 7)
+
+Day 7 is a dimension extension, not a physics extension. Both the
+equilibrium Poisson form (Section 1.1, 2.2) and the coupled Slotboom
+drift-diffusion block (Section 1.3, 2.5) are written against the
+abstract `nabla` operator and the cell measure `dx`, and the existing
+scaled coefficients `L_D^2 eps_r` (Poisson) and `L_0^2 mu_hat`
+(continuity) pick up no new dimensional factors in 3D: every
+`nabla` still contributes one `1 / L_0` and every `dx` still
+contributes `L_0^d`, with the `d`-dependence cancelling once the
+weak form is divided through by the reference density rate (see
+Section 2.5). In code, `semi/physics/poisson.py` and
+`semi/physics/drift_diffusion.py` are untouched on this branch; the
+only dimension-sensitive site is the mesh builder, which already
+dispatches to `create_interval / create_rectangle / create_box` by
+`cfg["dimension"]`, and the builtin box-tagger, which already
+indexes centroids over `range(tdim)`.
+
+The full derivation (device geometry, analytical ohmic resistance,
+V-I linearity metric and 1% tolerance rationale, 3D slice plot
+strategy, gmsh loader test strategy) lives in
+`docs/resistor_derivation.md`.
+
+### 7.1 Device
+
+Rectangular silicon bar aligned along the x axis: `L = 1 um`,
+cross-section `W x W = 200 nm x 200 nm`, uniform n-type
+`N_D = 1e18 cm^-3`. Two ohmic contacts on the `x = 0` and `x = L`
+faces; the other four faces are insulating (natural BC). Minority
+holes at equilibrium are `n_i^2 / N_D = 1e2 cm^-3`, sixteen orders
+of magnitude below N_D, so the device is safely in the ohmic
+majority-carrier regime.
+
+### 7.2 Analytical resistance
+
+For a uniform bar with constant mobility in the low-field
+low-injection limit,
+
+```
+R = L / (q N_D mu_n A),   I = V / R
+```
+
+Using `mu_n = 1400 cm^2/(V s)` from `semi/materials.py` and
+`A = 4e-14 m^2`:
+
+```
+R_theory = 1.0e-6 / (1.602e-19 * 1.0e24 * 0.14 * 4e-14) = 1115 Ohm
+```
+
+This is exact in the `V -> 0, uniform-everything` limit; the 1%
+verifier tolerance reflects that fact, in contrast to the 10-20%
+tolerances on pn-junction and MOS verifiers where the reference
+itself carries depletion-approximation modeling error.
+
+### 7.3 Bipolar sweep support
+
+The resistor sweep is symmetric about V = 0
+(`V in {-0.010, -0.005, 0.000, +0.005, +0.010} V`). The
+pn-junction / MOS benchmarks were always unipolar, so the bias
+runner (`semi/runners/bias_sweep.py`) grew a two-leg walk for this
+benchmark: when the requested sweep has both negative and positive
+entries, it walks `V = 0 -> min(V) -> max(V)` with a fresh
+`AdaptiveStepController` on each leg. This is a driver-level change
+only; the physics residual, current extraction, and BC code paths
+are untouched. A unit test in `tests/test_bipolar_sweep.py` pins
+the leg computation by constructing a sweep list crossing zero and
+asserting `bipolar_legs` is populated.
+
+### 7.4 V-I linearity verifier
+
+Implemented as `verify_resistor_3d` in `scripts/run_benchmark.py`:
+
+1. Sweep the right contact across 5 equally spaced points in
+   `[-0.01, +0.01] V`.
+2. Extract `I(V)` as the UFL facet integral of `J_n . n` over the
+   `x = L` contact (same postprocessing path as `pn_1d_bias`,
+   exercised here on a 3D facet set for the first time).
+3. Compute `R_sim(V) = V / I(V)` at each nonzero V.
+4. Compare against `R_theory` computed from `mu_n` read from
+   `semi/materials.py` and `N_D` read from the benchmark JSON.
+5. Assert `max |R_sim - R_theory| / R_theory < 1%`.
+
+Sanity checks: `|I(V=0)|` must be within numerical noise
+(`< R_theory * V_t * 1e-6`) and `sign(I(V)) == sign(V)` for every
+nonzero V. Either violation indicates a facet-normal orientation
+bug or a swapped ohmic BC, not a physics correction.
+
+### 7.5 Gmsh loader
+
+Unstructured tetrahedral meshes are loaded through
+`dolfinx.io.gmsh.read_from_msh` in
+`semi/mesh.py::_build_from_file`. Physical groups stored in the
+`.msh` file are returned verbatim as `cell_tags` and `facet_tags`;
+the builtin JSON box-tagger is bypassed for file-source meshes
+because the `.msh` tagging is authoritative. A committed fixture
+`benchmarks/resistor_3d/fixtures/box.msh` (with its reproducible
+`box.geo` source) exercises the same resistor geometry on an
+unstructured mesh; the builtin and gmsh variants must each clear
+the 1% V-I tolerance and must agree with each other by
+transitivity.
+
+No changes to the equilibrium or drift-diffusion residuals were
+required for the 3D path. MMS convergence in 3D is deferred: the
+1D and 2D MMS suites already cover the dimension-agnostic assembly
+(Section 5.1-5.5), and the 3D ohmic-resistor theory match against a
+closed-form reference on two distinct mesh paths (builtin Cartesian
+tetrahedralization + gmsh unstructured tetrahedra) is sufficient
+evidence that the 3D code path and the gmsh loader are correct.
