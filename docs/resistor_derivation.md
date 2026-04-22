@@ -172,8 +172,10 @@ order of likelihood:
    integral (the 2D MOS code path used oriented normals; 3D adds
    a third axis that is easy to mis-orient).
 2. Boundary-condition sign error on the ohmic contact psi (the
-   equilibrium psi at N_D = 1e18 cm^-3 is not zero, it is the
-   n-contact `phi_n_hat = ln(n/n_i) ~= +9.21` in V_t units).
+   equilibrium psi at N_D = 1e18 cm^-3 is not zero, it is
+   `psi_eq_hat = asinh(N_D / (2 n_i)) ~= ln(N_D / n_i) = ln(1e8)
+   = +18.42` in V_t units, as applied in
+   `semi/bcs.py::build_psi_dirichlet_bcs`).
 3. Mesh resolution too coarse along x for the linear psi gradient.
    `[64, 16, 16]` is empirically enough, but a coarser mesh can
    inflate the quadrature error on the extracted facet integral.
