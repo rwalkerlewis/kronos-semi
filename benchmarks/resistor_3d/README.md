@@ -1,6 +1,6 @@
 # 3D resistor benchmark (planned)
 
-Not yet implemented. Planned for Day 6 of the build.
+Not yet implemented. Planned for M6: 2D MOS capacitor.
 
 ## Physics scope
 
@@ -20,4 +20,4 @@ Demonstrate that the framework scales to 3D. Physics is trivial compared to the 
 
 Same framework dependencies as `mos_2d/` plus:
 - 3D mesh generation (builtin box works; file-based gmsh .msh also supported via schema)
-- Full drift-diffusion form (Day 2-3 of the build)
+- Full drift-diffusion form (M2: Coupled drift-diffusion / M3: Adaptive continuation)

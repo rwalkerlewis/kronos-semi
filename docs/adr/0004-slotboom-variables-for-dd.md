@@ -60,7 +60,7 @@ Harder:
 - The coefficient $n = n_i \exp((\hat\psi - \hat\Phi_n)/V_t)$ can
   underflow in deep depletion (large negative argument), or overflow in
   heavy accumulation. The coupled system is stiff. Bias ramping
-  continuation (Day 3) is mandatory; jumping from zero to high forward
+  continuation (M3: Adaptive continuation) is mandatory; jumping from zero to high forward
   bias will not converge.
 - Reverse bias near breakdown pushes the exponent large negative; we
   rely on PETSc SNES line search and bias ramping to stay in the

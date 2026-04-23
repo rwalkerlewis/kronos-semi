@@ -1,9 +1,9 @@
-# MOS Derivation: 2D MOS Capacitor (Day 6 Gate)
+# MOS Derivation: 2D MOS Capacitor (M6: 2D MOS capacitor)
 
-This document is the mathematical specification for the Day-6 2D MOS
+This document is the mathematical specification for the M6: 2D MOS
 capacitor benchmark, gate contact wiring, multi-region Poisson
 assembly, and C-V verification. It is a gate artifact in the same
-sense as `docs/mms_dd_derivation.md` for Day 4: no implementation code
+sense as `docs/mms_dd_derivation.md` for M4: V&V suite: no implementation code
 is written until this document is reviewed and approved.
 
 The scope is:
@@ -117,13 +117,13 @@ carries no doping field. Contacts:
 
 The `workfunction` JSON key already exists in the schema. Its semantic
 content at a gate contact is `phi_ms` (Section 5). For ideal-gate
-runs (Day 6 baseline) it is 0 V.
+runs (M6: 2D MOS capacitor baseline) it is 0 V.
 
 The resolution `[64, 72]` is illustrative. Vertical spacing must
 resolve the 5 nm oxide with at least 5 cells; the practical choice is
 a graded mesh (fine in the oxide, coarser in the bulk). The benchmark
 config may use a non-uniform rectangle or a Gmsh-loaded geometry in
-a later iteration; for Day 6 the builtin rectangle generator with a
+a later iteration; for M6 the builtin rectangle generator with a
 dense vertical resolution is sufficient.
 
 ---
@@ -262,7 +262,7 @@ submesh exterior.
 
 ### 3.3 Contact and interface charge
 
-Day 6 assumes zero fixed oxide charge Q_ox and zero interface trap
+M6: 2D MOS capacitor assumes zero fixed oxide charge Q_ox and zero interface trap
 density D_it. The flatband voltage derivation in Section 6 reflects
 this (V_FB = phi_ms, no Q_ox / C_ox term). Adding Q_ox or D_it is a
 future extension that requires an interface facet integral in the
@@ -348,10 +348,10 @@ When every cell in the full mesh carries `role = "semiconductor"`
 (the 1D `pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse` benchmarks), the
 submesh equals the full mesh modulo index maps. The Poisson LHS
 coefficient reduces to a scalar Constant, entity_maps are trivial
-identity, and the assembly is identical to the Day 2-5 single-region
+identity, and the assembly is identical to the M2-M5 single-region
 path. `semi/physics/poisson.py` detects this condition and uses the
 scalar path. This is what keeps the 1D benchmarks byte-identical
-through Day 6, which is the top stop-and-report trigger.
+through M6, which is the top stop-and-report trigger.
 
 ---
 
@@ -397,7 +397,7 @@ sweep override via `voltages=` in `resolve_contacts`) and
 
 `_VALID_DIRICHLET_KINDS` already contains `"gate"` (see
 `semi/bcs.py:34`). Both build functions today skip every contact with
-`c.kind != "ohmic"` (`semi/bcs.py:173` and `:216`). Day 6 adds a gate
+`c.kind != "ohmic"` (`semi/bcs.py:173` and `:216`). M6 adds a gate
 branch in `build_psi_dirichlet_bcs`:
 
 ```

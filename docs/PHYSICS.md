@@ -20,7 +20,7 @@ $$
     = q\,\bigl( p - n + N_D^+ - N_A^- \bigr)
 $$
 
-For Day 1 scope (equilibrium, complete ionization) we take
+For M1: Equilibrium Poisson scope (equilibrium, complete ionization) we take
 $N_D^+ = N_D$ and $N_A^- = N_A$.
 
 ### 1.2 Carrier statistics (Boltzmann)
@@ -128,7 +128,7 @@ That is, $L_D^2 = \lambda^2 L_0^2$. `lambda2` is only the correct
 stiffness coefficient if the spatial coordinate is itself scaled by
 $L_0$.
 
-> **Cautionary note (Day 1 bug).** An earlier version of
+> **Cautionary note (M1 coefficient bug).** An earlier version of
 > `semi/physics/poisson.py` used `sc.lambda2` directly as the Laplacian
 > coefficient. Because the mesh is in physical meters (not in units of
 > $L_0$), this suppressed diffusion by a factor of $L_0^2$ (of order
@@ -177,7 +177,7 @@ The controller is signed: negative `initial_step` drives a reverse
 sweep. `clamp_to_endpoint` ensures the final step exactly lands on
 the sweep endpoint instead of overshooting.
 
-**Why bias ramping is necessary.** At V = 0.6 V on the Day 2 pn
+**Why bias ramping is necessary.** At V = 0.6 V on the M2 pn
 junction, the peak electric field is roughly $2 \times 10^5$ V/cm and
 the minority carrier density at the depletion edge jumps by a factor
 $\exp(0.6/V_t) \approx 10^{10}$ above its equilibrium value. A Newton
@@ -205,7 +205,7 @@ of quadratic convergence.
 ### 2.5 Scaled drift-diffusion
 
 This section completes the nondimensionalization that was a placeholder
-through Day 2-4. The implementation is now in place
+through M2-M4. The implementation is now in place
 (`semi/physics/drift_diffusion.py`) and the V&V suite
 (`semi/verification/mms_dd.py`) confirms theoretical L^2 = 2 / H^1 = 1
 rates on every block, so we can fix the scaled forms here without risk
@@ -355,7 +355,7 @@ $$
 
 which for Si at $C_0 = 10^{17}\,\mathrm{cm}^{-3}$, $L_0 = 2\,\mu m$,
 and $\mu_0 = 1400\,\mathrm{cm^2/(V\,s)}$ comes out around
-$2.9 \times 10^4\,\mathrm{A/cm^2}$. The Day 2 `pn_1d_bias` benchmark
+$2.9 \times 10^4\,\mathrm{A/cm^2}$. The M2 `pn_1d_bias` benchmark
 reports $J(V = 0.6\,\mathrm{V}) \approx 1.6 \times 10^3\,\mathrm{A/m^2}$,
 which is several decades below $J_0$ as expected for moderate forward
 bias.
@@ -420,8 +420,7 @@ $$
 No carriers are defined in the oxide; continuity equations are solved
 only in semiconductor regions. The normal component of
 $\varepsilon \nabla \psi$ is continuous across the oxide/semiconductor
-interface (natural in the Galerkin form). Gate BCs are deferred to the
-Day 5 MOS benchmark.
+interface (natural in the Galerkin form). Gate BCs are deferred to the M6: 2D MOS capacitor benchmark.
 
 ### 3.3 Insulating boundaries
 
@@ -631,7 +630,7 @@ roundoff. The derivation (`mms_dd_derivation.md`) documents the
 block-residual scale-disparity issue that forced the SNES
 tolerance tweak to `atol = 0.0` with `stol = 1e-12`.
 
-### 5.5 MMS for multi-region Poisson (Day 6)
+### 5.5 MMS for multi-region Poisson (M6: 2D MOS capacitor)
 
 Guards the Si/SiO2 coefficient-jump assembly used by the MOS
 capacitor. A manufactured psi_exact(x, y) is C^0 across the interface
@@ -649,7 +648,7 @@ The CLI (`scripts/run_verification.py mms_poisson`) enforces
 pytest gate uses the looser `>= 1.85 / >= 0.85` thresholds common to
 the single-region MMS tests.
 
-## 6. 2D MOS capacitor (Day 6)
+## 6. 2D MOS capacitor (M6: 2D MOS capacitor)
 
 Condensed reference; the full derivation is in
 `docs/mos_derivation.md`.
@@ -742,9 +741,9 @@ qv}.png`. Monotone non-increasing C in the window is also checked
 back toward C_ox in inversion; inside the window it is strictly
 decreasing up to ~1% noise).
 
-## 7. 3D doped resistor (Day 7)
+## 7. 3D doped resistor (M7: 3D doped resistor)
 
-Day 7 is a dimension extension, not a physics extension. Both the
+M7: 3D doped resistor is a dimension extension, not a physics extension. Both the
 equilibrium Poisson form (Section 1.1, 2.2) and the coupled Slotboom
 drift-diffusion block (Section 1.3, 2.5) are written against the
 abstract `nabla` operator and the cell measure `dx`, and the existing

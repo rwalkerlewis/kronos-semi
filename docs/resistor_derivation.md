@@ -1,14 +1,14 @@
-# Resistor Derivation: 3D Doped Resistor (Day 7 Gate)
+# Resistor Derivation: 3D Doped Resistor (M7: 3D doped resistor)
 
 This document is the mathematical specification for the Day-7 3D doped
 resistor benchmark, the V-I linearity verifier, and the gmsh `.msh`
 loader test strategy. It is a derivation-lite gate in the same spirit
-as `docs/mos_derivation.md` for Day 6, but much shorter because the
+as `docs/mos_derivation.md` for M6: 2D MOS capacitor, but much shorter because the
 physics is unchanged from Days 1-6: equilibrium Poisson plus coupled
 Slotboom drift-diffusion with SRH recombination, already MMS-verified
 in 1D and 2D.
 
-What is new in Day 7 is structural, not physical:
+What is new in M7: 3D doped resistor is structural, not physical:
 
 1. A 3D rectangular-bar device that exercises the solver in 3D for the
    first time.
@@ -251,16 +251,16 @@ Three tests go in `tests/fem/test_mesh_gmsh.py`:
    R_sim must agree between the two variants within 1 percent.
 
 The project prompt notes that full MMS verification in 3D is not
-required for Day 7: the Poisson and drift-diffusion assembly is
+required for M7: the Poisson and drift-diffusion assembly is
 dimension agnostic and has been MMS-verified in 1D and 2D, and the
 ohmic-resistor theory match on an unstructured tetrahedral mesh is
 sufficient evidence that the 3D code path and the gmsh loader are
-correct. A 3D MMS convergence study is deferred to Day 8 or a
+correct. A 3D MMS convergence study is deferred to M8 or a
 follow-on PR if time allows.
 
 ## Summary
 
-Day 7 is a structural extension, not a physics extension. The
+M7: 3D doped resistor is a structural extension, not a physics extension. The
 gate-keeping document is short because the only genuinely new
 acceptance criterion is the 1 percent V-I linearity tolerance, and
 the only new infrastructure is the gmsh loader. Both are specified

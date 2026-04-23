@@ -1,4 +1,4 @@
-# 2D MOS capacitor benchmark (Day 6)
+# 2D MOS capacitor benchmark (M6: 2D MOS capacitor)
 
 First 2D benchmark and first multi-region device in kronos-semi.
 

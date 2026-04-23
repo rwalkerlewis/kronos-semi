@@ -17,9 +17,9 @@ project is the nonlinear solver interface:
   options, giving clean per-problem configuration. It also supports
   blocked and nested function spaces via `kind="blocked"` or
   `kind="nest"`, which the coupled (psi, Phi_n, Phi_p) system will
-  need for Day 2.
+  need for M2: Coupled drift-diffusion.
 
-The Day 2 coupled block Newton implementation needs the 0.10 blocked
+The M2: Coupled drift-diffusion block Newton implementation needs the 0.10 blocked
 support. Supporting both APIs simultaneously would fork the solver
 driver and double the test matrix.
 
@@ -36,7 +36,7 @@ will be removed.
 Easier:
 
 - Single solver driver, single set of PETSc option semantics.
-- Block-Newton (Day 2) uses the same `NonlinearProblem` API as
+- Block-Newton (M2: Coupled drift-diffusion) uses the same `NonlinearProblem` API as
   scalar Newton, with an additional `kind` argument.
 - SNES line search (`snes_linesearch_type`) and advanced convergence
   criteria are available out of the box.

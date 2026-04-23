@@ -1,4 +1,4 @@
-// Day 7 gmsh fixture: 1 um x 200 nm x 200 nm rectangular bar.
+// M7: 3D doped resistor gmsh fixture: 1 um x 200 nm x 200 nm rectangular bar.
 //
 // Physical groups:
 //   - Volume "silicon"       (tag 1) covers the whole bar.

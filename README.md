@@ -16,7 +16,7 @@ Before contributing (human or AI), read these in order:
 
 ## Status
 
-**End-of-Day-7 capability matrix**, shipped across PRs #2–#9:
+**End-of-M7 capability matrix**, shipped across PRs #2–#9:
 
 | Capability                         | Dimensions    | Status  | Verifier                                                     |
 |------------------------------------|---------------|---------|--------------------------------------------------------------|
@@ -37,7 +37,7 @@ Before contributing (human or AI), read these in order:
 
 ### Scope
 
-kronos-semi is a **seven-day FEM-framework demonstration** targeting the quasi-static, steady-state subset of the COMSOL Semiconductor Module: equilibrium Poisson and coupled drift-diffusion with SRH recombination over 1D/2D/3D meshes, multi-region dielectrics, and ohmic/gate/insulating boundary conditions. The verifier suite proves the numerics against analytical (Shockley, SNS, depletion-approx C–V, ohmic V–I) and manufactured (MMS) solutions.
+kronos-semi is an **eight-milestone FEM-framework demonstration** targeting the quasi-static, steady-state subset of the COMSOL Semiconductor Module: equilibrium Poisson and coupled drift-diffusion with SRH recombination over 1D/2D/3D meshes, multi-region dielectrics, and ohmic/gate/insulating boundary conditions. The verifier suite proves the numerics against analytical (Shockley, SNS, depletion-approx C–V, ohmic V–I) and manufactured (MMS) solutions.
 
 What it deliberately does **not** implement, relative to a full commercial Semiconductor Module:
 
@@ -52,7 +52,7 @@ What it deliberately does **not** implement, relative to a full commercial Semic
 - Thermal coupling (self-heating, lattice temperature).
 - Optical generation and photovoltaic carrier sources.
 
-These are deferred as out-of-scope for the seven-day framework demonstration; the architecture accommodates them as follow-on work (see [docs/ROADMAP.md](docs/ROADMAP.md) Week 2+).
+These are deferred as out-of-scope for the eight-milestone framework demonstration; the architecture accommodates them as follow-on work (see [docs/ROADMAP.md](docs/ROADMAP.md) Post-submission).
 
 For a breakdown of what each day shipped, see the capability matrix above and [CHANGELOG.md](CHANGELOG.md).
 
@@ -155,7 +155,7 @@ Doping densities are specified in cm⁻³ (device-physics tradition); everything
 
 ## Design notes
 
-### Why Slotboom variables (planned for Day 2+)
+### Why Slotboom variables (planned for M2+)
 
 Naive Galerkin FEM on drift-diffusion is unstable when drift dominates diffusion, which is almost everywhere in a real device. The standard FEM remedy is to rewrite the continuity equations in terms of quasi-Fermi potentials (Slotboom variables), which makes the current a pure gradient and the resulting form well-posed without stabilization. The equilibrium case implemented here is a special case where Φₙ = Φₚ = 0 and the continuity equations are trivially satisfied.
 
@@ -169,14 +169,14 @@ The `NonlinearProblem` class in 0.10 wraps PETSc SNES directly (the old `NewtonS
 
 ## Roadmap
 
-- **Day 1** ✓ Equilibrium Poisson, 1D pn junction, depletion-approx verification
-- **Day 2** Slotboom drift-diffusion, coupled (ψ, Φₙ, Φₚ) Newton
-- **Day 3** Bias ramping continuation; forward-bias IV curve vs Shockley diode equation
-- **Day 4** Refactor, comprehensive tests, documentation pass
-- **Day 5** 2D MOS capacitor (oxide + silicon multi-region, submesh for carriers)
-- **Day 6** 3D doped resistor (framework extension)
-- **Week 2** Full 2D MOSFET with source/drain/gate/body contacts
-- **Week 3+** 3D FinFET; field-dependent mobility; Auger recombination; Schottky contacts
+- **M1** ✓ Equilibrium Poisson, 1D pn junction, depletion-approx verification
+- **M2** ✓ Slotboom drift-diffusion, coupled (ψ, Φₙ, Φₚ) Newton
+- **M3** ✓ Adaptive continuation; forward-bias IV curve vs Shockley diode equation
+- **M4** ✓ V&V suite; MMS, mesh convergence, conservation, CI
+- **M5** ✓ Refactor and test pass (run.py split, bcs.py extracted, coverage 96%)
+- **M6** ✓ 2D MOS capacitor (oxide + silicon multi-region, submesh for carriers)
+- **M7** ✓ 3D doped resistor (gmsh loader, bipolar sweep, V-I linearity)
+- **Post-submission** Full 2D MOSFET with source/drain/gate/body contacts; 3D FinFET; field-dependent mobility; Auger recombination; Schottky contacts
 
 ## Verification
 

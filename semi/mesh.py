@@ -232,7 +232,7 @@ def is_single_region_semiconductor(cell_tags, regions_cfg: dict) -> bool:
     and there is at most one distinct tag. This is the condition under
     which the Poisson LHS coefficient can collapse to a scalar Constant
     and the continuity equations assemble directly on the full mesh,
-    giving byte-identical behaviour against the Day 2-5 1D path.
+    giving byte-identical behaviour against the M2-M5 1D path.
     """
     if cell_tags is None:
         return True

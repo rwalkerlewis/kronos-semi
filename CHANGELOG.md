@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.7.0] - Day 7
+## [0.7.0] - M7: 3D doped resistor
 
 ### Added
 - `benchmarks/resistor_3d/resistor.json`: 3D doped rectangular bar
@@ -25,7 +25,7 @@
   `AdaptiveStepController` on each leg. Unipolar sweeps (the
   pn-junction and MOS benchmarks) fall through to the original
   single-endpoint ramp unchanged, so 1D/2D numerics are
-  byte-identical to Day 6.
+  byte-identical to the M6 baseline.
 - `scripts/run_benchmark.py`: `verify_resistor_3d` V-I linearity
   verifier (max |R_sim - R_theory|/R_theory < 1% tolerance;
   sanity checks: |I(V=0)| under numerical-noise floor, and
@@ -34,7 +34,7 @@
   scatter against the theoretical line; the 1D and 2D plotters
   are untouched.
 - `docs/resistor_derivation.md` (derivation-lite gate, approved
-  before any Day 7 implementation): device geometry, analytical
+  before any M7 implementation): device geometry, analytical
   ohmic resistance `R = L / (q N_D mu_n A) = 1115 Ohm`, 1% V-I
   linearity rationale tied to the `V -> 0, uniform-everything`
   limit, 3D slice-plot strategy, gmsh loader test strategy.
@@ -60,7 +60,7 @@
 ### Changed
 - `semi/mesh.py` module docstring promotes the gmsh loader from
   "stubbed / NotImplementedError" to a supported file source.
-- `docs/ROADMAP.md`: Day 7 moves from Planned to Done; Day 8 is
+- `docs/ROADMAP.md`: M7 moves from Planned to Done; M8 is
   queued next.
 
 ### Verified
@@ -68,10 +68,10 @@
   builtin and gmsh variants; V-I linearity well inside the fixed
   1% tolerance. Three plots written per variant.
 - 1D and 2D benchmarks (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`,
-  `mos_2d`) byte-identical to Day 6.
+  `mos_2d`) byte-identical to the M6 baseline.
 - `python scripts/run_verification.py all` clears all gates;
   finest-pair MMS rates (including `2d_multiregion`) within 0.01
-  of the post-Day-6 values.
+  of the post-M6 values.
 - `pytest --cov=semi --cov-fail-under=95` exits 0.
 
 ### Notes
@@ -93,7 +93,7 @@
   `dolfinx.io.gmsh.read_from_msh` and greens the full benchmark
   matrix. No `main`-branch artifact ever saw a failing build.
 
-## [0.6.0] - Day 6
+## [0.6.0] - M6: 2D MOS capacitor
 
 ### Added
 - `semi/physics/poisson.py:build_equilibrium_poisson_form_mr`:
@@ -156,7 +156,7 @@
   `mos_cv.py` contributes ~100 statements, of which 8 error-branch
   lines are uncovered; the 95% CI gate still passes.
 
-## [0.5.0] - Day 5
+## [0.5.0] - M5: Refactor and test pass
 
 ### Added
 - `semi/bcs.py`: pure-Python boundary-condition module (joins the
@@ -194,7 +194,7 @@
   interface design (dataclass over dict, voltages override over
   config mutation, insulating-skip semantics, optional facet-tag
   verification).
-- `docs/PHYSICS.md` Section 2.5 completed (was a Day-2 placeholder):
+- `docs/PHYSICS.md` Section 2.5 completed (was an M2 placeholder):
   full scaled-DD derivation showing the L_0^2 coefficient on the
   continuity rows, scaled SRH kernel, residual-sign block summary,
   and J_0 numerical reality check. Section 3.1 BC reference
@@ -202,7 +202,7 @@
   `semi.bcs`.
 
 ### Changed
-- `semi/run.py` reduced from 580 lines (Day 4) to 74 (Day 5).
+- `semi/run.py` reduced from 580 lines (M4) to 74 (M5).
   `SimulationResult` and `run(cfg)` stay here; everything else moved
   to `runners/` and `postprocess.py`.
 - `semi/run.py` exposes `run_equilibrium`, `run_bias_sweep`,
@@ -223,18 +223,18 @@
 ### Verified
 - `pytest`: 177 / 177 pass (139 prior + 38 new).
 - `docker compose run --rm benchmark pn_1d`: V_bi 0.8334 V, peak |E|
-  104.84 kV/cm (byte-identical to Day 4 baseline).
+  104.84 kV/cm (byte-identical to the M4 baseline).
 - `docker compose run --rm benchmark pn_1d_bias`: J(V=0.6) 1.635e+03
   A/m^2, J_total continuity 1.91% at V=0.6 (byte-identical).
 - `docker compose run --rm benchmark pn_1d_bias_reverse`: |J| / SRH-gen
   worst 16.6% at V=-0.55 V (byte-identical).
 - `python scripts/run_verification.py all`: 53 PASS / 0 FAIL,
-  finest-pair MMS rates byte-identical to Day 4 baseline (no rate
+  finest-pair MMS rates byte-identical to the M4 baseline (no rate
   moved by more than 0.000).
 - Coverage: 96.25% across 1598 statements, 60 missed; gate at
   `--cov-fail-under=95`.
 
-## [0.4.0] - Day 4
+## [0.4.0] - M4: V&V suite
 
 ### Added
 - Verification & Validation suite under `semi/verification/`, driven
@@ -275,11 +275,11 @@
 ### Changed
 - `benchmark-plots` CI artifact renamed to `fem-results`; path
   stays `results/` and now covers benchmarks + V&V together.
-- Day-4 scope re-purposed: the originally-planned refactor pass is
-  pushed to Day 5 to make room for the V&V work (see
+- M4 scope re-purposed: the originally-planned refactor pass is
+  pushed to M5 to make room for the V&V work (see
   `docs/adr/0006-*.md` context).
 
-## [0.3.0] - Day 3
+## [0.3.0] - M3: Adaptive continuation
 
 ### Added
 - Adaptive step-size controller for bias continuation
@@ -303,13 +303,13 @@
 - `pn_1d_bias` forward verifier now demands J_sim within 15% of the
   SNS reference J_diff + J_rec (with Sze f = 2 V_t/(V_bi - V)
   correction) over V in [0.15, 0.55] V, and within 10% of Shockley
-  diffusion at V = 0.6 V. Day 2 "qualitative below 0.5 V" caveat is
+  diffusion at V = 0.6 V. M2 "qualitative below 0.5 V" caveat is
   removed.
 - `run_bias_sweep` walks the ramp adaptively instead of recording at
   every `voltage_sweep.step` point. Total SNES iterations on the
-  Day 2 sweep (0 to 0.6 V) dropped from 42 to 31 (26.2% reduction).
+  M2 sweep (0 to 0.6 V) dropped from 42 to 31 (26.2% reduction).
 
-## [0.2.0] - Day 2
+## [0.2.0] - M2: Coupled drift-diffusion
 
 ### Added
 - Coupled Slotboom drift-diffusion with SRH recombination
@@ -324,7 +324,7 @@
   `voltage_sweep`, `solver.type in {drift_diffusion, bias_sweep}`,
   and `continuation.{min_step, max_halvings}`.
 
-## [0.1.0] - Day 1
+## [0.1.0] - M1: Equilibrium Poisson
 
 ### Added
 - JSON schema with Draft-07 validation (`semi.schema`)

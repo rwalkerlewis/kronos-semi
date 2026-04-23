@@ -7,7 +7,7 @@ prove it is done), and dependencies on prior days.
 
 Read `PLAN.md` for the short version and the current in-flight task.
 
-## Day 1. Equilibrium Poisson, 1D pn junction, Docker env
+## M1: Equilibrium Poisson, 1D pn junction, Docker env
 
 - **Status:** Done (2026-04-20). PR `dev/docker-day1-fix`.
 - **Goal:** prove the end-to-end pipeline works for a known analytical
@@ -28,15 +28,15 @@ Read `PLAN.md` for the short version and the current in-flight task.
     verifier checks green.
 - **Dependencies:** none.
 
-## Day 2. Slotboom drift-diffusion, coupled Newton, bias sweep
+## M2: Coupled drift-diffusion (Slotboom, coupled Newton, bias sweep)
 
 - **Status:** Done (2026-04-20). Delivered on
   `dev/day2-drift-diffusion`; all deliverables landed, the
   `pn_1d_bias` verifier is green (V=0.6 V within 10% of Shockley),
-  and Day 1 did not regress. The low-bias ideal-Shockley mismatch is
+  and M1 did not regress. The low-bias ideal-Shockley mismatch is
   physical (SRH depletion-region recombination raises the ideality
-  factor) and is handled by the Day 2 verifier with qualitative
-  checks below 0.5 V. Day 3 will replace those qualitative checks
+  factor) and is handled by the M2 verifier with qualitative
+  checks below 0.5 V. M3 will replace those qualitative checks
   with a Sah-Noyce-Shockley term.
 - **Goal (as delivered):** solved the full coupled (psi, Phi_n, Phi_p)
   system with SRH recombination under forward bias, verified against
@@ -62,7 +62,7 @@ Read `PLAN.md` for the short version and the current in-flight task.
     recovery), SRH kernel limits (R = 0 at equilibrium, R > 0 under
     bias, correct saturation behavior).
 - **Verification:**
-  - `docker compose run --rm benchmark pn_1d` still green (Day 1
+  - `docker compose run --rm benchmark pn_1d` still green (M1
     regression).
   - `docker compose run --rm benchmark pn_1d_bias` exits 0 with IV
     curve within 10% of Shockley over V in [0.2, 0.6] V. Below 0.2 V
@@ -70,9 +70,9 @@ Read `PLAN.md` for the short version and the current in-flight task.
     meaningful target.
   - `docker compose run --rm test` green with the new tests.
   - ruff clean.
-- **Dependencies:** Day 1 merged to `main`.
+- **Dependencies:** M1 merged to `main`.
 
-## Day 3. Bias ramping hardening, Shockley IV polish
+## M3: Adaptive continuation (bias ramping hardening, Shockley IV polish)
 
 - **Status:** Done (2026-04-21). PR `dev/day3-bias-hardening`.
 - **Goal:** make the bias sweep robust, add reverse-bias check,
@@ -96,15 +96,15 @@ Read `PLAN.md` for the short version and the current in-flight task.
     `semi/diode_analytical.py`; 26 new pytest tests.
   - New "Bias continuation strategy" subsection in `docs/PHYSICS.md`.
   - CI `docker-fem` job runs the reverse benchmark on every push.
-- **Dependencies:** Day 2.
+- **Dependencies:** M2.
 
-## Day 4. Verification & Validation suite
+## M4: V&V suite (Verification & Validation)
 
 - **Status:** Done (2026-04-21). PR `dev/day4-vnv`.
 - **Goal:** replace single-point physical sanity tests with proper
   verification (Roache / Oberkampf-Roy sense): manufactured solutions,
   mesh-refinement convergence studies, and discrete conservation
-  checks. The originally-planned refactor moves to Day 5.
+  checks. The originally-planned refactor moves to M5.
 - **Rationale:** the existing benchmark "verifiers" prove the code
   reproduces analytical reference values at one mesh resolution. They
   do not prove convergence, do not exercise the discretization away
@@ -182,9 +182,9 @@ Read `PLAN.md` for the short version and the current in-flight task.
     "Verification & Validation" section in `docs/PHYSICS.md`,
     derivation artifact `docs/mms_dd_derivation.md` amended with
     the SNES atol-0 fix rationale.
-- **Dependencies:** Day 3 (PR #5) merged into `main`.
+- **Dependencies:** M3 (PR #5) merged into `main`.
 
-## Day 5. Refactor, expanded test coverage, docs pass
+## M5: Refactor and test pass
 
 - **Status:** Done (2026-04-21). Delivered on `dev/day5-refactor`.
 - **Goal:** paid down technical debt accumulated across Days 1-3 and
@@ -214,19 +214,19 @@ Read `PLAN.md` for the short version and the current in-flight task.
 - **Verification:**
   - `pytest --cov=semi --cov-fail-under=95` exits 0 at 96.25%.
   - `pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse` benchmarks all pass
-    with byte-identical numerics to the Day 4 baseline.
+    with byte-identical numerics to the M4 baseline.
   - `python scripts/run_verification.py all` reports 53 PASS / 0 FAIL
-    with finest-pair MMS rates byte-identical to Day 4.
-- **Dependencies:** Day 4 V&V suite merged (PR #6).
+    with finest-pair MMS rates byte-identical to M4.
+- **Dependencies:** M4 V&V suite merged (PR #6).
 
-## Day 6. 2D MOS capacitor
+## M6: 2D MOS capacitor
 
 - **Status:** Done (2026-04-21). Delivered on `dev/day6-mos-2d`.
   All eight deliverables landed; the `mos_2d` benchmark exits 0
-  with 4/4 verifier checks green; Day 4-5 V&V suite stayed green
+  with 4/4 verifier checks green; M4-M5 V&V suite stayed green
   with the new multi-region Poisson MMS study clearing
   rate_L^2 >= 1.99; 1D benchmarks (`pn_1d`, `pn_1d_bias`,
-  `pn_1d_bias_reverse`) are byte-identical to Day 5.
+  `pn_1d_bias_reverse`) are byte-identical to the M5 baseline.
 - **Goal (as delivered):** first 2D benchmark and first multi-region
   device. Equilibrium Poisson assembles over the full mesh with
   cellwise DG0 eps_r; space charge is restricted to silicon via
@@ -235,7 +235,7 @@ Read `PLAN.md` for the short version and the current in-flight task.
   with respect to V_gate and matches depletion-approximation MOS
   theory within 10% in the verifier window.
 - **Deliverables (as landed):**
-  - `docs/mos_derivation.md`: derivation-first gate, approved Day 6
+  - `docs/mos_derivation.md`: derivation-first gate, approved M6
     prerequisite (9da5fa6).
   - `semi/mesh.py` submesh + cellwise eps_r helpers (719b9e8).
   - `semi/bcs.py` gate contact wiring (b24c650).
@@ -261,18 +261,18 @@ Read `PLAN.md` for the short version and the current in-flight task.
   - V&V suite rates: see `PHYSICS.md` sections 5.1-5.5.
   - `pytest --cov=semi --cov-fail-under=95` exits 0 at 95.43%
     (195 tests pass).
-- **Dependencies:** Day 5 refactor (PR #7).
+- **Dependencies:** M5 refactor (PR #7).
 
-## Day 7. 3D doped resistor
+## M7: 3D doped resistor
 
 - **Status:** Completed (2026-04-21). Merged via PR #9 from
   `dev/day7-resistor-3d` at `a604b12`.
   All deliverables landed; the `resistor_3d` benchmark exits 0 on
   both the builtin `create_box` mesh and the committed gmsh fixture
   with worst |R_sim - R_theory|/R_theory well inside the fixed 1%
-  tolerance on both paths; Day 1-6 benchmarks (`pn_1d`,
+  tolerance on both paths; M1-M6 benchmarks (`pn_1d`,
   `pn_1d_bias`, `pn_1d_bias_reverse`, `mos_2d`) stay byte-identical;
-  the Day 4-6 V&V suite stays green (every MMS rate within 0.01 of
+  the M4-M6 V&V suite stays green (every MMS rate within 0.01 of
   the post-Day-6 values, including `2d_multiregion`).
 - **Goal (as delivered):** confirmed the simulator framework extends
   to 3D with no physics changes. Equilibrium Poisson and the
@@ -319,35 +319,35 @@ Read `PLAN.md` for the short version and the current in-flight task.
     `jn_slice_y_midplane.png`, IV scatter).
   - All prior benchmarks byte-identical; all prior V&V gates
     green; coverage stays >= 95%.
-- **Dependencies:** Day 6 MOS merged (PR #8).
+- **Dependencies:** M6 MOS merged (PR #8).
 
-## Day 8. Final polish and submission packaging
+## M8: Submission polish
 
-- **Status:** In flight. In progress on `dev/day8-polish`, targeting
-  PR #10 against `main`. Was originally Day 7 in the pre-resistor
+- **Status:** In flight. In progress on `dev/submission-polish`, targeting
+  PR #10 against `main`. Was originally M7 in the pre-resistor
   roadmap.
 - **Goal:** make the submission presentation-ready. No new physics,
   no new benchmarks; this is a documentation, notebook, and release
   pass only.
 - **Deliverables:**
   - Sync `PLAN.md` "Current state" and this roadmap to reflect the
-    Day 7 merge and Day 8 in flight.
+    M7 merge and M8 in flight.
   - Rewrite the `README.md` status section as an end-of-Day-7
-    capability matrix (Days 1-7 shipped across PRs #2-#9), with a
+    capability matrix (M1-M7 shipped across PRs #2-#9), with a
     short scope-out prose block enumerating COMSOL Semiconductor-Module
     features that are deliberately out of scope.
   - Regenerate `notebooks/01_pn_junction_1d.ipynb` via
     `scripts/build_notebook_01.py` with current-state framing (no
-    "Day 1" heading).
-  - Author `notebooks/02_pn_junction_bias.ipynb` (Day 2-3 content:
+    framing (no "M1" heading).
+  - Author `notebooks/02_pn_junction_bias.ipynb` (M2-M3 content:
     forward Shockley + reverse SNS sweeps).
-  - Author `notebooks/03_mos_cv.ipynb` (Day 6 content: MOS C-V, with
+  - Author `notebooks/03_mos_cv.ipynb` (M6 content: MOS C-V, with
     the `V_FB + 0.2` verifier-window disclosure surfaced in the
     narrative).
-  - Author `notebooks/04_resistor_3d.ipynb` (Day 7 content: bipolar
+  - Author `notebooks/04_resistor_3d.ipynb` (M7 content: bipolar
     sweep, builtin-vs-gmsh comparison).
   - Add a README "Notebooks" catalog with Colab badges.
-  - Append `[0.8.0] - Day 8` to `CHANGELOG.md`.
+  - Append `[0.8.0] - M8: Submission polish` to `CHANGELOG.md`.
   - Open PR #10, wait for CI, do not self-merge.
   - Post-merge and only on explicit human prompt, create annotated
     tag `v0.2.0`.
@@ -358,11 +358,11 @@ Read `PLAN.md` for the short version and the current in-flight task.
   - README and CHANGELOG accurately describe the end-of-Day-7
     capability set.
   - CI green on every commit on the branch
-    (`gh run list --branch dev/day8-polish` verbatim).
+    (`gh run list --branch dev/submission-polish` verbatim).
   - All five benchmarks (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`,
     `mos_2d`, `resistor_3d`) stay green; coverage stays >= 95%;
     V&V suite stays green; no physics, schema, or verifier changes.
-- **Dependencies:** Days 6 and 7.
+- **Dependencies:** M6 and M7.
 
 ## Post-submission (stretch goals)
 

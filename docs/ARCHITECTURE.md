@@ -94,7 +94,7 @@ Modules: `semi.mesh`, `semi.physics.*`, `semi.solver`, `semi.run`.
   - `mesh`: builtin interval/rectangle/box mesh construction plus
     region and facet tagging.
   - `physics.poisson`: equilibrium Poisson UFL residual builder.
-  - Future `physics.drift_diffusion`: Slotboom continuity forms (Day 2).
+  - Future `physics.drift_diffusion`: Slotboom continuity forms (M2: Coupled drift-diffusion).
   - `solver`: `solve_nonlinear` wrapping `dolfinx.fem.petsc.NonlinearProblem`.
   - `run`: top-level `run(cfg) -> SimulationResult` orchestrator.
 - **Depends on:** dolfinx 0.10, petsc4py, mpi4py, ufl, basix, plus

@@ -5,7 +5,7 @@
 
 ## Context
 
-Through Day 3 the project had three benchmark "verifiers" under
+Through M3: Adaptive continuation the project had three benchmark "verifiers" under
 `scripts/run_benchmark.py`: `pn_1d` (equilibrium depletion-approximation
 check), `pn_1d_bias` (forward Shockley / SNS check), and
 `pn_1d_bias_reverse` (SRH generation check). Each runs at a single
@@ -31,7 +31,7 @@ construction:
 - Discretization that loses order silently (Galerkin degradation
   under high Peclet, or a P1 form that is accidentally P0-like).
 
-Day 4 was originally scoped as a refactor pass. We re-scoped it to
+M4: V&V suite was originally scoped as a refactor pass. We re-scoped it to
 build a proper V&V suite because the cost of shipping a silently
 non-convergent simulator to the evaluation reviewer was higher than
 the cost of a refactor delay.
@@ -51,7 +51,7 @@ The candidate verification activities considered:
   neutrality). Both are exact consequences of the equations and
   so are easy to gate tightly.
 - **Code-to-code comparison** against devsim / Sentaurus. Rejected
-  for Day 4: introduces an external-tool dependency and a
+  for M4: introduces an external-tool dependency and a
   licensing gate, and adds little over MMS for a short-horizon
   project.
 - **Experimental validation.** Out of scope; no lab data.
@@ -154,7 +154,7 @@ Harder:
   dolfinx image is cached; adding a 2D MOS MMS or a 3D resistor
   study will need either per-mesh caching or a split job. This
   is acceptable for the submission timeline but will need
-  revisiting in Day 6-7.
+  revisiting in M6-M7.
 - Variant A is only gated on psi because the continuity-row
   errors collapse to machine-noise when the quasi-Fermis are
   identically zero. This is documented but could confuse a

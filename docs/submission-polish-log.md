@@ -1,11 +1,11 @@
-# Day 8 submission log
+# M8: Submission polish log
 
-Day 8 is the final polish and submission-packaging pass on
-`dev/day8-polish`, targeting PR #10 against `main` (PR number TBD; not
+M8: Submission polish is the final polish and submission-packaging pass on
+`dev/submission-polish`, targeting PR #10 against `main` (PR number TBD; not
 yet opened at the time this log is written). The branch does not add
 physics, solver features, benchmarks, or schema. It closes out
-documentation drift from Days 1 through 7, regenerates the four
-user-facing notebooks against the end-of-Day-7 capability surface,
+documentation drift from M1 through M7, regenerates the four
+user-facing notebooks against the end-of-M7 capability surface,
 tightens the MOS verifier disclosure language, and captures the
 reviewer-caught engineering decisions needed to defend the PR. Seven
 commits are on the branch as of HEAD `d52ca20` (pre-docs-commit tip,
@@ -18,25 +18,25 @@ and for the decisions behind them.
 ## Scope and non-scope
 
 **In scope.** Syncing `PLAN.md` "Current state" and `docs/ROADMAP.md`
-to the post-Day-7 reality; rewriting the README status section as an
-end-of-Day-7 capability matrix; regenerating `notebooks/01_pn_junction_1d.ipynb`
-from the matching build script to strip Day-1 framing; authoring
+to the post-M7 reality; rewriting the README status section as an
+end-of-M7 capability matrix; regenerating `notebooks/01_pn_junction_1d.ipynb`
+from the matching build script to strip M1 framing; authoring
 `notebooks/02_pn_junction_bias.ipynb`, `notebooks/03_mos_cv.ipynb`, and
 `notebooks/04_resistor_3d.ipynb`; verifying every notebook on Colab
 against a `release-real` FEM-on-Colab runtime; adding the CHANGELOG
-`[0.8.0] - Day 8` entry; opening PR #10; and, post-merge under
+`[0.8.0] - M8: Submission polish` entry; opening PR #10; and, post-merge under
 explicit human prompt only, tagging `v0.2.0`.
 
 **Out of scope.** New physics code, new verifiers, new benchmark JSON,
 schema changes, or any refactor that is not mechanically required by
 a notebook. The explicit rule on this PR is that if a notebook
-surfaces a bug, it gets noted in the PR body and deferred to a Day 9
-PR; the Day 8 branch does not grow to absorb it. This anti-scope-creep
+surfaces a bug, it gets noted in the PR body and deferred to a
+post-submission PR; the M8 branch does not grow to absorb it. This anti-scope-creep
 rule is the submission-day failure mode being guarded against.
 
 ## Phase plan and execution
 
-The Day 8 work is divided into eleven phases. Phase 0 is a baseline
+The M8: Submission polish work is divided into eleven phases. Phase 0 is a baseline
 verification pass that does not produce a commit; Phases 1 through 7
 have shipped; Phases 8 through 11 are pending or in flight at the time
 of this writing.
@@ -45,34 +45,34 @@ of this writing.
 |------:|-----------------------------------------------------------------------|--------------|---------------------------------|
 | 0     | Verify `main` baseline (pytest 206, V&V 62/62, ruff clean)            | N/A          | N/A (verification-only)         |
 | 1     | Sync `PLAN.md` "Current state" and `docs/ROADMAP.md` statuses         | `1d86504`    | Done                            |
-| 2     | Rewrite `README.md` status section as end-of-Day-7 capability matrix  | `c7343c9`    | Done                            |
-| 3     | Regenerate `notebooks/01_pn_junction_1d.ipynb` (end-of-Day-7 framing) | `8ce6b10`    | Done                            |
-| 4     | Author `notebooks/02_pn_junction_bias.ipynb` (Day 2-3 content)        | `f7c83b0`    | Done                            |
-| 5     | Author `notebooks/03_mos_cv.ipynb` (Day 6 C-V content)                | `bc3409b`    | Done                            |
-| 6     | Author `notebooks/04_resistor_3d.ipynb` (Day 7 content)               | `365da06`    | Done                            |
+| 2     | Rewrite `README.md` status section as end-of-M7 capability matrix     | `c7343c9`    | Done                            |
+| 3     | Regenerate `notebooks/01_pn_junction_1d.ipynb` (end-of-M7 framing)    | `8ce6b10`    | Done                            |
+| 4     | Author `notebooks/02_pn_junction_bias.ipynb` (M2-M3 content)          | `f7c83b0`    | Done                            |
+| 5     | Author `notebooks/03_mos_cv.ipynb` (M6 C-V content)                   | `bc3409b`    | Done                            |
+| 6     | Author `notebooks/04_resistor_3d.ipynb` (M7 content)                  | `365da06`    | Done                            |
 | 7     | Cross-notebook consistency pass (headings, install cells, artifacts)  | `d52ca20`    | Done                            |
 | 8     | Colab QA on all four notebooks, record wall times                     | pending      | In flight (NB04 outstanding)    |
-| 9     | CHANGELOG `[0.8.0] - Day 8`, `semi/__init__.py` version bump          | pending      | Pending                         |
+| 9     | CHANGELOG `[0.8.0] - M8: Submission polish`, `semi/__init__.py` version bump | pending      | Pending                  |
 | 10    | Open PR #10, wait for CI, do not self-merge                           | pending      | Pending                         |
 | 11    | Post-merge and only on explicit prompt, tag `v0.2.0`                  | pending      | Pending                         |
 
-**Phase 0 (baseline).** Before any Day 8 commit, the branch point
-(`main` at `a604b12`, the Day 7 merge) was re-verified locally under
+**Phase 0 (baseline).** Before any M8 commit, the branch point
+(`main` at `a604b12`, the M7 merge) was re-verified locally under
 `docker compose run --rm test` and `python scripts/run_verification.py
 all`. Pytest reported 206 tests passing at 95.58% coverage, ruff was
 clean, and the V&V suite was 62/62 PASS. This baseline is the
 reference point every subsequent phase is measured against.
 
 **Phase 1 (`1d86504`).** `PLAN.md` "Current state" and the Roadmap
-table were rewritten to mark Day 7 merged via PR #9 at `a604b12` and
-to move Day 8 into "in flight" on `dev/day8-polish`. `docs/ROADMAP.md`
-received the matching status ticks through Day 7. The Day 7 entry in
+table were rewritten to mark M7 merged via PR #9 at `a604b12` and
+to move M8 into "in flight" on `dev/submission-polish`. `docs/ROADMAP.md`
+received the matching status ticks through M7. The M7 entry in
 the PLAN "Completed work log" was appended with per-file citations so
 a reviewer walking backward from HEAD can reach the substantive
-commits without re-reading the Day 7 PR.
+commits without re-reading the M7 PR.
 
 **Phase 2 (`c7343c9`).** The README status section was rewritten from
-a Day-1-centric pitch into a capability matrix listing every verified
+an M1-centric pitch into a capability matrix listing every verified
 dimension-capability pair shipped across PRs #2 through #9. Test and
 coverage numbers (206 tests, 95.58% coverage) and V&V gate counts
 (62/62 PASS) were pinned against the Phase 0 baseline. The "Scope"
@@ -81,14 +81,14 @@ read absence as oversight.
 
 **Phase 3 (`8ce6b10`).** `notebooks/01_pn_junction_1d.ipynb` was
 regenerated via `scripts/build_notebook_01.py`. The narrative was
-rewritten to frame the notebook as the end-of-Day-7 intro rather than
-a Day-1 artifact: references to later-shipped capabilities (bias
+rewritten to frame the notebook as the end-of-M7 intro rather than
+an M1 artifact: references to later-shipped capabilities (bias
 sweep, MOS, resistor) appear as forward pointers to notebooks 02-04,
 and the analytical overlays (V_bi, depletion width, peak field) quote
-the values the Day-1 verifier produces against the shipped code.
+the values the M1 verifier produces against the shipped code.
 
 **Phase 4 (`f7c83b0`).** `notebooks/02_pn_junction_bias.ipynb` was
-authored against the Day 2-3 content: forward-bias Shockley sweep
+authored against the M2-M3 content: forward-bias Shockley sweep
 with the Sah-Noyce-Shockley overlay for ideality-factor context, and
 reverse-bias SRH generation-current sweep. The build script
 `scripts/build_notebook_02.py` drives both sweeps through
@@ -96,16 +96,16 @@ reverse-bias SRH generation-current sweep. The build script
 verifier code paths CI runs.
 
 **Phase 5 (`bc3409b`).** `notebooks/03_mos_cv.ipynb` was authored
-against the Day 6 MOS C-V benchmark. The narrative carries the
+against the M6 MOS C-V benchmark. The narrative carries the
 disclosure that the verifier window is `[V_FB + 0.2, V_T - 0.1] V`
-rather than the `V_FB + 0.1` edge the original Day 6 plan suggested;
+rather than the `V_FB + 0.1` edge the original M6 plan suggested;
 see "MOS verifier window" below for the reasoning. The notebook also
 renders the 2D psi contour and the central-column psi(y) slice so a
 reader can read the surface-bending regime visually even outside the
 verifier window.
 
 **Phase 6 (`365da06`).** `notebooks/04_resistor_3d.ipynb` was authored
-against the Day 7 resistor benchmark. It runs the symmetric bipolar
+against the M7 resistor benchmark. It runs the symmetric bipolar
 sweep on both mesh paths: the builtin `create_box` mesh and the
 committed gmsh fixture under `benchmarks/resistor_3d/fixtures/`. The
 narrative point of the notebook is the mesh equivalence claim, so
@@ -114,7 +114,7 @@ firing on each.
 
 **Phase 7 (`d52ca20`).** A cross-notebook consistency pass aligned
 headings, the Colab install cell, and artifact-output conventions
-across all four notebooks. `PLAN.md` picked up the "Day 9+ cleanups"
+across all four notebooks. `PLAN.md` picked up the "Post-submission cleanups"
 section here, documenting the MOS derivation convention drift and the
 `semi/__init__.py` version-string staleness so those items are on
 record but explicitly out of scope for PR #10.
@@ -132,14 +132,14 @@ throughout `semi/bcs.py` and the Poisson residual in
 `semi/physics/poisson.py`. Both conventions are self-consistent and
 produce the same C(V) curve once V_FB is computed against the matching
 reference. The review pass caught the drift between derivation and
-code; reconciling the derivation is deferred to Day 9+ to avoid
+code; reconciling the derivation is deferred to post-submission to avoid
 touching doctrinal physics text under submission-day time pressure.
-The Day 6 benchmark and the Notebook 03 narrative both use the code's
+The M6 benchmark and the Notebook 03 narrative both use the code's
 convention, stated explicitly in both places.
 
 ### MOS verifier window V_FB+0.1 -> V_FB+0.2
 
-The original Day 6 plan specified a verifier window of
+The original M6 plan specified a verifier window of
 `[V_FB + 0.1, V_T - 0.1] V` with a 10% tolerance. Running that window
 under the shipped `psi = 0` at the intrinsic level convention produces
 a 10.06% relative error at the low edge, a near-miss that is driven
@@ -174,27 +174,27 @@ cell before `!pip install -q gmsh`. This is an apt dependency,
 unrelated to the Python package resolver, and missing it manifests
 as a confusing `OSError` at `import gmsh` time.
 
-### Bipolar sweep parameterization fix (Day 7 carryover)
+### Bipolar sweep parameterization fix (M7 carryover)
 
-`tests/test_bipolar_sweep.py` was added on the Day 7 merge and
+`tests/test_bipolar_sweep.py` was added on the M7 merge and
 contributes four tests, bringing the pure-Python test total to 206.
 The README capability matrix was initially drafted against the
-pre-Day-7 count of 202 and corrected to 206 during the Phase 2
+pre-M7 count of 202 and corrected to 206 during the Phase 2
 polish pass. The four tests pin `compute_bipolar_legs` across a
 bipolar sweep, a unipolar-positive sweep, a unipolar-negative sweep,
 and a degenerate single-point case, so the sign-spanning runner path
 cannot silently regress into the unipolar branch.
 
-### Day 9+ cleanups (deferred)
+### Post-submission cleanups (deferred)
 
 The following pre-existing drift items were identified during the
-Day 8 polish pass and are explicitly deferred to preserve PR #10
+M8: Submission polish pass and are explicitly deferred to preserve PR #10
 scope. None of them affects any verifier or benchmark numerical
 result; they are surface-level alignment items.
 
 - `docs/mos_derivation.md` §6 bulk-reference convention versus the
   intrinsic-reference convention shipped in code (see above).
-- `semi/__init__.py::__version__` still reads `"0.1.0"` from the Day 1
+- `semi/__init__.py::__version__` still reads `"0.1.0"` from the M1
   placeholder; it will be bumped to `"0.8.0"` in Phase 9 alongside
   the CHANGELOG entry so the package SemVer, the CHANGELOG header,
   and the eventual `v0.2.0` submission tag are internally consistent.
@@ -202,7 +202,7 @@ result; they are surface-level alignment items.
   days-of-work shipped) and release tag (`v0.2.0`, tracking
   submission version) is intentional and recorded in `PLAN.md`.
 
-These items mirror the "Day 9+ cleanups" section already in `PLAN.md`
+These items mirror the "Post-submission cleanups" section already in `PLAN.md`
 and are reproduced here for reviewer convenience.
 
 ## Verification
@@ -225,7 +225,7 @@ consistency pass):
 
 ### CI run history on the branch
 
-The Day 8 branch history was rebased locally before this log was
+The M8: Submission polish branch history was rebased locally before this log was
 written to keep it anchored against the current `main`. Per-commit CI
 ran on the pre-rebase SHA chain; those runs are the authoritative
 green-CI evidence for each phase because the rebase preserved every
@@ -302,17 +302,17 @@ What this branch adds or changes, at a glance:
 - Four matching build scripts: `scripts/build_notebook_01.py`,
   `scripts/build_notebook_02.py`, `scripts/build_notebook_03.py`,
   `scripts/build_notebook_04.py`.
-- `README.md` status section rewritten as the end-of-Day-7
+- `README.md` status section rewritten as the end-of-M7
   capability matrix.
-- `PLAN.md` "Current state" updated and "Day 9+ cleanups" section
-  added; this log is linked from a new "Day 8 execution" section
+- `PLAN.md` "Current state" updated and "Post-submission cleanups" section
+  added; this log is linked from a new "M8: Submission polish execution" section
   near the top.
-- `docs/ROADMAP.md` marked Day 7 complete and Day 8 in flight.
-- `docs/day8-submission-log.md` (this file).
+- `docs/ROADMAP.md` marked M7 complete and M8 in flight.
+- `docs/submission-polish-log.md` (this file).
 
 Pending in Phases 9-11 (not yet committed):
 
-- `CHANGELOG.md` `[0.8.0] - Day 8` entry.
+- `CHANGELOG.md` `[0.8.0] - M8: Submission polish` entry.
 - `semi/__init__.py` version string bump to `"0.8.0"`.
 - PR #10 body against `main`.
 - `v0.2.0` tag (post-merge, under explicit prompt).
