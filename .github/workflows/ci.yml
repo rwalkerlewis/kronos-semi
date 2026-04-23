@@ -51,11 +51,15 @@ jobs:
 
   docker-fem:
     # FEM integration: build the dolfinx dev image, run pytest inside,
-    # and execute the benchmark verifiers plus the full V&V suite. The
-    # job stays inside a 15-minute budget once the image is cached.
+    # and execute the benchmark verifiers plus the full V&V suite.
     # This is the only place the dolfinx code paths actually run.
+    #
+    # Budget: the coverage pytest step takes ~7 min on GHA runners,
+    # each of the five benchmarks runs in 1-5 min, and the V&V suite
+    # adds another ~5 min. 45 min leaves comfortable headroom so a
+    # slow runner does not flake the job.
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -82,21 +86,19 @@ jobs:
             USER_UID=1001
             USER_GID=127
 
-      - name: Run pytest inside container
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
-            -w /workspaces/kronos-semi \
-            kronos-semi:ci \
-            pytest tests/ -v --tb=short
-
       - name: Run pytest with coverage gate (>= 95% on semi/)
+        # Single pytest invocation: runs the full suite (including the
+        # dolfinx-dependent tests under tests/fem/) with coverage and
+        # enforces the 95% gate. We used to run pytest twice (plain
+        # then with coverage) which doubled wall time for no signal.
         run: |
           docker run --rm \
             -v "${{ github.workspace }}:/workspaces/kronos-semi" \
             -w /workspaces/kronos-semi \
             kronos-semi:ci \
-            pytest tests/ --cov=semi --cov-report=term-missing --cov-report=xml --cov-fail-under=95
+            pytest tests/ -v --tb=short \
+              --cov=semi --cov-report=term-missing --cov-report=xml \
+              --cov-fail-under=95
 
       - name: Run pn_1d benchmark
         run: |
