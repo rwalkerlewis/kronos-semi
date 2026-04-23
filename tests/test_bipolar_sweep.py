@@ -1,7 +1,7 @@
 """
 Pure-Python tests for the bipolar-sweep leg computation.
 
-The Day-7 resistor benchmark introduced symmetric sweeps that cross
+The M7 resistor benchmark introduced symmetric sweeps that cross
 zero. `compute_bipolar_legs` converts such a sweep into the two
 single-direction endpoints the `AdaptiveStepController` can walk
 (V = 0 -> most-negative -> most-positive). Unipolar sweeps (the

@@ -15,7 +15,7 @@ Verification benchmark: symmetric 1D pn junction, Si, $N_A = N_D = 10^{17}$ cm‚Å
 
 ## Notebook set
 
-This is the first of four Colab walkthroughs that exercise the [end-of-Day-7 capability matrix](https://github.com/rwalkerlewis/kronos-semi#status) from the README:
+This is the first of four Colab walkthroughs that exercise the [end-of-M7 capability matrix](https://github.com/rwalkerlewis/kronos-semi#status) from the README:
 
 | Notebook | Covers |
 |----------|--------|

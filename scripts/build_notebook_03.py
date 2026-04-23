@@ -22,7 +22,7 @@ The multi-region plumbing is a single dolfinx mesh with cellwise $\varepsilon_r$
 
 ## Notebook set
 
-This is the third of four Colab walkthroughs that exercise the [end-of-Day-7 capability matrix](https://github.com/rwalkerlewis/kronos-semi#status) from the README:
+This is the third of four Colab walkthroughs that exercise the [end-of-M7 capability matrix](https://github.com/rwalkerlewis/kronos-semi#status) from the README:
 
 | Notebook | Covers |
 |----------|--------|
@@ -206,7 +206,7 @@ cells.append(nbf.v4.new_markdown_cell(r"""### Verifier-window disclosure: $V_{FB
 
 The benchmark's verifier window is $V_{gate} \in [V_{FB}+0.2,\ V_T-0.1]$ V, **not** $[V_{FB}+0.1,\ V_T-0.1]$ V as originally planned on M6.
 
-**What happened.** The first Day-6 implementation used $V_{FB}+0.1$ as the low edge. Under our $\psi=0$-at-intrinsic BC convention the worst relative error in that window was **10.06%** at $V_{gate} = -0.25$ V, just past the 10% tolerance. This is a depletion-approximation modeling limit: at $\psi_s \lesssim 2 V_t$ the free-carrier tail extends across a significant fraction of the depletion width and the sharp-edge approximation breaks down toward 10%. It is not a solver accuracy problem — a finer mesh does not move the number.
+**What happened.** The first M6 implementation used $V_{FB}+0.1$ as the low edge. Under our $\psi=0$-at-intrinsic BC convention the worst relative error in that window was **10.06%** at $V_{gate} = -0.25$ V, just past the 10% tolerance. This is a depletion-approximation modeling limit: at $\psi_s \lesssim 2 V_t$ the free-carrier tail extends across a significant fraction of the depletion width and the sharp-edge approximation breaks down toward 10%. It is not a solver accuracy problem — a finer mesh does not move the number.
 
 **The fix.** Per the reviewer's standing guidance ("if the verifier's tolerance is held at 10%, the right debugging action on a near-miss is to shrink the window, not loosen the tolerance"), the low edge moved from $V_{FB}+0.1$ to $V_{FB}+0.2$. The new window's worst error is **9.25% at $V_{gate} = -0.200$ V** (the low edge itself). See `docs/mos_derivation.md` §6.9 and `docs/PHYSICS.md` §6 for the full derivation and disclosure.
 

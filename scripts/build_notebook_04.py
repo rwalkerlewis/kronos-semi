@@ -21,7 +21,7 @@ The two runs share a JSON schema, a physics stack, and a verifier. What differs 
 
 ## Notebook set
 
-This is the fourth and final Colab walkthrough that exercises the [end-of-Day-7 capability matrix](https://github.com/rwalkerlewis/kronos-semi#status) from the README:
+This is the fourth and final Colab walkthrough that exercises the [end-of-M7 capability matrix](https://github.com/rwalkerlewis/kronos-semi#status) from the README:
 
 | Notebook | Covers |
 |----------|--------|
@@ -296,7 +296,7 @@ cells.append(nbf.v4.new_markdown_cell(r"""## Summary
   - V-I linearity verifier specification (5-point sweep, zero-bias floor, sign check, 1% tolerance): `docs/resistor_derivation.md` §3.
   - Verifier implementation: `verify_resistor_3d()` in `scripts/run_benchmark.py`, registered under the key `"resistor_3d"`.
 
-**Notebook set complete.** Notebooks 01-04 together walk a new reviewer through all four device classes in the end-of-Day-7 capability matrix: 1D equilibrium Poisson, 1D coupled drift-diffusion under bias, 2D multi-region MOS C-V, and 3D ohmic V-I with two mesh sources. The rest of the simulator's capability — MMS-verified convergence rates, charge-neutrality conservation, SRH reverse-bias generation, adaptive continuation diagnostics — is exercised by the test suite (206 tests, 95.58% coverage) and the V&V battery (62/62 PASS). See the [repo](https://github.com/rwalkerlewis/kronos-semi) and its [capability matrix](https://github.com/rwalkerlewis/kronos-semi#status)."""))
+**Notebook set complete.** Notebooks 01-04 together walk a new reviewer through all four device classes in the end-of-M7 capability matrix: 1D equilibrium Poisson, 1D coupled drift-diffusion under bias, 2D multi-region MOS C-V, and 3D ohmic V-I with two mesh sources. The rest of the simulator's capability — MMS-verified convergence rates, charge-neutrality conservation, SRH reverse-bias generation, adaptive continuation diagnostics — is exercised by the test suite (206 tests, 95.58% coverage) and the V&V battery (62/62 PASS). See the [repo](https://github.com/rwalkerlewis/kronos-semi) and its [capability matrix](https://github.com/rwalkerlewis/kronos-semi#status)."""))
 
 nb.cells = cells
 

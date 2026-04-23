@@ -143,8 +143,8 @@ at 1%, and 3D slice plots) merged via PR #9 from
 - **Scope, in:**
   - Sync `PLAN.md` "Current state" and `docs/ROADMAP.md` statuses to
     reflect the M7 merge and M8 in flight.
-  - Rewrite the `README.md` status section as an end-of-Day-7
-    capability matrix (Days 1-7 shipped across PRs #2-#9).
+  Rewrite the `README.md` status section as an end-of-M7
+    capability matrix (M1-M7 shipped across PRs #2-#9).
   - Regenerate `notebooks/01_pn_junction_1d.ipynb` using
     `scripts/build_notebook_01.py` (current-state framing, not
     framing (no "M1" heading).
@@ -182,8 +182,8 @@ document.
 |------:|-----------------------------------------------------------------------|--------------|---------------------------------|
 | 0     | Verify `main` baseline (pytest 206, V&V 62/62, ruff clean)            | N/A          | N/A (verification-only)         |
 | 1     | Sync `PLAN.md` "Current state" and `docs/ROADMAP.md` statuses         | `1d86504`    | Done                            |
-| 2     | Rewrite `README.md` status section as end-of-Day-7 capability matrix  | `c7343c9`    | Done                            |
-| 3     | Regenerate `notebooks/01_pn_junction_1d.ipynb` (end-of-Day-7 framing) | `8ce6b10`    | Done                            |
+| 2     | Rewrite `README.md` status section as end-of-M7 capability matrix  | `c7343c9`    | Done                            |
+| 3     | Regenerate `notebooks/01_pn_junction_1d.ipynb` (end-of-M7 framing) | `8ce6b10`    | Done                            |
 | 4     | Author `notebooks/02_pn_junction_bias.ipynb` (M2-M3 content)          | `f7c83b0`    | Done                            |
 | 5     | Author `notebooks/03_mos_cv.ipynb` (M6 C-V content)                   | `bc3409b`    | Done                            |
 | 6     | Author `notebooks/04_resistor_3d.ipynb` (M7 content)                  | `365da06`    | Done                            |

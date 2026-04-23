@@ -363,7 +363,7 @@ bias.
 #### The lambda2 / L_D^2 trap
 
 `Scaling.lambda2` returns the dimensionless ratio $\lambda^2 = L_D^2 /
-L_0^2$ (Section 2.3). Early Day-1 versions of `semi/physics/poisson.py`
+L_0^2$ (Section 2.3). Early M1 versions of `semi/physics/poisson.py`
 used `sc.lambda2` directly as the Laplacian coefficient. Because the
 mesh is in physical meters (Invariant 3, not $L_0$ units), this
 suppressed diffusion by $L_0^2$ ($\sim 10^{-12}$ on a micron device)
@@ -477,7 +477,7 @@ permittivity; semiconductor-specific fields are zero on them.
 
 ## 5. Verification & Validation
 
-This section documents the Day-4 V&V suite and its results. The code
+This section documents the M4 V&V suite and its results. The code
 lives under `semi/verification/`, the runner is
 `scripts/run_verification.py`, artifacts land under
 `results/mms_poisson/`, `results/mesh_convergence/`,
@@ -525,7 +525,7 @@ is within an order of magnitude of the triangle error at N = 64
 Module: `semi/verification/mesh_convergence.py`. Subcommand:
 `run_verification.py mesh_convergence`.
 
-A mesh sweep over N in [50, 100, 200, 400, 800, 1600] on the Day-1
+A mesh sweep over N in [50, 100, 200, 400, 800, 1600] on the M1
 equilibrium pn junction reports V_bi, peak |E|, depletion width W,
 Newton iterations, and solve time. Errors are recorded in two ways:
 against the depletion-approximation reference (which is itself an
@@ -696,7 +696,7 @@ silicon) therefore requires psi_gate = psi_body, giving
 
     V_FB = phi_ms - phi_F
 
-not the textbook V_FB = phi_ms. For the ideal-gate Day-6 device
+not the textbook V_FB = phi_ms. For the ideal-gate M6 device
 (phi_ms = 0, N_A = 1e17 cm^-3, T = 300 K), V_FB = -0.417 V and
 V_T = -0.417 + 2 * 0.417 + sqrt(4 eps_s q N_A phi_F) / C_ox = +0.658 V.
 The benchmark sweep covers V_gate in [-0.9, +1.2] V (roughly V_FB -

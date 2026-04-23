@@ -425,7 +425,7 @@ CLI_NS_2D = [16, 32, 64, 128]
 # when paired with a consistent RHS, so this MMS runs in pure scalar
 # Poisson form without the Slotboom / doping / carrier terms. That
 # isolates the coefficient-jump assembly, which is the only new thing
-# in Day-6 Poisson physics. See docs/mos_derivation.md section 7.
+# in M6 Poisson physics. See docs/mos_derivation.md section 7.
 # ---------------------------------------------------------------------------
 
 # Material constants used by the multi-region MMS. Hard-coded so the
