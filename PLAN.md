@@ -30,8 +30,8 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `dev/submission-polish` (M8: Submission polish and
-  submission packaging in flight; M7 merged via PR #9, `a604b12`)
+- Active dev branch: `dev/final-housekeeping` (M9: Result artifact writer
+  in flight; M8 merged via PRs #10/#11)
 
 ## Current state
 
@@ -133,65 +133,7 @@ at 1%, and 3D slice plots) merged via PR #9 from
 
 ## Next task
 
-**M8: Submission polish.** In flight on
-`dev/submission-polish`, targeting PR #10 against `main`.
-
-- **Goal:** make the submission presentation-ready. No new physics,
-  no new benchmarks; this is a documentation, notebook, and release
-  pass only. Scope creep on the final PR is the submission-day
-  failure mode to avoid.
-- **Scope, in:**
-  - Sync `PLAN.md` "Current state" and `docs/ROADMAP.md` statuses to
-    reflect the M7 merge and M8 in flight.
-  Rewrite the `README.md` status section as an end-of-M7
-    capability matrix (M1-M7 shipped across PRs #2-#9).
-  - Regenerate `notebooks/01_pn_junction_1d.ipynb` using
-    `scripts/build_notebook_01.py` (current-state framing, not
-    framing (no "M1" heading).
-  - Author `notebooks/02_pn_junction_bias.ipynb` (M2-M3 content:
-    forward Shockley + reverse SNS sweeps).
-  - Author `notebooks/03_mos_cv.ipynb` (M6 content: MOS C-V with
-    the V_FB + 0.2 verifier-window disclosure in the narrative).
-  - Author `notebooks/04_resistor_3d.ipynb` (M7 content: bipolar
-    sweep, builtin-vs-gmsh comparison).
-  - Verify every notebook by actually executing it on Colab; record
-    wall time and final plot observation in the PR body. Local
-    `jupyter nbconvert --execute` is a convenience check, not a
-    verification, because FEM-on-Colab's dolfinx pin can drift from
-    the local Docker pin.
-  - Add a README "Notebooks" catalog with Colab badges.
-  - Append `[0.8.0] - M8: Submission polish` to `CHANGELOG.md`.
-  - Open PR #10, wait for CI, do not self-merge.
-  - Post-merge and only on explicit human prompt, tag `v0.2.0`.
-- **Scope, out:** any new physics code, new verifier, new benchmark
-  JSON, or schema change. If a notebook reveals a bug, note it in
-  the PR body and defer the fix to a post-submission PR.
-- **Preconditions:** M7 (PR #9) merged into `main` at `a604b12`.
-
-## M8: Submission polish execution
-
-The full M8: Submission polish narrative, per-phase commit history, reviewer-caught
-decisions (MOS ψ-reference convention, verifier window shift, Option-A
-Colab gmsh install plus the `libGLU` apt dependency), verification
-status (CI, local Docker, Colab QA), and deferred post-submission cleanups live
-in [`docs/submission-polish-log.md`](docs/submission-polish-log.md). This
-PLAN section carries only the phase index; the log is the reference
-document.
-
-| Phase | Scope                                                                 | Commit SHA   | Status                          |
-|------:|-----------------------------------------------------------------------|--------------|---------------------------------|
-| 0     | Verify `main` baseline (pytest 206, V&V 62/62, ruff clean)            | N/A          | N/A (verification-only)         |
-| 1     | Sync `PLAN.md` "Current state" and `docs/ROADMAP.md` statuses         | `1d86504`    | Done                            |
-| 2     | Rewrite `README.md` status section as end-of-M7 capability matrix  | `c7343c9`    | Done                            |
-| 3     | Regenerate `notebooks/01_pn_junction_1d.ipynb` (end-of-M7 framing) | `8ce6b10`    | Done                            |
-| 4     | Author `notebooks/02_pn_junction_bias.ipynb` (M2-M3 content)          | `f7c83b0`    | Done                            |
-| 5     | Author `notebooks/03_mos_cv.ipynb` (M6 C-V content)                   | `bc3409b`    | Done                            |
-| 6     | Author `notebooks/04_resistor_3d.ipynb` (M7 content)                  | `365da06`    | Done                            |
-| 7     | Cross-notebook consistency pass (headings, install cells, artifacts)  | `d52ca20`    | Done                            |
-| 8     | Colab QA on all four notebooks, record wall times                     | pending      | In flight (NB04 outstanding)    |
-| 9     | CHANGELOG `[0.8.0] - M8: Submission polish`, `semi/__init__.py` version bump | pending      | Pending                  |
-| 10    | Open PR #10, wait for CI, do not self-merge                           | pending      | Pending                         |
-| 11    | Post-merge and only on explicit prompt, tag `v0.2.0`                  | pending      | Pending                         |
+**M10: (next milestone).** To be defined after M9 merges.
 
 ## Roadmap
 
@@ -204,7 +146,8 @@ document.
 | M5: Refactor and test pass   | run.py split, bcs.py extracted, coverage 96.25%              | Done       | `dev/day5-refactor`; run.py 580->74, bcs.py extracted, coverage 96.25% |
 | M6: 2D MOS capacitor         | Oxide + silicon multi-region, C-V sweep                      | Done       | `dev/day6-mos-2d`; mos_cv runner, 4/4 C-V checks green, coverage 95.43% |
 | M7: 3D doped resistor        | gmsh loader, bipolar sweep, V-I 1%                           | Done       | Merged via PR #9 (`a604b12`): gmsh loader, bipolar sweep, V-I 1%      |
-| M8: Submission polish        | Notebooks, catalog, CHANGELOG, tag prep                      | In flight  | `dev/submission-polish` (PR #10): README, 4 notebooks, CHANGELOG, tag prep |
+| M8: Submission polish        | Notebooks, catalog, CHANGELOG, tag prep                      | Done       | Merged via PRs #10/#11: README, 4 notebooks, CHANGELOG, tag prep            |
+| M9: Result artifact writer   | `semi/io/artifact.py`, `schemas/manifest.v1.json`, `semi-run` CLI | In flight  | `dev/final-housekeeping`: artifact writer, schema, CLI, tests          |
 
 See `docs/ROADMAP.md` for the full per-day breakdown.
 
@@ -295,6 +238,8 @@ items.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M9 (2026-04-23):** Result artifact writer; `semi/io/artifact.py`, `schemas/manifest.v1.json`, `semi-run` CLI.
 
 - **M7 (2026-04-21):** 3D doped resistor benchmark, first
   dimension extension; delivered on `dev/day7-resistor-3d` (PR #9):

@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "kronos-semi run manifest v1",
+  "description": "Schema-versioned metadata describing a single kronos-semi simulation run artifact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "engine",
+    "run_id",
+    "status",
+    "wall_time_s",
+    "input_sha256",
+    "solver",
+    "fields",
+    "mesh"
+  ],
+  "properties": {
+    "schema_version": {
+      "description": "Version of this manifest schema, following semantic versioning (MAJOR.MINOR.PATCH).",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "engine": {
+      "description": "Metadata identifying the simulation engine that produced this artifact.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "commit"],
+      "properties": {
+        "name": {
+          "description": "Name of the simulation engine (e.g. 'kronos-semi').",
+          "type": "string"
+        },
+        "version": {
+          "description": "Package version string of the engine.",
+          "type": "string"
+        },
+        "commit": {
+          "description": "Git commit SHA of the engine source at the time of the run, or 'unknown' if unavailable.",
+          "type": "string"
+        }
+      }
+    },
+    "run_id": {
+      "description": "Unique identifier for this run, typically '<timestamp>_<name>_<sha7>'.",
+      "type": "string"
+    },
+    "status": {
+      "description": "Terminal status of the simulation run.",
+      "type": "string",
+      "enum": ["completed", "failed", "running"]
+    },
+    "wall_time_s": {
+      "description": "Total wall-clock time consumed by the simulation run, in seconds.",
+      "type": "number",
+      "minimum": 0
+    },
+    "input_sha256": {
+      "description": "SHA-256 hex digest of the input JSON bytes used to drive this run.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "solver": {
+      "description": "Summary of the solver configuration and convergence outcome.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "backend", "n_dofs", "n_steps", "converged"],
+      "properties": {
+        "type": {
+          "description": "Solver type (e.g. 'equilibrium', 'drift_diffusion', 'bias_sweep', 'mos_cv').",
+          "type": "string"
+        },
+        "backend": {
+          "description": "PETSc backend and linear solver descriptor (e.g. 'petsc-cpu-mumps').",
+          "type": "string"
+        },
+        "n_dofs": {
+          "description": "Total number of global degrees of freedom in the primary function space.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "n_steps": {
+          "description": "Number of bias/gate steps executed during the run (at least 1 for equilibrium).",
+          "type": "integer",
+          "minimum": 1
+        },
+        "converged": {
+          "description": "Whether the final SNES solve converged to within the requested tolerances.",
+          "type": "boolean"
+        }
+      }
+    },
+    "fields": {
+      "description": "List of exported field files, one entry per scalar or vector quantity.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "description": "Metadata for a single exported field.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "units", "path", "rank"],
+        "properties": {
+          "name": {
+            "description": "Physical name of the field (e.g. 'psi', 'n', 'p', 'E', 'J_n').",
+            "type": "string"
+          },
+          "units": {
+            "description": "SI units of the field values (e.g. 'V', 'm^-3', 'V/m', 'A/m^2').",
+            "type": "string"
+          },
+          "path": {
+            "description": "Path to the field file relative to the run directory root.",
+            "type": "string"
+          },
+          "rank": {
+            "description": "Tensor rank of the field: 0 for scalar, 1 for vector, 2 for matrix.",
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "mesh": {
+      "description": "Summary of the mesh used in this simulation.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "dimension", "n_cells", "n_vertices", "regions"],
+      "properties": {
+        "path": {
+          "description": "Path to the exported mesh XDMF file relative to the run directory root.",
+          "type": "string"
+        },
+        "dimension": {
+          "description": "Topological dimension of the mesh (1, 2, or 3).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "n_cells": {
+          "description": "Total number of mesh cells (elements) across all MPI ranks.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "n_vertices": {
+          "description": "Total number of mesh vertices across all MPI ranks.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "regions": {
+          "description": "List of named mesh regions (physical groups) tagged in the mesh.",
+          "type": "array",
+          "items": {
+            "description": "Metadata for a single tagged mesh region.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "material"],
+            "properties": {
+              "name": {
+                "description": "Name of the region as specified in the input JSON.",
+                "type": "string"
+              },
+              "material": {
+                "description": "Material identifier string for this region (e.g. 'Si', 'SiO2').",
+                "type": "string"
+              },
+              "tag": {
+                "description": "Integer subdomain tag assigned to this region in the mesh.",
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "sweeps": {
+      "description": "List of bias or gate sweep records. Omitted for equilibrium runs.",
+      "type": "array",
+      "items": {
+        "description": "Metadata for a single contact sweep (voltage or gate).",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "contact", "path", "n_steps", "bipolar"],
+        "properties": {
+          "kind": {
+            "description": "Whether this is a voltage (ohmic) sweep or a gate (MOS) sweep.",
+            "type": "string",
+            "enum": ["voltage", "gate"]
+          },
+          "contact": {
+            "description": "Name of the swept contact as it appears in the input JSON.",
+            "type": "string"
+          },
+          "path": {
+            "description": "Path to the I-V or Q-V CSV file relative to the run directory root.",
+            "type": "string"
+          },
+          "n_steps": {
+            "description": "Number of bias steps recorded in the CSV (equals the number of data rows).",
+            "type": "integer",
+            "minimum": 1
+          },
+          "bipolar": {
+            "description": "True when the sweep spans both positive and negative applied voltages.",
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "warnings": {
+      "description": "List of non-fatal warning messages emitted during artifact writing.",
+      "type": "array",
+      "items": {
+        "description": "A single warning message string.",
+        "type": "string"
+      }
+    }
+  }
+}
