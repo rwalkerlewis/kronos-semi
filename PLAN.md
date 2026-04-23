@@ -35,123 +35,140 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M7 are merged into `main`. M8: Submission polish (final polish and
-submission packaging) is in flight on `dev/submission-polish`.
-CI hardening (branch glob plus Dockerized FEM job) merged on
-`ci/docker-benchmark-matrix`. M3: Adaptive continuation (adaptive bias continuation,
-Sah-Noyce-Shockley verifier, reverse-bias generation check) merged
-via PR #5 from `dev/day3-bias-hardening`. M4 (Verification &
-Validation suite: MMS-Poisson, mesh convergence, discrete
-conservation, MMS for coupled drift-diffusion, CI integration,
-documentation) merged via PR #6 from `dev/day4-vnv`. M5 (refactor
-pass: `semi/bcs.py` extraction, `semi/run.py` split into a 74-line
-dispatcher plus `runners/` and `postprocess.py`, coverage to 96.25%
-with a 95% CI gate, completed `docs/PHYSICS.md` Section 2.5, ADR 0007)
-merged via PR #7 from `dev/day5-refactor`. M6 (2D MOS capacitor:
-multi-region Poisson over oxide plus silicon, gate contact, continuity
-on a semiconductor submesh, C-V verifier matching depletion-approximation
-MOS theory within 10% in [V_FB + 0.2, V_T - 0.1] V, multi-region MMS)
-merged via PR #8 from `dev/day6-mos-2d`. M7 (3D doped resistor with
-gmsh `.msh` loader, bipolar-sweep driver path, V-I linearity verifier
-at 1%, and 3D slice plots) merged via PR #9 from
-`dev/day7-resistor-3d` at `a604b12`.
+M1 through M8 are merged into `main` at `c899594` (PR #11,
+`dev/submission-cleanup`). Version `v0.8.0` is published in
+`semi/__init__.py` and `CHANGELOG.md`. The project has delivered the
+KronosAI evaluation milestones and is transitioning to a production
+engine intended to sit behind a web UI.
+
+The capability matrix (verified in CI) is authoritative: see
+`README.md` §Status or `docs/ROADMAP.md` §"Capability matrix."
 
 ### What works (verified in Docker on current `main`)
 
 - Docker dev environment on `ghcr.io/fenics/dolfinx/dolfinx:stable`
-  (dolfinx 0.10). `docker compose run --rm test` runs 70/70 pytest.
-- Pure-Python core: constants, materials (Si, Ge, GaAs, SiO2, HfO2, Si3N4),
-  nondimensional scaling, doping profiles (uniform/step/gaussian), JSON
-  schema with validate/load.
+ (dolfinx 0.10). `docker compose run --rm test` runs 206/206 pytest.
+- Pure-Python core: constants, materials (Si, Ge, GaAs, SiO2, HfO2,
+ Si3N4), nondimensional scaling, doping profiles (uniform/step/gaussian),
+ JSON schema with validate/load.
 - JSON input schema (jsonschema Draft-07) with defaults, including
-  `recombination.E_t`, per-contact `voltage_sweep`, and
-  `solver.continuation.{min_step, max_halvings}`.
-- Builtin mesh generation (interval/rectangle/box) with region and facet
-  tagging from axis-aligned boxes and planes.
-- Equilibrium Poisson under Boltzmann statistics, solved via PETSc SNES
-  through `dolfinx.fem.petsc.NonlinearProblem`. Quadratic Newton
-  convergence (5 iterations, residual 1.5e-6 to 8.1e-15).
-- Coupled Slotboom drift-diffusion with SRH recombination. Three-block
-  (psi, phi_n, phi_p) residual with `L_D^2 * eps_r` on Poisson and
-  `L_0^2 * mu_hat` on continuity. Forward-bias sweep with snapshot/
-  restore adaptive halving continuation; UFL facet-integral current
-  evaluation.
-- Benchmark runner CLI (`scripts/run_benchmark.py`) producing plots and
-  running registered verifiers.
-- `pn_1d` benchmark (equilibrium): V_bi, peak |E|, bulk densities, mass
-  action, all within 5-10% of depletion-approximation theory.
-- `pn_1d_bias` benchmark (forward bias): J at V = 0.6 V within 10% of
-  Shockley long-diode theory; J_sim within 15% of the Sah-Noyce-Shockley
-  total (J_diff + J_rec, with the Sze f = 2 V_t/(V_bi - V) correction)
-  on V in [0.15, 0.55] V. The original M2 "qualitative below 0.5 V"
-  caveat was retired by the M3 SNS verifier.
-- `pn_1d_bias_reverse` benchmark (reverse bias): |J| within 20% of the
-  net SRH generation current (q n_i / 2 tau_eff)(W(V) - W(0)) on V in
-  [-2, -0.5] V.
-- `mos_2d` benchmark (C-V sweep, M6: 2D MOS capacitor): 500 nm p-type Si / 5 nm SiO2
-  capacitor; |C_sim - C_theory|/C_theory < 10% in the depletion-regime
-  window [V_FB + 0.2, V_T - 0.1] V (worst 9.25% at V_gate = -0.20 V
-  under ideal phi_ms = 0 with psi = 0 at intrinsic level). Sweep
-  covers [-0.9, +1.2] V; accumulation and strong-inversion regimes
-  are rendered on the plot but excluded from the verifier per
-  depletion-approximation scope.
-- GitHub Actions runs pure-Python tests on 3.10/3.11/3.12, ruff, and a
-  Dockerized FEM job that runs pytest, three benchmark verifiers, and
-  the full V&V suite on every push to `main`, `dev/**`, `ci/**`,
-  `docs/**`. Job timeout is 15 minutes once the dolfinx image is cached.
-- Verification & Validation suite (M4: V&V suite): MMS for Poisson (1D linear,
-  1D nonlinear, 2D triangles, 2D quad smoke) with finest-pair rates at
-  theoretical 2.0/1.0; mesh convergence on `pn_1d` with Cauchy ratios
-  >= 1.99x per doubling; discrete conservation (charge on `pn_1d`
-  equilibrium at relative 1.5e-17; current continuity on forward and
-  reverse bias sweeps); MMS for coupled drift-diffusion (three variants
-  x three grids) with all gated block rates >= 1.99.
-
-- `resistor_3d` benchmark (M7: 3D doped resistor): 3D rectangular silicon bar (1 um x
-  200 nm x 200 nm), uniform n-type N_D = 1e18 cm^-3, two ohmic
-  contacts on the x = 0 and x = L faces, symmetric bias sweep in
-  [-0.01, +0.01] V. V-I linearity within 1% of
-  `R_theory = L / (q N_D mu_n A) = 1115 Ohm` on both the builtin
-  `create_box` mesh and the committed gmsh fixture. 3D slice plots
-  of psi and |J_n| at the y = W/2 midplane are written per run.
-- Gmsh `.msh` loader (M7: 3D doped resistor): `semi/mesh.py::_build_from_file` via
-  `dolfinx.io.gmsh.read_from_msh`; physical groups in the file are
-  returned verbatim as `cell_tags` and `facet_tags`, so `build_mesh`
-  bypasses the JSON box-tagger for file-source meshes. XDMF remains
-  a clear `NotImplementedError` for a future PR.
-- Bipolar (sign-spanning) bias sweep (M7: 3D doped resistor): the driver walks
-  `V = 0 -> min(V) -> max(V)` with a fresh
-  `AdaptiveStepController` on each leg. Unipolar pn-junction and
-  MOS sweeps fall through to the original single-endpoint ramp
-  unchanged.
+ `recombination.E_t`, per-contact `voltage_sweep`, and
+ `solver.continuation.{min_step, max_halvings, max_step,
+ easy_iter_threshold, grow_factor}`.
+- Builtin mesh generation (interval/rectangle/box) with region and
+ facet tagging from axis-aligned boxes and planes. Gmsh `.msh`
+ loader via `dolfinx.io.gmsh.read_from_msh` (physical groups
+ returned verbatim as cell_tags and facet_tags). XDMF loader
+ remains a clear `NotImplementedError` (M12).
+- Equilibrium Poisson under Boltzmann statistics via PETSc SNES.
+- Coupled Slotboom drift-diffusion with SRH recombination: three-block
+ (psi, phi_n, phi_p) residual with multi-region Poisson coefficient
+ and continuity equations restricted to a semiconductor submesh for
+ MOS-style geometries.
+- Adaptive bias continuation with halving on SNES failure, growth
+ after repeated easy solves, and sign-spanning (bipolar) support.
+- Five benchmarks, each with a registered verifier:
+ - `pn_1d` equilibrium: V_bi, peak |E|, bulk densities, mass action
+ within 5-10% of depletion-approximation theory.
+ - `pn_1d_bias` forward: J(0.6 V) within 10% of Shockley long-diode
+ theory; within 15% of Sah-Noyce-Shockley total on V in [0.15, 0.55].
+ - `pn_1d_bias_reverse`: |J| within 20% of net SRH generation current
+ on V in [-2, -0.5].
+ - `mos_2d` C-V: worst-case 9.25% at V_gate = -0.20 V, within 10% in
+ the depletion-regime window [V_FB + 0.2, V_T - 0.1].
+ - `resistor_3d` V-I: within 1% of R_theory = L/(q N_D mu_n A) = 1115 Ohm
+ on both builtin box mesh and committed gmsh fixture.
+- V&V suite: MMS for Poisson (1D linear, 1D nonlinear, 2D triangles,
+ 2D quad) with finest-pair rates at theoretical 2.0/1.0; MMS for
+ coupled drift-diffusion (three variants × three grids) with all
+ rates >= 1.99; multi-region Poisson MMS L2 = 2.0; mesh convergence
+ on `pn_1d`; discrete conservation on equilibrium and bias sweeps.
+ 62/62 PASS.
+- Four Colab notebooks (NB01 pn_1d, NB02 pn_bias, NB03 mos_cv, NB04
+ resistor_3d) install FEniCSx via fem-on-colab and run each benchmark
+ end-to-end.
+- GitHub Actions: pure-Python matrix (3.10/3.11/3.12) + ruff + a
+ Dockerized FEM job running pytest, three benchmark verifiers, and
+ the full V&V suite on every push to `main`, `dev/**`, `ci/**`,
+ `docs/**`. Green.
 
 ### What does not work / not yet built
 
-- Schottky contacts: deferred (Non-goals).
-- Field-dependent mobility, Auger/radiative recombination, Fermi-Dirac
-  statistics (see Non-goals).
+The gaps between the current state and a production UI-backed engine
+are enumerated and sequenced in
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md), milestones
+M9 through M18. Summary of the most important missing pieces:
+
+- **No machine-readable result artifact.** `SimulationResult` holds
+ live PETSc/dolfinx handles. No JSON/HDF5/VTU manifest file, no way
+ to consume results from a separate process. M9 addresses this.
+- **No HTTP server / API surface.** A UI cannot talk to the engine
+ today. M10.
+- **No schema versioning.** JSON inputs lack `schema_version`; UI and
+ engine versions can drift silently. M11.
+- **Mesh input is axis-aligned-only.** Real devices need gmsh geometry
+ or parametric meshing. M12.
+- **No transient, no AC small-signal.** Steady-state only. M13, M14.
+- **Linear solver is CPU-LU only** (MUMPS). Unusable above ~200k DOFs.
+ M15 (GPU + iterative Krylov).
+- **Physics gaps:** no field-dependent mobility, Auger, Fermi-Dirac,
+ Schottky contacts, tunneling, heterojunctions. M16, M17.
 
 ## Next task
 
-**M10: HTTP server (see docs/IMPROVEMENT_GUIDE.md §4).** FastAPI `POST /solve`,
-`GET /runs/{id}`, WebSocket progress stream; worker pool via ProcessPoolExecutor.
-Consumes the M9 artifact directory layout. Deliverable: new `kronos_server/` package.
+**M9: Result artifact writer + manifest.** Scoped in full in
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §4 (M9). A
+ready-to-paste starter prompt for a coding agent lives in
+`docs/M9_STARTER_PROMPT.md`.
+
+- **Goal:** make every completed solve produce a stable, schema-validated,
+ on-disk result tree that downstream consumers (HTTP server in M10, UI
+ in M18, external analysis scripts today) can read without importing
+ dolfinx.
+- **Scope, in:**
+ - New `schemas/manifest.v1.json` (jsonschema Draft-07) covering the
+ manifest contract in IMPROVEMENT_GUIDE.md §3.
+ - New `semi/io/artifact.py` exposing `write_artifact(result, out_dir,
+ run_id)` and `read_manifest(run_dir)`. The reader must work in a
+ pure-stdlib environment (no dolfinx, no numpy import at module
+ top level).
+ - New CLI `semi-run <input.json> [--out runs/]` registered in
+ `pyproject.toml`.
+ - New `tests/test_artifact.py` asserting round-trip manifest
+ validation on all five shipped benchmarks.
+- **Scope, out:** any change to physics kernels, existing runners, or
+ the input schema. Any change to `semi/run.py::SimulationResult`
+ beyond additive fields.
+- **Preconditions:** M8 merged on `main` at `c899594`.
+- **Acceptance gate:** the six commands in `docs/M9_STARTER_PROMPT.md`
+ §"Acceptance criteria" all pass locally and in CI.
 
 ## Roadmap
 
-| Milestone                    | Summary                                                      | Status     | Notes                                                                 |
-|:-----------------------------|--------------------------------------------------------------|------------|-----------------------------------------------------------------------|
-| M1: Equilibrium Poisson      | 1D pn junction, Docker env                                   | Done       | 6/6 verifier checks pass; PR `dev/docker-day1-fix`                    |
-| M2: Coupled drift-diffusion  | Slotboom, coupled Newton, bias sweep                         | Done       | 6/6 `pn_1d_bias` checks pass; PR `dev/day2-drift-diffusion`           |
-| M3: Adaptive continuation    | Bias ramping, Shockley IV verifier hardening                 | Done       | Adaptive ramp (-26.2% iters), SNS verifier, reverse-bias gen check    |
-| M4: V&V suite                | MMS, mesh convergence, conservation, CI                      | Done       | `dev/day4-vnv`; all four phases green, CI V&V step within 15 min      |
-| M5: Refactor and test pass   | run.py split, bcs.py extracted, coverage 96.25%              | Done       | `dev/day5-refactor`; run.py 580->74, bcs.py extracted, coverage 96.25% |
-| M6: 2D MOS capacitor         | Oxide + silicon multi-region, C-V sweep                      | Done       | `dev/day6-mos-2d`; mos_cv runner, 4/4 C-V checks green, coverage 95.43% |
-| M7: 3D doped resistor        | gmsh loader, bipolar sweep, V-I 1%                           | Done       | Merged via PR #9 (`a604b12`): gmsh loader, bipolar sweep, V-I 1%      |
-| M8: Submission polish        | Notebooks, catalog, CHANGELOG, tag prep                      | Done       | Merged via PRs #10/#11: README, 4 notebooks, CHANGELOG, tag prep            |
-| M9: Result artifact writer   | `semi/io/artifact.py`, `schemas/manifest.v1.json`, `semi-run` CLI | In flight  | `dev/final-housekeeping`: artifact writer, schema, CLI, tests          |
+| Milestone | Summary | Status |
+|:-----------------------------|--------------------------------------------------------------|------------|
+| M1: Equilibrium Poisson | 1D pn junction, Docker env | Done |
+| M2: Coupled drift-diffusion | Slotboom, coupled Newton, bias sweep | Done |
+| M3: Adaptive continuation | Bias ramping, Shockley IV verifier | Done |
+| M4: V&V suite | MMS, mesh convergence, conservation, CI | Done |
+| M5: Refactor and test pass | run.py split, bcs.py extracted, coverage 96.25% | Done |
+| M6: 2D MOS capacitor | Oxide + silicon multi-region, C-V sweep | Done |
+| M7: 3D doped resistor | gmsh loader, bipolar sweep, V-I 1% | Done |
+| M8: Submission polish | Notebooks, catalog, CHANGELOG, v0.8.0 tag | Done |
+| M9: Result artifact writer | manifest.json, on-disk field/IV files, semi-run CLI | **Next** |
+| M10: HTTP server | POST /solve, GET /runs/{id}, WebSocket progress | Planned |
+| M11: Schema versioning | UI-facing schema companion, form-builder annotations | Planned |
+| M12: Mesh beyond boxes | XDMF loader, gmsh .geo ingress, 2D MOSFET benchmark | Planned |
+| M13: Transient solver | Backward-Euler + BDF2, diode turn-on benchmark | Planned |
+| M14: AC small-signal | Complex-frequency admittance, true C-V | Planned |
+| M15: GPU linear solver | PETSc CUDA/HIP, AMGX preconditioner, 500k-DOF 3D benchmark | Planned |
+| M16: Physics completeness | Caughey-Thomas, Lombardi, Auger, FD, Schottky, tunneling | Planned |
+| M17: Heterojunctions | Position-dependent chi, Eg; HEMT or HBT benchmark | Planned |
+| M18: UI (separate repo) | React + vtk.js + JSONForms, consumes M9+M10+M11 contracts | Out of scope (this repo) |
 
-See `docs/ROADMAP.md` for the full per-day breakdown.
+Per-milestone acceptance tests and scope definitions live in
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md). The M1–M8
+delivery history is in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Invariants
 
