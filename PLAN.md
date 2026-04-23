@@ -35,113 +35,90 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M8 are merged into `main` at `c899594` (PR #11,
-`dev/submission-cleanup`). Version `v0.8.0` is published in
-`semi/__init__.py` and `CHANGELOG.md`. The project has delivered the
-KronosAI evaluation milestones and is transitioning to a production
-engine intended to sit behind a web UI.
+M1 through M9 are merged into `main`. The most recent M9 commit is `ba5f5d9`
+(result artifact writer); follow-up commit `7e426d2` updated planning docs.
+Version `v0.9.0` is recorded in `CHANGELOG.md`. The project has delivered
+the KronosAI evaluation milestones plus the first piece of the
+production-engine track (on-disk result artifact contract).
 
-The capability matrix (verified in CI) is authoritative: see
-`README.md` §Status or `docs/ROADMAP.md` §"Capability matrix."
+The capability matrix (verified in CI) is authoritative: see `README.md`
+§Status or `docs/ROADMAP.md`.
 
 ### What works (verified in Docker on current `main`)
 
-- Docker dev environment on `ghcr.io/fenics/dolfinx/dolfinx:stable`
- (dolfinx 0.10). `docker compose run --rm test` runs 206/206 pytest.
-- Pure-Python core: constants, materials (Si, Ge, GaAs, SiO2, HfO2,
- Si3N4), nondimensional scaling, doping profiles (uniform/step/gaussian),
- JSON schema with validate/load.
-- JSON input schema (jsonschema Draft-07) with defaults, including
- `recombination.E_t`, per-contact `voltage_sweep`, and
- `solver.continuation.{min_step, max_halvings, max_step,
- easy_iter_threshold, grow_factor}`.
-- Builtin mesh generation (interval/rectangle/box) with region and
- facet tagging from axis-aligned boxes and planes. Gmsh `.msh`
- loader via `dolfinx.io.gmsh.read_from_msh` (physical groups
- returned verbatim as cell_tags and facet_tags). XDMF loader
- remains a clear `NotImplementedError` (M12).
-- Equilibrium Poisson under Boltzmann statistics via PETSc SNES.
-- Coupled Slotboom drift-diffusion with SRH recombination: three-block
- (psi, phi_n, phi_p) residual with multi-region Poisson coefficient
- and continuity equations restricted to a semiconductor submesh for
- MOS-style geometries.
-- Adaptive bias continuation with halving on SNES failure, growth
- after repeated easy solves, and sign-spanning (bipolar) support.
-- Five benchmarks, each with a registered verifier:
- - `pn_1d` equilibrium: V_bi, peak |E|, bulk densities, mass action
- within 5-10% of depletion-approximation theory.
- - `pn_1d_bias` forward: J(0.6 V) within 10% of Shockley long-diode
- theory; within 15% of Sah-Noyce-Shockley total on V in [0.15, 0.55].
- - `pn_1d_bias_reverse`: |J| within 20% of net SRH generation current
- on V in [-2, -0.5].
- - `mos_2d` C-V: worst-case 9.25% at V_gate = -0.20 V, within 10% in
- the depletion-regime window [V_FB + 0.2, V_T - 0.1].
- - `resistor_3d` V-I: within 1% of R_theory = L/(q N_D mu_n A) = 1115 Ohm
- on both builtin box mesh and committed gmsh fixture.
-- V&V suite: MMS for Poisson (1D linear, 1D nonlinear, 2D triangles,
- 2D quad) with finest-pair rates at theoretical 2.0/1.0; MMS for
- coupled drift-diffusion (three variants × three grids) with all
- rates >= 1.99; multi-region Poisson MMS L2 = 2.0; mesh convergence
- on `pn_1d`; discrete conservation on equilibrium and bias sweeps.
- 62/62 PASS.
-- Four Colab notebooks (NB01 pn_1d, NB02 pn_bias, NB03 mos_cv, NB04
- resistor_3d) install FEniCSx via fem-on-colab and run each benchmark
- end-to-end.
-- GitHub Actions: pure-Python matrix (3.10/3.11/3.12) + ruff + a
- Dockerized FEM job running pytest, three benchmark verifiers, and
- the full V&V suite on every push to `main`, `dev/**`, `ci/**`,
- `docs/**`. Green.
+- Everything from M1–M8: Docker dev environment, pure-Python core, JSON
+  schema, builtin meshes, gmsh `.msh` loader, equilibrium Poisson,
+  coupled Slotboom drift-diffusion, SRH recombination, adaptive bias
+  continuation (including bipolar sweeps), five shipped benchmarks
+  (pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d), MMS
+  and conservation V&V suite (62/62 PASS), four Colab notebooks,
+  GitHub Actions CI.
+- **M9 deliverables (new in v0.9.0):**
+  - `schemas/manifest.v1.json` — JSON Schema Draft-07 for run manifests,
+    `additionalProperties: false` throughout.
+  - `semi/io/artifact.py` — `write_artifact(result, out_dir, run_id)`
+    produces a validated on-disk run tree.
+  - `semi/io/reader.py` — `read_manifest(run_dir)` runs stdlib-only (no
+    numpy, no dolfinx), suitable for M10 subprocess use.
+  - `semi/io/cli.py` + `semi-run` console entry point.
+  - `tests/test_artifact.py` — 3 pure-Python + 5 FEM round-trip tests
+    across all five benchmarks.
+  - Verified in Docker: gates 3, 4, 5 and sanity checks S1–S5 all pass
+    (see `scripts/m9_verify.sh`).
 
 ### What does not work / not yet built
 
 The gaps between the current state and a production UI-backed engine
 are enumerated and sequenced in
 [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md), milestones
-M9 through M18. Summary of the most important missing pieces:
+M10 through M18. Summary:
 
-- **No machine-readable result artifact.** `SimulationResult` holds
- live PETSc/dolfinx handles. No JSON/HDF5/VTU manifest file, no way
- to consume results from a separate process. M9 addresses this.
-- **No HTTP server / API surface.** A UI cannot talk to the engine
- today. M10.
-- **No schema versioning.** JSON inputs lack `schema_version`; UI and
- engine versions can drift silently. M11.
-- **Mesh input is axis-aligned-only.** Real devices need gmsh geometry
- or parametric meshing. M12.
+- **No HTTP server / API surface.** M9 produces a disk artifact but
+  there is no web-facing way to submit JSON and fetch results. M10
+  addresses this.
+- **No schema versioning.** Input JSON still lacks `schema_version`.
+  M11.
+- **Mesh input is axis-aligned-only** except for imported gmsh files
+  that came pre-meshed. M12.
 - **No transient, no AC small-signal.** Steady-state only. M13, M14.
-- **Linear solver is CPU-LU only** (MUMPS). Unusable above ~200k DOFs.
- M15 (GPU + iterative Krylov).
+- **Linear solver is CPU-LU only.** Unusable above ~200k DOFs. M15.
 - **Physics gaps:** no field-dependent mobility, Auger, Fermi-Dirac,
- Schottky contacts, tunneling, heterojunctions. M16, M17.
+  Schottky contacts, tunneling, heterojunctions. M16, M17.
 
 ## Next task
 
-**M9: Result artifact writer + manifest.** Scoped in full in
-[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §4 (M9). A
-ready-to-paste starter prompt for a coding agent lives in
-`docs/M9_STARTER_PROMPT.md`.
+**M10: HTTP server.** Scoped in full in
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §4 (M10). A
+starter prompt for a coding agent is maintained separately by the
+project lead (not committed to the repo).
 
-- **Goal:** make every completed solve produce a stable, schema-validated,
- on-disk result tree that downstream consumers (HTTP server in M10, UI
- in M18, external analysis scripts today) can read without importing
- dolfinx.
+- **Goal:** expose the M9 engine over HTTP so a web UI (or any network
+  client) can submit JSON, poll run status, stream Newton-solver
+  progress, and fetch result artifacts without importing dolfinx.
 - **Scope, in:**
- - New `schemas/manifest.v1.json` (jsonschema Draft-07) covering the
- manifest contract in IMPROVEMENT_GUIDE.md §3.
- - New `semi/io/artifact.py` exposing `write_artifact(result, out_dir,
- run_id)` and `read_manifest(run_dir)`. The reader must work in a
- pure-stdlib environment (no dolfinx, no numpy import at module
- top level).
- - New CLI `semi-run <input.json> [--out runs/]` registered in
- `pyproject.toml`.
- - New `tests/test_artifact.py` asserting round-trip manifest
- validation on all five shipped benchmarks.
-- **Scope, out:** any change to physics kernels, existing runners, or
- the input schema. Any change to `semi/run.py::SimulationResult`
- beyond additive fields.
-- **Preconditions:** M8 merged on `main` at `c899594`.
-- **Acceptance gate:** the six commands in `docs/M9_STARTER_PROMPT.md`
- §"Acceptance criteria" all pass locally and in CI.
+  - New top-level package `kronos_server/` with FastAPI app, pydantic
+    request/response models, LocalFS storage backend, in-process
+    `ProcessPoolExecutor` worker pool, WebSocket progress stream.
+  - Endpoints: `POST /solve`, `GET /runs`, `GET /runs/{id}` and its
+    sub-resources, `WS /runs/{id}/stream`, `GET /schema`,
+    `GET /materials`, `GET /capabilities`, `GET /health`, `GET /ready`.
+  - `[project.optional-dependencies]` server extra
+    (`fastapi`, `uvicorn`, `httpx`, `pydantic`).
+  - `kronos-server` console entry point.
+  - Docker Compose `server` service.
+  - `tests/test_kronos_server.py` with at least 10 tests including
+    WebSocket progress and concurrent-solve coverage.
+- **Scope, out:** any physics change, any change to the M9 artifact
+  writer or manifest schema, any change to the input schema, auth,
+  rate limiting, persistence beyond the on-disk run directory.
+- **Permitted minor change to `semi/`:** adding optional
+  `progress_callback=None` parameters to the three runners
+  (`equilibrium`, `bias_sweep`, `mos_cv`) so the WebSocket stream can
+  get structured SNES progress events rather than parsing stderr.
+  Budget: ~30 lines total across all three runners.
+- **Preconditions:** M9 merged on `main` at `ba5f5d9`.
+- **Acceptance gate:** the 8 acceptance commands specified in the M10
+  starter prompt all pass in Docker.
 
 ## Roadmap
 
@@ -155,8 +132,8 @@ ready-to-paste starter prompt for a coding agent lives in
 | M6: 2D MOS capacitor | Oxide + silicon multi-region, C-V sweep | Done |
 | M7: 3D doped resistor | gmsh loader, bipolar sweep, V-I 1% | Done |
 | M8: Submission polish | Notebooks, catalog, CHANGELOG, v0.8.0 tag | Done |
-| M9: Result artifact writer | manifest.json, on-disk field/IV files, semi-run CLI | **Next** |
-| M10: HTTP server | POST /solve, GET /runs/{id}, WebSocket progress | Planned |
+| M9: Result artifact writer | manifest.json, on-disk field/IV files, semi-run CLI | Done |
+| M10: HTTP server | POST /solve, GET /runs/{id}, WebSocket progress | Next |
 | M11: Schema versioning | UI-facing schema companion, form-builder annotations | Planned |
 | M12: Mesh beyond boxes | XDMF loader, gmsh .geo ingress, 2D MOSFET benchmark | Planned |
 | M13: Transient solver | Backward-Euler + BDF2, diode turn-on benchmark | Planned |
