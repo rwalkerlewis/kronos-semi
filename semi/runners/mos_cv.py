@@ -1,5 +1,5 @@
 """
-MOS capacitor C-V runner (Day 6).
+MOS capacitor C-V runner (M6).
 
 Solves multi-region equilibrium Poisson at each gate bias in a sweep,
 integrates the semiconductor space charge to recover Q_gate(V_gate),

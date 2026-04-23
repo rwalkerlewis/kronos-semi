@@ -1,5 +1,5 @@
 """
-End-to-end tests for the Day 7 3D resistor benchmark.
+End-to-end tests for the M7 3D resistor benchmark.
 
 Two scopes:
 

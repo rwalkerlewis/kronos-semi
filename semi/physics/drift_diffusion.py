@@ -49,7 +49,7 @@ def make_dd_block_spaces(msh) -> DDBlockSpaces:
 
     Using three separate scalar spaces (rather than a vector MixedElement
     on the same mesh) keeps the block residual assembly explicit and
-    lets us re-use the Day 1 equilibrium Poisson solver for the initial
+    lets us re-use the M1 equilibrium Poisson solver for the initial
     guess.
     """
     from dolfinx import fem
@@ -87,7 +87,7 @@ def build_dd_block_residual(
         Scaling object; provides lambda2, L0, n_i/C0 ratio.
     eps_r : float | dolfinx.fem.Function
         Relative permittivity. Scalar (single-region fast path,
-        byte-identical with Day 2-5) or a DG0 cellwise Function on the
+        byte-identical with M2-M5) or a DG0 cellwise Function on the
         parent mesh for the multi-region Poisson coefficient jump.
     mu_n_over_mu0, mu_p_over_mu0 : float
         Ratios of carrier mobility to the scaling reference mobility.

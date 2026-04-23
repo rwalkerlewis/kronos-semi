@@ -1,6 +1,6 @@
 """
 Build the Colab notebook 04 that walks through the 3D doped resistor
-V-I benchmark. Day 7 content: 3D ohmic V-I linearity on a builtin box
+V-I benchmark. M7 content: 3D ohmic V-I linearity on a builtin box
 mesh and on a gmsh `.msh` fixture, compared to R = L / (q N_D mu_n A).
 """
 from pathlib import Path
@@ -59,7 +59,10 @@ major, minor = (int(x) for x in dolfinx.__version__.split('.')[:2])
 assert (major, minor) >= (0, 10), f"Need dolfinx >= 0.10; got {dolfinx.__version__}"
 
 # Option A: ensure the gmsh Python module is available for the .msh loader.
-# Idempotent; noop if gmsh is already installed.
+# gmsh's Python bindings link against libGLU even when used headlessly.
+# Colab's FEM-on-Colab image does not always ship libGLU, so install it
+# explicitly before the pip install. This is idempotent if already present.
+!apt-get install -y -q libglu1-mesa
 !pip install -q gmsh
 import gmsh as _gmsh_probe
 print(f"gmsh Python module present: version {_gmsh_probe.__version__}")

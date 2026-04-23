@@ -130,7 +130,7 @@ def test_build_mesh_unsupported_dimension_raises():
 
 
 # ---------------------------------------------------------------------------
-# Submesh + cellwise eps_r helpers (Day 6)
+# Submesh + cellwise eps_r helpers (M6)
 # ---------------------------------------------------------------------------
 
 def _mos_like_cfg(Nx: int = 8, Ny: int = 10):

@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.8.0] - M8: Submission polish
+
+### Added
+- Four Colab notebooks in `notebooks/`: `01_pn_junction_1d.ipynb`,
+  `02_pn_junction_bias.ipynb`, `03_mos_cv.ipynb`,
+  `04_resistor_3d.ipynb`. Each notebook installs FEniCSx via
+  FEM on Colab, clones the repo, loads a benchmark JSON, runs the
+  solver, and plots results against analytical references. No local
+  install required.
+- `scripts/build_notebook_0[1-4].py`: generator scripts that produce
+  the notebooks from Python source so the cell content is reviewable
+  and version-controlled outside the notebook JSON.
+- `docs/submission-polish-log.md`: engineering decision log capturing
+  the M8 phase plan, per-phase commit history, reviewer-caught issues
+  (MOS psi-reference convention, verifier window shift, Colab gmsh
+  libGLU dependency), and Colab QA results.
+
+### Changed
+- `README.md`: replaced the M1-era status section with a shipped-feature
+  capability matrix covering all 14 capabilities across PRs #2-#9.
+  Added a notebook catalog table with Colab badges for all four
+  notebooks. Added an explicit scope/out-of-scope section.
+- `PLAN.md`, `docs/ROADMAP.md`: updated to reflect M8 complete.
+- `CHANGELOG.md`, `docs/`, `scripts/`, `tests/`: replaced "Day N"
+  internal sprint labels with milestone names (M1-M8) throughout.
+- `semi/__init__.py`: version bumped from `0.1.0` to `0.8.0`.
+
+### Fixed
+- `notebooks/04_resistor_3d.ipynb`: added `apt-get install libglu1-mesa`
+  before `pip install gmsh` to resolve `OSError: libGLU.so.1` on fresh
+  Colab sessions. Confirmed working with dolfinx 0.10.0.post5 and
+  gmsh 4.15.2.
+
+### Verified
+- All four notebooks execute end-to-end on Colab (dolfinx 0.10.0.post5):
+  NB01 (Vbi 0.834 V, W 147 nm), NB02 (J(0.6V) ~1.6e3 A/m²),
+  NB03 (C-V worst error 9.25% at V_gate = -0.200 V),
+  NB04 (R_sim 1.115 kΩ, both mesh variants).
+- pytest 206/206 passed, V&V 62/62 PASS, ruff clean on main.
+
 ## [0.7.0] - M7: 3D doped resistor
 
 ### Added

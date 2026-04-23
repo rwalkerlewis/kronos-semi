@@ -1,5 +1,5 @@
 """
-Gmsh `.msh` loader (Day 7, Phase 3).
+Gmsh `.msh` loader (M7, Phase 3).
 
 Exercises `semi.mesh.build_mesh` on the committed
 `benchmarks/resistor_3d/fixtures/box.msh` fixture. The fixture is a

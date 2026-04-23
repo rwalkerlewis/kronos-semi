@@ -1,5 +1,5 @@
 """
-Equilibrium Poisson runner (Day 1).
+Equilibrium Poisson runner (M1).
 
 Solves -div(L_D^2 eps_r grad psi_hat) = p_hat - n_hat + N_hat under
 Boltzmann statistics on the validated config and returns a populated
@@ -13,7 +13,7 @@ import numpy as np
 
 
 def run_equilibrium(cfg: dict[str, Any]):
-    """Day 1 equilibrium Poisson solver (Boltzmann statistics)."""
+    """M1 equilibrium Poisson solver (Boltzmann statistics)."""
     from dolfinx import fem
 
     from ..bcs import build_psi_dirichlet_bcs, resolve_contacts

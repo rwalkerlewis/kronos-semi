@@ -29,7 +29,7 @@ pip install -e ".[dev]"
 ## Before committing
 
 ```bash
-pytest tests/ -v       # all 36 should pass
+pytest tests/ -v       # 206 tests (148 pure-Python + 58 FEM under Docker)
 ruff check semi/ tests/
 python tests/check_day1_math.py
 ```

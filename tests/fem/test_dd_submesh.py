@@ -1,7 +1,7 @@
 """
 End-to-end tests for the submesh-based drift-diffusion assembly.
 
-Exercises the Day 6 multi-region path:
+Exercises the M6 multi-region path:
     - V_psi on the parent mesh, V_phi_n/V_phi_p on a semiconductor submesh
     - Poisson stiffness over the full parent mesh with cellwise eps_r
     - Poisson source restricted to silicon cells via dx(subdomain_id=1)

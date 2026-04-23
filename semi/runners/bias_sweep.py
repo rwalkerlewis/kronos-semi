@@ -122,7 +122,7 @@ def run_bias_sweep(
     bipolar_legs = compute_bipolar_legs(v_sweep_list)
 
     # Nominal step size from the sweep spacing (e.g., voltage_sweep.step).
-    # continuation.max_step defaults to this, which preserves the Day 2
+    # continuation.max_step defaults to this, which preserves the M2
     # halving-only behaviour when growth cannot exceed the initial step.
     if len(v_sweep_list) >= 2:
         nominal_step_abs = abs(v_sweep_list[1] - v_sweep_list[0])
