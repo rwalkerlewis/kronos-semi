@@ -29,86 +29,86 @@ test file.
 Implement M9 as specified in `docs/IMPROVEMENT_GUIDE.md` section 4:
 
 1. Create `schemas/manifest.v1.json` — a JSON-schema Draft-07 file describing
- the manifest contract in section 3 of the improvement guide. Every property
- must have `description`. Required fields: `schema_version`, `engine`,
- `run_id`, `status`, `wall_time_s`, `input_sha256`, `solver`, `fields`,
- `mesh`. Optional: `sweeps`, `warnings`.
+   the manifest contract in section 3 of the improvement guide. Every property
+   must have `description`. Required fields: `schema_version`, `engine`,
+   `run_id`, `status`, `wall_time_s`, `input_sha256`, `solver`, `fields`,
+   `mesh`. Optional: `sweeps`, `warnings`.
 
 2. Create `semi/io/__init__.py` and `semi/io/artifact.py` exposing:
 
- ```python
- def write_artifact(
- result: "SimulationResult",
- out_dir: Path,
- run_id: str | None = None,
- input_json_path: Path | None = None,
- ) -> Path:
- """
- Write the full result tree under out_dir/<run_id>/ and return the path.
- If run_id is None, generate one as
- f"{iso_timestamp}_{cfg['name']}_{short_sha}"
- where short_sha is the first 7 chars of sha256(input_json_bytes).
- """
+   ```python
+   def write_artifact(
+       result: "SimulationResult",
+       out_dir: Path,
+       run_id: str | None = None,
+       input_json_path: Path | None = None,
+   ) -> Path:
+       """
+       Write the full result tree under out_dir/<run_id>/ and return the path.
+       If run_id is None, generate one as
+           f"{iso_timestamp}_{cfg['name']}_{short_sha}"
+       where short_sha is the first 7 chars of sha256(input_json_bytes).
+       """
 
- def read_manifest(run_dir: Path) -> dict:
- """Load and JSON-schema-validate manifest.json from a run dir."""
- ```
+   def read_manifest(run_dir: Path) -> dict:
+       """Load and JSON-schema-validate manifest.json from a run dir."""
+   ```
 
- Output layout exactly as specified in section 3 of the improvement guide.
+   Output layout exactly as specified in section 3 of the improvement guide.
 
 3. Field export rules:
- - Write `psi`, `n`, `p`, `N_net` always (all solver types produce these).
- - Write `E = -grad(psi)` as a DG0 vector field.
- - For `drift_diffusion` and `bias_sweep` runs, additionally write `phi_n`,
- `phi_p`, and per-step `J_n`, `J_p` (these can be time-series in a single
- BP file).
- - Use `dolfinx.io.VTXWriter` with ADIOS2 BP5 backend. If ADIOS2 is not
- available, fall back to `XDMFFile` and note the fallback in
- `manifest.warnings`.
+   - Write `psi`, `n`, `p`, `N_net` always (all solver types produce these).
+   - Write `E = -grad(psi)` as a DG0 vector field.
+   - For `drift_diffusion` and `bias_sweep` runs, additionally write `phi_n`,
+     `phi_p`, and per-step `J_n`, `J_p` (these can be time-series in a single
+     BP file).
+   - Use `dolfinx.io.VTXWriter` with ADIOS2 BP5 backend. If ADIOS2 is not
+     available, fall back to `XDMFFile` and note the fallback in
+     `manifest.warnings`.
 
 4. IV export: if `result.iv` is non-empty, write `iv/<contact>.csv` with header
- `V,J_n,J_p,J_total`. For now, populate `J_total = result.iv[i]["J"]` and
- leave `J_n`, `J_p` as `NaN` — splitting those is M10's problem.
+   `V,J_n,J_p,J_total`. For now, populate `J_total = result.iv[i]["J"]` and
+   leave `J_n`, `J_p` as `NaN` — splitting those is M10's problem.
 
 5. Convergence export: write `convergence/snes.csv` with columns
- `bias_step,V_applied,iterations,reason,converged` from the per-step info
- the runners already record. For equilibrium runs, this is a single row.
+   `bias_step,V_applied,iterations,reason,converged` from the per-step info
+   the runners already record. For equilibrium runs, this is a single row.
 
 6. New CLI `semi-run`, registered via `pyproject.toml`:
 
- ```
- semi-run <path-to-input.json> [--out runs/] [--run-id <id>]
- ```
+   ```
+   semi-run <path-to-input.json> [--out runs/] [--run-id <id>]
+   ```
 
- Prints the run directory path on stdout on success. Nonzero exit on any
- failure.
+   Prints the run directory path on stdout on success. Nonzero exit on any
+   failure.
 
 7. Tests in `tests/test_artifact.py`:
- - For each of the five benchmarks in `benchmarks/*/`, run it through
- `semi.run.run`, call `write_artifact`, then `read_manifest`, and assert
- the manifest validates against `schemas/manifest.v1.json`.
- - Assert every field listed in `manifest.fields[].path` exists on disk.
- - Assert every sweep file listed in `manifest.sweeps[].path` is readable
- as CSV and has `n_steps + 1` rows (header + data).
- - Assert `manifest.input_sha256` matches the actual SHA256 of the input
- JSON file.
- - Use `pytest.mark.skipif` to skip the FEM-heavy tests when dolfinx is
- unavailable; the pure-Python tests (schema validation round-trip) must
- still run in the pure-Python CI job.
+   - For each of the five benchmarks in `benchmarks/*/`, run it through
+     `semi.run.run`, call `write_artifact`, then `read_manifest`, and assert
+     the manifest validates against `schemas/manifest.v1.json`.
+   - Assert every field listed in `manifest.fields[].path` exists on disk.
+   - Assert every sweep file listed in `manifest.sweeps[].path` is readable
+     as CSV and has `n_steps + 1` rows (header + data).
+   - Assert `manifest.input_sha256` matches the actual SHA256 of the input
+     JSON file.
+   - Use `pytest.mark.skipif` to skip the FEM-heavy tests when dolfinx is
+     unavailable; the pure-Python tests (schema validation round-trip) must
+     still run in the pure-Python CI job.
 
 ## Constraints
 
 - No changes to `semi/physics/`, `semi/mesh.py`, `semi/bcs.py`,
- `semi/continuation.py`, or any existing test.
+  `semi/continuation.py`, or any existing test.
 - No `import dolfinx` in `semi/io/artifact.py` at module top level. Do the
- imports inside functions, matching the existing convention in `semi/run.py`.
+  imports inside functions, matching the existing convention in `semi/run.py`.
 - The manifest JSON must be deterministic given identical input — sort keys,
- fix float precision at 10 significant figures, use ISO-8601 UTC for the
- `run_id` timestamp.
+  fix float precision at 10 significant figures, use ISO-8601 UTC for the
+  `run_id` timestamp.
 - The `kronos_server/` package from M10 will consume this artifact. Design
- `read_manifest` so it can be called from a subprocess that has no dolfinx
- or numpy installed (pure-stdlib JSON only). If you need to, split the
- reader out into `semi/io/reader.py` that has only stdlib dependencies.
+  `read_manifest` so it can be called from a subprocess that has no dolfinx
+  or numpy installed (pure-stdlib JSON only). If you need to, split the
+  reader out into `semi/io/reader.py` that has only stdlib dependencies.
 
 ## Acceptance criteria (gate for merge)
 
@@ -160,11 +160,11 @@ will cut the release.
 
 - Do not start M10. The HTTP server is a separate PR.
 - Do not add new physics, new solver backends, new benchmarks, or new
- materials.
+  materials.
 - Do not refactor `semi/run.py` or the runners. If you find you need to, stop
- and ask first.
+  and ask first.
 - Do not change the existing JSON input schema in this PR. Any schema changes
- belong in M11.
+  belong in M11.
 
 When you are done, post a single summary message listing: files added, files
 modified (should be only `PLAN.md`, `CHANGELOG.md`, `pyproject.toml`),
