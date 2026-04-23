@@ -5,7 +5,7 @@
 
 ## Context
 
-Through Day 4, ohmic contact BC construction lived inline in
+Through M4: V&V suite, ohmic contact BC construction lived inline in
 `semi/run.py` as the private helpers `_build_ohmic_bcs_psi` and
 `_build_dd_ohmic_bcs`. Both helpers read `cfg["contacts"]`, walked
 `cfg["mesh"].get("facets_by_plane", [])` to resolve string facet
@@ -27,7 +27,7 @@ That code worked but it had three issues:
    applied voltage right now?" decisions are pure-Python (Invariant
    4-eligible) but were buried inside helpers that imported dolfinx
    at module scope.
-3. **The Day 5 `run.py` split needed somewhere clean to host the
+3. **The M5: Refactor and test pass `run.py` split needed somewhere clean to host the
    BC code.** Pulling these helpers into the per-runner files would
    re-duplicate them between `equilibrium.py` and `bias_sweep.py`.
 
@@ -72,7 +72,7 @@ Specific design choices and their reasons:
   semantics in the legacy helpers.
 - **`gate` and `schottky` kinds resolve but are skipped by the
   builders.** The schema accepts `"gate"` (and we anticipate
-  `"schottky"` for Day 6+); validating the kind at `resolve_contacts`
+  `"schottky"` for M6+); validating the kind at `resolve_contacts`
   time means a typo in `cfg["contacts"][i]["type"]` raises during
   config processing rather than during the builder's silent
   skip-loop. The builders themselves only handle ohmic for now;
@@ -88,7 +88,7 @@ Specific design choices and their reasons:
 ## Consequences
 
 - `semi/bcs.py` is now the single owner of contact BC construction.
-  Adding gate / Schottky support in Day 6+ means one new
+  Adding gate / Schottky support in M6+ means one new
   `build_gate_dirichlet_bcs` (or similar) here plus dispatch from
   the runner; no edits to `run.py`, `runners/equilibrium.py`, or
   `runners/bias_sweep.py`.

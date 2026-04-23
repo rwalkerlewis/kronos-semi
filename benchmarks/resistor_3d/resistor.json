@@ -1,6 +1,6 @@
 {
   "name": "resistor_3d",
-  "description": "3D doped silicon resistor (Day 7). 1 um x 200 nm x 200 nm rectangular bar, uniform n-type N_D=1e18 cm^-3, two ohmic contacts on the x=0 and x=L faces, 5-point bias sweep on contact_right in [-0.01, +0.01] V. Verifier checks V-I linearity within 1% (R_sim vs analytical R = L / (q N_D mu_n A)).",
+  "description": "3D doped silicon resistor (M7: 3D doped resistor). 1 um x 200 nm x 200 nm rectangular bar, uniform n-type N_D=1e18 cm^-3, two ohmic contacts on the x=0 and x=L faces, 5-point bias sweep on contact_right in [-0.01, +0.01] V. Verifier checks V-I linearity within 1% (R_sim vs analytical R = L / (q N_D mu_n A)).",
   "dimension": 3,
   "mesh": {
     "source": "builtin",

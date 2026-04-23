@@ -17,7 +17,7 @@ below `min_step_abs`.
 
 Growth is bounded above by `max_step_abs` so a user who sets
 `max_step_abs` equal to the sweep's voltage_sweep.step recovers the
-Day 2 halving-only behaviour.
+M2: Coupled drift-diffusion halving-only behaviour.
 """
 from __future__ import annotations
 

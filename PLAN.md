@@ -30,15 +30,15 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `dev/day7-resistor-3d` (Day 7 3D doped resistor in
-  flight; Day 6 merged via PR #8)
+- Active dev branch: `dev/submission-polish` (M8: Submission polish and
+  submission packaging in flight; M7 merged via PR #9, `a604b12`)
 
 ## Current state
 
-Day 1 through Day 7 are delivered. Days 1-6 are merged into `main`;
-Day 7 is on `dev/day7-resistor-3d` and is the subject of PR #9.
+M1 through M7 are merged into `main`. M8: Submission polish (final polish and
+submission packaging) is in flight on `dev/submission-polish`.
 CI hardening (branch glob plus Dockerized FEM job) merged on
-`ci/docker-benchmark-matrix`. Day 3 (adaptive bias continuation,
+`ci/docker-benchmark-matrix`. M3: Adaptive continuation (adaptive bias continuation,
 Sah-Noyce-Shockley verifier, reverse-bias generation check) merged
 via PR #5 from `dev/day3-bias-hardening`. Day 4 (Verification &
 Validation suite: MMS-Poisson, mesh convergence, discrete
@@ -53,8 +53,8 @@ on a semiconductor submesh, C-V verifier matching depletion-approximation
 MOS theory within 10% in [V_FB + 0.2, V_T - 0.1] V, multi-region MMS)
 merged via PR #8 from `dev/day6-mos-2d`. Day 7 (3D doped resistor with
 gmsh `.msh` loader, bipolar-sweep driver path, V-I linearity verifier
-at 1%, and 3D slice plots) awaits merge via PR #9 from
-`dev/day7-resistor-3d`.
+at 1%, and 3D slice plots) merged via PR #9 from
+`dev/day7-resistor-3d` at `a604b12`.
 
 ### What works (verified in Docker on current `main`)
 
@@ -83,12 +83,12 @@ at 1%, and 3D slice plots) awaits merge via PR #9 from
 - `pn_1d_bias` benchmark (forward bias): J at V = 0.6 V within 10% of
   Shockley long-diode theory; J_sim within 15% of the Sah-Noyce-Shockley
   total (J_diff + J_rec, with the Sze f = 2 V_t/(V_bi - V) correction)
-  on V in [0.15, 0.55] V. The original Day 2 "qualitative below 0.5 V"
-  caveat was retired by the Day 3 SNS verifier.
+  on V in [0.15, 0.55] V. The original M2 "qualitative below 0.5 V"
+  caveat was retired by the M3 SNS verifier.
 - `pn_1d_bias_reverse` benchmark (reverse bias): |J| within 20% of the
   net SRH generation current (q n_i / 2 tau_eff)(W(V) - W(0)) on V in
   [-2, -0.5] V.
-- `mos_2d` benchmark (C-V sweep, Day 6): 500 nm p-type Si / 5 nm SiO2
+- `mos_2d` benchmark (C-V sweep, M6: 2D MOS capacitor): 500 nm p-type Si / 5 nm SiO2
   capacitor; |C_sim - C_theory|/C_theory < 10% in the depletion-regime
   window [V_FB + 0.2, V_T - 0.1] V (worst 9.25% at V_gate = -0.20 V
   under ideal phi_ms = 0 with psi = 0 at intrinsic level). Sweep
@@ -99,7 +99,7 @@ at 1%, and 3D slice plots) awaits merge via PR #9 from
   Dockerized FEM job that runs pytest, three benchmark verifiers, and
   the full V&V suite on every push to `main`, `dev/**`, `ci/**`,
   `docs/**`. Job timeout is 15 minutes once the dolfinx image is cached.
-- Verification & Validation suite (Day 4): MMS for Poisson (1D linear,
+- Verification & Validation suite (M4: V&V suite): MMS for Poisson (1D linear,
   1D nonlinear, 2D triangles, 2D quad smoke) with finest-pair rates at
   theoretical 2.0/1.0; mesh convergence on `pn_1d` with Cauchy ratios
   >= 1.99x per doubling; discrete conservation (charge on `pn_1d`
@@ -107,19 +107,19 @@ at 1%, and 3D slice plots) awaits merge via PR #9 from
   reverse bias sweeps); MMS for coupled drift-diffusion (three variants
   x three grids) with all gated block rates >= 1.99.
 
-- `resistor_3d` benchmark (Day 7): 3D rectangular silicon bar (1 um x
+- `resistor_3d` benchmark (M7: 3D doped resistor): 3D rectangular silicon bar (1 um x
   200 nm x 200 nm), uniform n-type N_D = 1e18 cm^-3, two ohmic
   contacts on the x = 0 and x = L faces, symmetric bias sweep in
   [-0.01, +0.01] V. V-I linearity within 1% of
   `R_theory = L / (q N_D mu_n A) = 1115 Ohm` on both the builtin
   `create_box` mesh and the committed gmsh fixture. 3D slice plots
   of psi and |J_n| at the y = W/2 midplane are written per run.
-- Gmsh `.msh` loader (Day 7): `semi/mesh.py::_build_from_file` via
+- Gmsh `.msh` loader (M7: 3D doped resistor): `semi/mesh.py::_build_from_file` via
   `dolfinx.io.gmsh.read_from_msh`; physical groups in the file are
   returned verbatim as `cell_tags` and `facet_tags`, so `build_mesh`
   bypasses the JSON box-tagger for file-source meshes. XDMF remains
   a clear `NotImplementedError` for a future PR.
-- Bipolar (sign-spanning) bias sweep (Day 7): the driver walks
+- Bipolar (sign-spanning) bias sweep (M7: 3D doped resistor): the driver walks
   `V = 0 -> min(V) -> max(V)` with a fresh
   `AdaptiveStepController` on each leg. Unipolar pn-junction and
   MOS sweeps fall through to the original single-endpoint ramp
@@ -133,34 +133,78 @@ at 1%, and 3D slice plots) awaits merge via PR #9 from
 
 ## Next task
 
-**Day 8: final polish and submission packaging.** Queued on `main`
-once PR #9 (Day 7) merges.
+**M8: Submission polish.** In flight on
+`dev/submission-polish`, targeting PR #10 against `main`.
 
 - **Goal:** make the submission presentation-ready. No new physics,
-  no new benchmarks; this is regenerate-notebooks, capability-matrix
-  pass, release tag.
+  no new benchmarks; this is a documentation, notebook, and release
+  pass only. Scope creep on the final PR is the submission-day
+  failure mode to avoid.
 - **Scope, in:**
-  - Regenerate `notebooks/01_pn_junction_1d.ipynb` against the
-    Day 1-7 codebase using `scripts/build_notebook_01.py`.
-  - Add `notebooks/02_pn_junction_bias.ipynb` for Day 2-3 content.
-  - Update `README.md` capability matrix to reflect Day 7 (3D bar,
-    gmsh loader, V-I verifier) and the final feature set.
-  - Update `CHANGELOG.md` with the final tag entry.
-  - Tag release `v0.2.0` (or similar) on `main` after final review.
-- **Preconditions:** Day 7 (PR #9) merged into `main`.
+  - Sync `PLAN.md` "Current state" and `docs/ROADMAP.md` statuses to
+    reflect the M7 merge and M8 in flight.
+  - Rewrite the `README.md` status section as an end-of-Day-7
+    capability matrix (Days 1-7 shipped across PRs #2-#9).
+  - Regenerate `notebooks/01_pn_junction_1d.ipynb` using
+    `scripts/build_notebook_01.py` (current-state framing, not
+    framing (no "M1" heading).
+  - Author `notebooks/02_pn_junction_bias.ipynb` (M2-M3 content:
+    forward Shockley + reverse SNS sweeps).
+  - Author `notebooks/03_mos_cv.ipynb` (M6 content: MOS C-V with
+    the V_FB + 0.2 verifier-window disclosure in the narrative).
+  - Author `notebooks/04_resistor_3d.ipynb` (M7 content: bipolar
+    sweep, builtin-vs-gmsh comparison).
+  - Verify every notebook by actually executing it on Colab; record
+    wall time and final plot observation in the PR body. Local
+    `jupyter nbconvert --execute` is a convenience check, not a
+    verification, because FEM-on-Colab's dolfinx pin can drift from
+    the local Docker pin.
+  - Add a README "Notebooks" catalog with Colab badges.
+  - Append `[0.8.0] - M8: Submission polish` to `CHANGELOG.md`.
+  - Open PR #10, wait for CI, do not self-merge.
+  - Post-merge and only on explicit human prompt, tag `v0.2.0`.
+- **Scope, out:** any new physics code, new verifier, new benchmark
+  JSON, or schema change. If a notebook reveals a bug, note it in
+  the PR body and defer the fix to a post-submission PR.
+- **Preconditions:** M7 (PR #9) merged into `main` at `a604b12`.
+
+## M8: Submission polish execution
+
+The full M8: Submission polish narrative, per-phase commit history, reviewer-caught
+decisions (MOS ψ-reference convention, verifier window shift, Option-A
+Colab gmsh install plus the `libGLU` apt dependency), verification
+status (CI, local Docker, Colab QA), and deferred post-submission cleanups live
+in [`docs/submission-polish-log.md`](docs/submission-polish-log.md). This
+PLAN section carries only the phase index; the log is the reference
+document.
+
+| Phase | Scope                                                                 | Commit SHA   | Status                          |
+|------:|-----------------------------------------------------------------------|--------------|---------------------------------|
+| 0     | Verify `main` baseline (pytest 206, V&V 62/62, ruff clean)            | N/A          | N/A (verification-only)         |
+| 1     | Sync `PLAN.md` "Current state" and `docs/ROADMAP.md` statuses         | `1d86504`    | Done                            |
+| 2     | Rewrite `README.md` status section as end-of-Day-7 capability matrix  | `c7343c9`    | Done                            |
+| 3     | Regenerate `notebooks/01_pn_junction_1d.ipynb` (end-of-Day-7 framing) | `8ce6b10`    | Done                            |
+| 4     | Author `notebooks/02_pn_junction_bias.ipynb` (M2-M3 content)          | `f7c83b0`    | Done                            |
+| 5     | Author `notebooks/03_mos_cv.ipynb` (M6 C-V content)                   | `bc3409b`    | Done                            |
+| 6     | Author `notebooks/04_resistor_3d.ipynb` (M7 content)                  | `365da06`    | Done                            |
+| 7     | Cross-notebook consistency pass (headings, install cells, artifacts)  | `d52ca20`    | Done                            |
+| 8     | Colab QA on all four notebooks, record wall times                     | pending      | In flight (NB04 outstanding)    |
+| 9     | CHANGELOG `[0.8.0] - M8: Submission polish`, `semi/__init__.py` version bump | pending      | Pending                  |
+| 10    | Open PR #10, wait for CI, do not self-merge                           | pending      | Pending                         |
+| 11    | Post-merge and only on explicit prompt, tag `v0.2.0`                  | pending      | Pending                         |
 
 ## Roadmap
 
-| Day | Milestone                                                    | Status     | Notes                                                                 |
-|----:|--------------------------------------------------------------|------------|-----------------------------------------------------------------------|
-| 1   | Equilibrium Poisson, 1D pn junction, Docker env              | Done       | 6/6 verifier checks pass; PR `dev/docker-day1-fix`                    |
-| 2   | Slotboom drift-diffusion, coupled Newton, bias sweep         | Done       | 6/6 `pn_1d_bias` checks pass; PR `dev/day2-drift-diffusion`           |
-| 3   | Bias ramping continuation, Shockley IV verifier hardening    | Done       | Adaptive ramp (-26.2% iters), SNS verifier, reverse-bias gen check    |
-| 4   | Verification & Validation suite (MMS, conv, conservation)    | Done       | `dev/day4-vnv`; all four phases green, CI V&V step within 15 min      |
-| 5   | Refactor pass, expanded test coverage, physics docs updates  | Done       | `dev/day5-refactor`; run.py 580->74, bcs.py extracted, coverage 96.25% |
-| 6   | 2D MOS capacitor (oxide + silicon multi-region)              | Done       | `dev/day6-mos-2d`; mos_cv runner, 4/4 C-V checks green, coverage 95.43% |
-| 7   | 3D doped resistor                                            | Done       | `dev/day7-resistor-3d` (PR #9): gmsh loader, bipolar sweep, V-I 1%    |
-| 8   | Final polish, submission packaging                           | Queued     | Regenerate notebooks, tag release                                     |
+| Milestone                    | Summary                                                      | Status     | Notes                                                                 |
+|:-----------------------------|--------------------------------------------------------------|------------|-----------------------------------------------------------------------|
+| M1: Equilibrium Poisson      | 1D pn junction, Docker env                                   | Done       | 6/6 verifier checks pass; PR `dev/docker-day1-fix`                    |
+| M2: Coupled drift-diffusion  | Slotboom, coupled Newton, bias sweep                         | Done       | 6/6 `pn_1d_bias` checks pass; PR `dev/day2-drift-diffusion`           |
+| M3: Adaptive continuation    | Bias ramping, Shockley IV verifier hardening                 | Done       | Adaptive ramp (-26.2% iters), SNS verifier, reverse-bias gen check    |
+| M4: V&V suite                | MMS, mesh convergence, conservation, CI                      | Done       | `dev/day4-vnv`; all four phases green, CI V&V step within 15 min      |
+| M5: Refactor and test pass   | run.py split, bcs.py extracted, coverage 96.25%              | Done       | `dev/day5-refactor`; run.py 580->74, bcs.py extracted, coverage 96.25% |
+| M6: 2D MOS capacitor         | Oxide + silicon multi-region, C-V sweep                      | Done       | `dev/day6-mos-2d`; mos_cv runner, 4/4 C-V checks green, coverage 95.43% |
+| M7: 3D doped resistor        | gmsh loader, bipolar sweep, V-I 1%                           | Done       | Merged via PR #9 (`a604b12`): gmsh loader, bipolar sweep, V-I 1%      |
+| M8: Submission polish        | Notebooks, catalog, CHANGELOG, tag prep                      | In flight  | `dev/submission-polish` (PR #10): README, 4 notebooks, CHANGELOG, tag prep |
 
 See `docs/ROADMAP.md` for the full per-day breakdown.
 
@@ -218,11 +262,41 @@ They may be added after submission as stretch goals (see
 - FinFET or any 3D transistor geometry. **Post-submission stretch goal only.**
 - GUI or web frontend.
 
+## Post-submission cleanups
+
+Pre-existing doc/code inconsistencies discovered during the M8: Submission polish
+polish pass and deferred per the M8 anti-pattern rule against
+expanding scope on the final submission PR. None of these affect any
+verifier or benchmark result; they are all surface-level alignment
+items.
+
+- **`docs/mos_derivation.md` §6 ψ-reference convention.** Section 6
+  derives `psi_s = psi(x, y_int) - psi(x, y_bulk)` (psi referenced to
+  the bulk Fermi level), but the shipped MOS code uses the project-
+  wide `psi = 0` at the intrinsic Fermi level convention enforced by
+  the ohmic-contact equilibrium BC. Both conventions yield the same
+  C(V) curve once V_FB is computed against the matching reference;
+  the M6 verifier uses the shipped code's convention and passes
+  at 9.25 percent worst-case in [V_FB + 0.2, V_T - 0.1] V. Action:
+  rewrite §6 in the intrinsic-reference convention so the derivation
+  reads against the same baseline as the code, and add a short
+  appendix mapping between the two conventions for readers who learn
+  MOS from textbooks (Sze, Pierret) that use the bulk reference.
+- **`semi/__init__.py::__version__` still reads `"0.1.0"`.** This was
+  the M1 placeholder and never bumped through M2 through M7.
+  Action: bump to `"0.8.0"` as part of Phase 9 (CHANGELOG `[0.8.0] -
+  M8: Submission polish` entry) so the package version, the changelog header, and
+  the eventual `v0.2.0` tag (post-merge per the M8 prompt's
+  Phase 11) are internally consistent. Note the discrepancy between
+  package SemVer `0.8.0` and release tag `v0.2.0`: the tag tracks
+  the *submission* version (v0.1.0 = M1 baseline, v0.2.0 = M8
+  submission), the package SemVer tracks days-of-work shipped.
+
 ## Completed work log
 
 Append-only. Newest entries on top.
 
-- **Day 7 (2026-04-21):** 3D doped resistor benchmark, first
+- **M7 (2026-04-21):** 3D doped resistor benchmark, first
   dimension extension; delivered on `dev/day7-resistor-3d` (PR #9):
   - **`docs/resistor_derivation.md`** (pre-approved derivation-lite
     gate): device geometry, analytical ohmic resistance, V-I
@@ -266,9 +340,9 @@ Append-only. Newest entries on top.
     No `main`-branch artifact ever saw a failing build.
   - **No regressions**: 1D and 2D benchmarks (`pn_1d`,
     `pn_1d_bias`, `pn_1d_bias_reverse`, `mos_2d`) byte-identical
-    to Day 6; V&V suite green; coverage stays >= 95%.
+    to the M6 baseline; V&V suite green; coverage stays >= 95%.
 
-- **Day 6 (2026-04-21):** 2D MOS capacitor (first 2D benchmark, first
+- **M6 (2026-04-21):** 2D MOS capacitor (first 2D benchmark, first
   multi-region device). Merged via PR #8 from `dev/day6-mos-2d`:
   - **`docs/mos_derivation.md`** (pre-approved derivation gate):
     device geometry, per-region equations, Si/SiO2 interface
@@ -329,11 +403,11 @@ Append-only. Newest entries on top.
     V_gate = -0.25 V; per the reviewer's guidance the fix was to
     shrink the window to V_FB+0.2, not loosen the tolerance.
   - **Regressions**: 1D benchmarks (`pn_1d`, `pn_1d_bias`,
-    `pn_1d_bias_reverse`) are byte-identical to Day 5; V&V suite
+    `pn_1d_bias_reverse`) are byte-identical to the M5 baseline; V&V suite
     clears all gates including the new multi-region MMS; pytest
     195/195 passes; coverage 95.43% (95% CI gate passes).
 
-- **Day 5 (2026-04-21):** Refactor pass, coverage to 95%+, completed
+- **M5 (2026-04-21):** Refactor pass, coverage to 95%+, completed
   `docs/PHYSICS.md` Section 2.5. Merged via PR #7 from
   `dev/day5-refactor`:
   - **`semi/bcs.py`** extracted (pure-Python core, no dolfinx at
@@ -362,11 +436,11 @@ Append-only. Newest entries on top.
     drift-diffusion derivation. ADR 0007 records the BC interface
     design.
   - **No behavioral regression.** `pn_1d`, `pn_1d_bias`,
-    `pn_1d_bias_reverse` byte-identical to Day 4 baseline; V&V 53
+    `pn_1d_bias_reverse` byte-identical to the M4 baseline; V&V 53
     PASS / 0 FAIL with rates byte-identical. PR #7.
 
-- **Day 4 (2026-04-21):** Verification & Validation suite. Replaces
-  the originally-planned refactor (pushed to Day 5) with four
+- **M4 (2026-04-21):** Verification & Validation suite. Replaces
+  the originally-planned refactor (pushed to M5) with four
   verification activities, each gated in CI via
   `scripts/run_verification.py`:
   - **MMS for equilibrium Poisson** (`semi/verification/mms_poisson.py`):
@@ -405,7 +479,7 @@ Append-only. Newest entries on top.
     `docs/adr/0006-verification-and-validation-strategy.md`. PR:
     `dev/day4-vnv`.
 
-- **Day 3 (2026-04-21):** adaptive bias continuation, Sah-Noyce-
+- **M3 (2026-04-21):** adaptive bias continuation, Sah-Noyce-
   Shockley recombination in the forward verifier, and a dedicated
   reverse-bias benchmark. Added `semi/continuation.py`
   (`AdaptiveStepController`: grow on easy_iter_threshold easy solves,
@@ -429,7 +503,7 @@ Append-only. Newest entries on top.
   now also runs `pn_1d_bias_reverse`. 26 new tests (continuation
   controller, diode analytical helpers, schema fields). PR:
   `dev/day3-bias-hardening`.
-- **Day 2 (2026-04-20):** coupled Slotboom drift-diffusion with SRH
+- **M2 (2026-04-20):** coupled Slotboom drift-diffusion with SRH
   recombination and forward-bias sweep. Added `semi/physics/slotboom.py`
   (n/p from (psi, phi_n, phi_p), UFL and NumPy),
   `semi/physics/recombination.py` (SRH with E_t trap level),
@@ -447,9 +521,9 @@ Append-only. Newest entries on top.
   current matches Shockley within 10%; at lower bias SRH depletion-
   region current dominates, so the verifier only requires qualitative
   properties there. 34 new tests (schema, Slotboom, SRH, bias BC
-  helpers) pass alongside the Day 1 suite (70 total). PR:
+  helpers) pass alongside the M1 suite (70 total). PR:
   `dev/day2-drift-diffusion`.
-- **Day 1 (2026-04-20):** equilibrium Poisson, 1D pn junction benchmark,
+- **M1 (2026-04-20):** equilibrium Poisson, 1D pn junction benchmark,
   Docker dev environment, benchmark runner CLI, physics coefficient fix
   (scaled Poisson LHS uses `L_D^2 = lambda2 * L_0^2`, not `lambda2`, since
   the mesh is in physical meters). All 6 `pn_1d` verifier checks pass.

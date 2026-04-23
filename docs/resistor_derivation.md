@@ -1,29 +1,16 @@
-# Resistor Derivation: 3D Doped Resistor (Day 7 Gate)
+# Resistor Derivation: 3D Doped Resistor
 
-This document is the mathematical specification for the Day-7 3D doped
+This document is the mathematical specification for the 3D doped
 resistor benchmark, the V-I linearity verifier, and the gmsh `.msh`
-loader test strategy. It is a derivation-lite gate in the same spirit
-as `docs/mos_derivation.md` for Day 6, but much shorter because the
-physics is unchanged from Days 1-6: equilibrium Poisson plus coupled
+loader test strategy. The implementation is shipped and the V-I
+linearity verifier passes at below 1% on both the builtin and gmsh
+mesh paths; this document is the stable reference derivation.
+
+It is a derivation-lite document in the same spirit
+as `docs/mos_derivation.md` for the 2D MOS capacitor, but much shorter because the
+physics is unchanged from the 1D and 2D benchmarks: equilibrium Poisson plus coupled
 Slotboom drift-diffusion with SRH recombination, already MMS-verified
 in 1D and 2D.
-
-What is new in Day 7 is structural, not physical:
-
-1. A 3D rectangular-bar device that exercises the solver in 3D for the
-   first time.
-2. A new verifier, V-I linearity, that checks the simulated current
-   scales linearly with applied voltage to within 1 percent.
-3. A gmsh `.msh` loader wired into `semi/mesh.py::_build_from_file`
-   via `dolfinx.io.gmsh`, with a committed fixture mesh for
-   regression testing.
-
-No implementation code (other than PLAN.md and this document) is
-written until this document is reviewed and approved.
-
-Scaled symbols follow the established Day-2 / Day-4 / Day-6
-conventions (mesh in meters, psi and quasi-Fermi potentials in units
-of V_t = k_B T / q, densities in units of C_0).
 
 ## Section 1: Device geometry
 
@@ -100,16 +87,16 @@ Predicted currents at the three reference biases:
 All three are comfortably in the ohmic regime: `|V| << V_bi` (no
 built-in junction barrier), `|V| <= 0.1 V = ~4 V_t` (no high-field
 nonlinearity), and the bar is uniformly doped n-type (no majority-
-to-minority flipping). The Day-7 benchmark caps its sweep at 0.01 V
+to-minority flipping). The resistor_3d benchmark caps its sweep at 0.01 V
 to stay deep inside this regime, well below `V_t = 0.02585 V`. The
 higher-bias values in the table are recorded here only to make the
 scaling check plain.
 
 ## Section 3: V-I linearity verifier
 
-`verify_resistor_3d` (to be added alongside the existing
-`verify_pn_1d_bias`, `verify_pn_1d_bias_reverse`, `verify_mos_2d`
-entries in `scripts/run_benchmark.py`) consumes the IV rows produced
+`verify_resistor_3d` (in `scripts/run_benchmark.py`, alongside
+`verify_pn_1d_bias`, `verify_pn_1d_bias_reverse`, `verify_mos_2d`)
+consumes the IV rows produced
 by the `bias_sweep` runner and performs the following steps:
 
 1. Sweep grid: bias the `contact_right` contact across 5 equally
@@ -251,16 +238,16 @@ Three tests go in `tests/fem/test_mesh_gmsh.py`:
    R_sim must agree between the two variants within 1 percent.
 
 The project prompt notes that full MMS verification in 3D is not
-required for Day 7: the Poisson and drift-diffusion assembly is
+required for M7: the Poisson and drift-diffusion assembly is
 dimension agnostic and has been MMS-verified in 1D and 2D, and the
 ohmic-resistor theory match on an unstructured tetrahedral mesh is
 sufficient evidence that the 3D code path and the gmsh loader are
-correct. A 3D MMS convergence study is deferred to Day 8 or a
+correct. A 3D MMS convergence study is deferred to M8 or a
 follow-on PR if time allows.
 
 ## Summary
 
-Day 7 is a structural extension, not a physics extension. The
+M7: 3D doped resistor is a structural extension, not a physics extension. The
 gate-keeping document is short because the only genuinely new
 acceptance criterion is the 1 percent V-I linearity tolerance, and
 the only new infrastructure is the gmsh loader. Both are specified

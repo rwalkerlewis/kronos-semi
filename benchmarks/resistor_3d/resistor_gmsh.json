@@ -1,6 +1,6 @@
 {
   "name": "resistor_3d_gmsh",
-  "description": "3D doped silicon resistor on a gmsh fixture mesh (Day 7). Identical device geometry to `resistor.json` (1 um x 200 nm x 200 nm n-type bar, N_D=1e18 cm^-3, 5-point sweep in [-0.01, +0.01] V) but loads the unstructured tetrahedral mesh from `fixtures/box.msh` to exercise the gmsh `.msh` loader and the file-source mesh path. Same 1% V-I linearity tolerance.",
+  "description": "3D doped silicon resistor on a gmsh fixture mesh (M7: 3D doped resistor). Identical device geometry to `resistor.json` (1 um x 200 nm x 200 nm n-type bar, N_D=1e18 cm^-3, 5-point sweep in [-0.01, +0.01] V) but loads the unstructured tetrahedral mesh from `fixtures/box.msh` to exercise the gmsh `.msh` loader and the file-source mesh path. Same 1% V-I linearity tolerance.",
   "dimension": 3,
   "mesh": {
     "source": "file",

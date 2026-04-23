@@ -1,6 +1,6 @@
 """
-Build the Day 1 Colab notebook that uses the kronos-semi package via git clone.
-Replaces the inline version with a thin notebook that imports from semi/.
+Build the Colab notebook 01 that uses the kronos-semi package via git clone.
+Equilibrium Poisson walkthrough on a 1D pn junction.
 """
 from pathlib import Path
 
@@ -9,15 +9,26 @@ import nbformat as nbf
 nb = nbf.v4.new_notebook()
 cells = []
 
-cells.append(nbf.v4.new_markdown_cell(r"""# kronos-semi · 1D pn Junction (Day 1)
+cells.append(nbf.v4.new_markdown_cell(r"""# kronos-semi · Notebook 01: Equilibrium Poisson on a 1D pn Junction
 
 Verification benchmark: symmetric 1D pn junction, Si, $N_A = N_D = 10^{17}$ cm⁻³, junction at 1 µm. Solves the nonlinear equilibrium Poisson equation (Boltzmann statistics) via PETSc SNES on a dolfinx 0.10 mesh, then compares to the analytical depletion approximation.
+
+## Notebook set
+
+This is the first of four Colab walkthroughs that exercise the [end-of-Day-7 capability matrix](https://github.com/rwalkerlewis/kronos-semi#status) from the README:
+
+| Notebook | Covers |
+|----------|--------|
+| **01 — Equilibrium Poisson on a 1D pn junction** (this one) | Nonlinear Poisson with Boltzmann carriers; depletion-approximation comparison |
+| [02 — Bias sweep on the 1D pn junction](./02_pn_junction_bias.ipynb) | Coupled Slotboom drift-diffusion with SRH; Shockley forward + SNS reverse |
+| [03 — MOS capacitor C-V (2D multi-region)](./03_mos_cv.ipynb) | Gate contact BCs with $\phi_{ms}$; Si/SiO₂ multi-region; depletion-approximation C-V |
+| [04 — 3D doped resistor V-I](./04_resistor_3d.ipynb) | Ohmic V-I linearity; builtin box mesh vs. gmsh `.msh` fixture |
 
 **What this notebook does:**
 1. Installs `dolfinx` on Colab via [FEM on Colab](https://fem-on-colab.github.io/) (one wget, ~30 s)
 2. Clones the [kronos-semi](https://github.com/rwalkerlewis/kronos-semi) repo
-3. Loads `benchmarks/pn_1d/pn_junction.json`
-4. Runs `semi.run.run(cfg)` which returns the scaled potential, carriers, and diagnostics
+3. Loads `benchmarks/pn_1d/pn_junction.json` via `schema.load`
+4. Runs `run.run(cfg)` which returns the scaled potential, carriers, and diagnostics
 5. Plots ψ(x), E(x), carrier densities; compares to analytical depletion approximation
 
 If you want to modify the physics, edit the JSON (resolution, doping, geometry, contact voltages) and re-run. The Python code lives in the package — this notebook is a thin driver.
@@ -145,7 +156,7 @@ ax1.axvspan((x_j - xp)*1e6, (x_j + xn)*1e6, alpha=0.1, color='green',
             label=f'Depletion region (W = {W*1e9:.0f} nm)')
 ax1.set_xlabel(r"$x$ [μm]"); ax1.set_ylabel(r"$\psi$ [V]")
 ax1.set_title(r"Electrostatic potential $\psi(x)$")
-ax1.legend(); ax1.grid(alpha=0.3)
+ax1.legend(); ax1.grid(True, alpha=0.3)
 
 E_fem = -np.gradient(psi_phys, x_dof[order])
 ax2.plot(x_phys_um, E_fem*1e-5, 'b-', lw=2, label='FEM')
@@ -153,7 +164,7 @@ ax2.axhline(-E_peak_an*1e-5, color='r', ls='--', alpha=0.7,
             label=rf'$-|E_{{\max}}|$ = {-E_peak_an*1e-5:.1f} kV/cm')
 ax2.set_xlabel(r"$x$ [μm]"); ax2.set_ylabel(r"$E$ [kV/cm]")
 ax2.set_title("Electric field")
-ax2.legend(); ax2.grid(alpha=0.3)
+ax2.legend(); ax2.grid(True, alpha=0.3)
 plt.tight_layout(); plt.show()
 
 E_peak_fem = np.max(np.abs(E_fem))
@@ -164,14 +175,14 @@ print(f"  Vbi:       FEM        = {psi_phys[-1] - psi_phys[0]:.4f} V")
 print(f"             analytical = {Vbi:.4f} V")
 """))
 
-cells.append(nbf.v4.new_code_cell(r"""fig, ax = plt.subplots(figsize=(9, 4))
+cells.append(nbf.v4.new_code_cell(r"""fig, ax = plt.subplots(figsize=(7, 4.5))
 ax.semilogy(x_phys_um, n_phys*1e-6, 'b-', lw=2, label=r'$n$ (electrons)')
 ax.semilogy(x_phys_um, p_phys*1e-6, 'r-', lw=2, label=r'$p$ (holes)')
 ax.axhline(n_i*1e-6, color='k', ls=':', alpha=0.5, label=r'$n_i$')
 ax.axvline(x_j*1e6, color='gray', ls='--', alpha=0.4)
 ax.set_xlabel(r"$x$ [μm]"); ax.set_ylabel(r"density [cm$^{-3}$]")
 ax.set_title("Equilibrium carrier densities")
-ax.legend(); ax.grid(alpha=0.3, which='both')
+ax.legend(); ax.grid(True, which='both', alpha=0.3)
 ax.set_ylim([1e0, 1e18])
 plt.tight_layout(); plt.show()
 
@@ -192,13 +203,14 @@ cells.append(nbf.v4.new_markdown_cell(r"""## Summary
 - 1D pn junction verifies against depletion approximation: V_bi, W, peak |E| all agree within a few percent
 - Mass-action $np = n_i^2$ holds across the domain; bulk densities match majority doping
 
-**Next step (Day 2).** Replace the Boltzmann equilibrium with a Slotboom $(\psi, \Phi_n, \Phi_p)$ block system, add drift-diffusion continuity equations with SRH recombination, enable bias sweeps. The equilibrium case here becomes the starting iterate.
+**Next up.** Notebook 02 replaces the Boltzmann equilibrium with a Slotboom $(\psi, \Phi_n, \Phi_p)$ block system, adds drift-diffusion continuity equations with SRH recombination, and runs forward and reverse bias sweeps against Shockley and SNS analytics. The equilibrium solution built here is the starting iterate for those sweeps.
 
-See [the repo](https://github.com/rwalkerlewis/kronos-semi) for the roadmap and code."""))
+See [the repo](https://github.com/rwalkerlewis/kronos-semi) and its [capability matrix](https://github.com/rwalkerlewis/kronos-semi#status) for the full scope."""))
 
 nb.cells = cells
 
-out_path = Path("/home/claude/kronos-semi/notebooks/01_pn_junction_1d.ipynb")
+out_path = Path(__file__).resolve().parent.parent / "notebooks" / "01_pn_junction_1d.ipynb"
+out_path.parent.mkdir(parents=True, exist_ok=True)
 with out_path.open("w") as f:
     nbf.write(nb, f)
 print(f"Wrote {out_path} with {len(cells)} cells")

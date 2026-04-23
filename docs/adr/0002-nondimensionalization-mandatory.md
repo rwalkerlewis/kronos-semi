@@ -62,7 +62,7 @@ Harder:
 - Every new physics form must be written in scaled variables from the
   start. Mixing scaled and unscaled quantities is a source of bugs.
 - The asymmetric scaling choice (fields scaled, x not) is unusual and
-  caused the Day 1 coefficient bug (see `docs/PHYSICS.md` Section 2.3).
+  caused the M1 coefficient bug (see `docs/PHYSICS.md` Section 2.3).
   All new physics modules must reference that section and use $L_D^2$,
   not $\lambda^2$, when the coordinate is in meters.
 

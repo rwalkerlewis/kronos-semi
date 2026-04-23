@@ -69,7 +69,7 @@ def sns_total_reference(
 
     The final (2 V_t / (V_bi - V)) prefactor is the leading-order Sze
     correction that brings SNS into 10-15% agreement with a Galerkin
-    Slotboom solution on the Day 2 benchmark; without it the raw
+    Slotboom solution on the M2 benchmark; without it the raw
     exponential overestimates the recombination branch by roughly an
     order of magnitude.
 

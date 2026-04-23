@@ -1,10 +1,19 @@
-# MOS Derivation: 2D MOS Capacitor (Day 6 Gate)
+# MOS Derivation: 2D MOS Capacitor
 
-This document is the mathematical specification for the Day-6 2D MOS
+This document is the mathematical specification for the 2D MOS
 capacitor benchmark, gate contact wiring, multi-region Poisson
-assembly, and C-V verification. It is a gate artifact in the same
-sense as `docs/mms_dd_derivation.md` for Day 4: no implementation code
-is written until this document is reviewed and approved.
+assembly, and C-V verification. The implementation is shipped and all
+four verifier checks pass; this document is the stable reference
+derivation.
+
+Note on psi-reference convention: Section 6 below derives surface
+potential as `psi_s = psi(x, y_int) - psi(x, y_bulk)` (bulk Fermi
+level reference, the textbook convention). The shipped code uses the
+project-wide `psi = 0` at the intrinsic Fermi level convention
+enforced by `semi/bcs.py`. Both conventions produce the same C(V)
+curve once V_FB is computed against the matching reference. A
+reconciliation of this convention drift is tracked in
+`PLAN.md` Post-submission cleanups.
 
 The scope is:
 
@@ -24,7 +33,7 @@ The scope is:
    continuity at the interface, per-region forcing derived from a
    cellwise eps_r, and the finest-pair rate targets.
 
-Scaled symbols follow Day-2 and Day-4 conventions:
+Scaled symbols follow the conventions established in `docs/PHYSICS.md` Sections 2.1 and 2.5:
 
 ```
 psi_hat   = psi   / V_t      (electrostatic potential)
@@ -117,13 +126,13 @@ carries no doping field. Contacts:
 
 The `workfunction` JSON key already exists in the schema. Its semantic
 content at a gate contact is `phi_ms` (Section 5). For ideal-gate
-runs (Day 6 baseline) it is 0 V.
+runs (M6: 2D MOS capacitor baseline) it is 0 V.
 
 The resolution `[64, 72]` is illustrative. Vertical spacing must
 resolve the 5 nm oxide with at least 5 cells; the practical choice is
 a graded mesh (fine in the oxide, coarser in the bulk). The benchmark
 config may use a non-uniform rectangle or a Gmsh-loaded geometry in
-a later iteration; for Day 6 the builtin rectangle generator with a
+a later iteration; for M6 the builtin rectangle generator with a
 dense vertical resolution is sufficient.
 
 ---
@@ -148,8 +157,8 @@ n_hat = ni_hat * exp( psi_hat   - phi_n_hat )
 p_hat = ni_hat * exp( phi_p_hat - psi_hat   )
 ```
 
-and SRH (used as a verification hook; Day-6 equilibrium and small-bias
-C-V sweeps sit near equilibrium where R_hat is small). Materials: Si
+and SRH (used as a verification hook; the MOS benchmark at equilibrium and small-bias
+C-V sweeps sits near equilibrium where R_hat is small). Materials: Si
 with `eps_r_Si = 11.7` and `n_i(Si, 300K) = 1.0e10 cm^-3`.
 
 ### 2.2 Oxide region (Omega_ox)
@@ -195,10 +204,10 @@ eps_r(x) = eps_r_Si   if cell lies in Omega_Si
            eps_r_ox   if cell lies in Omega_ox
 ```
 
-This is the minimum structural change to `semi/physics/poisson.py`:
-today `eps_r` is a `fem.Constant` (see line 63 of `poisson.py`); Day-6
-replaces it with a Function interpolated from the region tag map. The
-single-region path (all cells have the same role) is preserved as a
+This is the multi-region Poisson change to `semi/physics/poisson.py`:
+in the shipped code, `eps_r` is a DG0 cellwise Function interpolated
+from the region tag map (see `semi/physics/poisson.py::build_equilibrium_poisson_form_mr`).
+The single-region path (all cells have the same role) is preserved as a
 scalar fast path so the 1D benchmarks do not regress.
 
 ---
@@ -262,7 +271,7 @@ submesh exterior.
 
 ### 3.3 Contact and interface charge
 
-Day 6 assumes zero fixed oxide charge Q_ox and zero interface trap
+M6: 2D MOS capacitor assumes zero fixed oxide charge Q_ox and zero interface trap
 density D_it. The flatband voltage derivation in Section 6 reflects
 this (V_FB = phi_ms, no Q_ox / C_ox term). Adding Q_ox or D_it is a
 future extension that requires an interface facet integral in the
@@ -348,10 +357,10 @@ When every cell in the full mesh carries `role = "semiconductor"`
 (the 1D `pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse` benchmarks), the
 submesh equals the full mesh modulo index maps. The Poisson LHS
 coefficient reduces to a scalar Constant, entity_maps are trivial
-identity, and the assembly is identical to the Day 2-5 single-region
+identity, and the assembly is identical to the M2-M5 single-region
 path. `semi/physics/poisson.py` detects this condition and uses the
 scalar path. This is what keeps the 1D benchmarks byte-identical
-through Day 6, which is the top stop-and-report trigger.
+through M6, which is the top stop-and-report trigger.
 
 ---
 
@@ -397,7 +406,7 @@ sweep override via `voltages=` in `resolve_contacts`) and
 
 `_VALID_DIRICHLET_KINDS` already contains `"gate"` (see
 `semi/bcs.py:34`). Both build functions today skip every contact with
-`c.kind != "ohmic"` (`semi/bcs.py:173` and `:216`). Day 6 adds a gate
+`c.kind != "ohmic"` (`semi/bcs.py:173` and `:216`). M6 adds a gate
 branch in `build_psi_dirichlet_bcs`:
 
 ```
