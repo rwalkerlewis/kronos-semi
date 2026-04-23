@@ -17,12 +17,12 @@ do not and can be imported and tested independently.
 
 __version__ = "0.8.0"
 
-# Pure-Python imports, always safe
-from . import constants, doping, materials, scaling, schema
+# Pure-Python imports, always safe (doping requires numpy so is not imported here)
+from . import constants, materials, scaling, schema
 
 # dolfinx-dependent modules are NOT imported at package level. Import them
 # explicitly when you have dolfinx available:
 #     from semi import run, mesh, solver
 #     from semi.physics import poisson
 
-__all__ = ["constants", "materials", "scaling", "doping", "schema", "__version__"]
+__all__ = ["constants", "materials", "scaling", "schema", "__version__"]
