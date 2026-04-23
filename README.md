@@ -2,68 +2,78 @@
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rwalkerlewis/kronos-semi/blob/main/notebooks/01_pn_junction_1d.ipynb)
 
-A JSON-driven finite-element semiconductor device simulator built on [FEniCSx](https://fenicsproject.org/) (dolfinx 0.10+), targeting the workflow of the COMSOL Semiconductor Module — Poisson-coupled drift-diffusion with SRH recombination, multi-region support, ohmic/gate/insulating boundary conditions — in a clean, extensible Python package.
+kronos-semi is a FEniCSx-based finite-element semiconductor device simulator that mimics the capabilities of the COMSOL Semiconductor Module. Simulations are driven by a single JSON file (optionally referencing an external geometry/mesh artifact) and are otherwise plain text. The project ships 1D, 2D, and 3D benchmark problems and a zero-setup Colab notebook (cloud-hosted, no local install) so reviewers can run everything from a browser.
 
-## Planning documents
+**Audience:** TCAD engineers, device-physics researchers, and evaluation reviewers who want a reproducible, open-source alternative to a commercial Semiconductor Module solver.
 
-Before contributing (human or AI), read these in order:
+## Quick start on Colab (zero setup, under one minute)
 
-- [PLAN.md](PLAN.md): authoritative current state, next task, invariants, and non-goals.
-- [docs/PHYSICS.md](docs/PHYSICS.md): governing equations, nondimensionalization, and boundary-condition conventions.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): five-layer component design and dependency rules.
-- [docs/adr/](docs/adr/): architecture decision records; open a new ADR before changing any invariant.
-- [docs/ROADMAP.md](docs/ROADMAP.md): full per-day deliverables and verification criteria.
+Click the badge above, or open the direct link:
+
+```
+https://colab.research.google.com/github/rwalkerlewis/kronos-semi/blob/main/notebooks/01_pn_junction_1d.ipynb
+```
+
+The first cell installs FEniCSx on Colab via [FEM on Colab](https://fem-on-colab.github.io/) (~30 s). Subsequent cells clone this repo, load a JSON benchmark file, run the solve, and plot results against analytical curves. No local installation is required.
+
+### Notebooks
+
+| Notebook | Benchmark | Colab |
+|---|---|---|
+| 01 pn junction 1D | Equilibrium Poisson, depletion approximation | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rwalkerlewis/kronos-semi/blob/main/notebooks/01_pn_junction_1d.ipynb) |
+| 02 pn junction bias | Forward Shockley + reverse SNS sweep | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rwalkerlewis/kronos-semi/blob/main/notebooks/02_pn_junction_bias.ipynb) |
+| 03 MOS C-V | 2D MOS capacitor C-V sweep | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rwalkerlewis/kronos-semi/blob/main/notebooks/03_mos_cv.ipynb) |
+| 04 resistor 3D | 3D doped bar, builtin and gmsh meshes | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/rwalkerlewis/kronos-semi/blob/main/notebooks/04_resistor_3d.ipynb) |
+
+## Scope vs. COMSOL Semiconductor Module
+
+kronos-semi covers the quasi-static, steady-state subset of the COMSOL Semiconductor Module over 1D, 2D, and 3D meshes.
+
+**In scope (shipped):**
+- Poisson equation with multi-region dielectric (Si/SiO2)
+- Drift-diffusion in Slotboom (quasi-Fermi potential) form
+- SRH recombination with configurable mid-gap trap energy
+- Ohmic contacts and ideal gate contacts with work-function offset
+- 1D, 2D, and 3D structured meshes (builtin); 3D unstructured meshes via gmsh .msh files
+- Bias sweeps with adaptive step-size continuation (unipolar and bipolar)
+- Method-of-Manufactured-Solutions and conservation V&V suite
+
+**Explicitly out of scope (post-submission stretch goals, see [docs/ROADMAP.md](docs/ROADMAP.md)):**
+- Caughey-Thomas or Lombardi field-dependent mobility
+- Auger and radiative recombination
+- Fermi-Dirac statistics (Boltzmann throughout; valid below ~10^19 cm^-3)
+- Impact ionization and avalanche generation
+- AC small-signal analysis
+- Transient (time-dependent) solver (steady-state only)
+- Band-to-band or trap-assisted tunneling
+- Heterojunction band-offset models and position-dependent band structure
+- Schottky contacts, tunnel junctions, or contact resistance models
+- Thermal coupling (self-heating, lattice temperature)
+- Optical generation and photovoltaic carrier sources
+- Full MOSFET, FinFET, or 3D transistor geometries
 
 ## Status
 
-**End-of-M7 capability matrix**, shipped across PRs #2–#9:
+**End-of-M7 capability matrix**, shipped across PRs #2-#9:
 
 | Capability                         | Dimensions    | Status  | Verifier                                                     |
 |------------------------------------|---------------|---------|--------------------------------------------------------------|
 | Equilibrium Poisson                | 1D / 2D / 3D  | shipped | MMS finest-pair rates L2 = 2.0, H1 = 1.0                     |
-| Coupled Slotboom drift-diffusion   | 1D / 2D       | shipped | MMS finest-pair rates L2 ≥ 1.99 across variants              |
+| Coupled Slotboom drift-diffusion   | 1D / 2D       | shipped | MMS finest-pair rates L2 >= 1.99 across variants             |
 | SRH recombination                  | 1D / 2D       | shipped | verified against SNS analytical at reverse bias              |
 | Ohmic contact BCs                  | 1D / 2D / 3D  | shipped | Shockley diode within 10% at forward bias                    |
-| Gate contact BCs with φ_ms         | 2D            | shipped | MOS C–V within 10% in depletion window                       |
-| Multi-region Poisson (Si/SiO₂)     | 2D            | shipped | multi-region MMS L2 = 2.0                                    |
+| Gate contact BCs with phi_ms       | 2D            | shipped | MOS C-V within 10% in depletion window                       |
+| Multi-region Poisson (Si/SiO2)     | 2D            | shipped | multi-region MMS L2 = 2.0                                    |
 | File-sourced gmsh .msh meshes      | 3D            | shipped | builtin vs gmsh R-match within 1%                            |
 | Adaptive bias continuation         | uni + bipolar | shipped | pn junction forward + reverse, 3D resistor                   |
-| 3D ohmic V–I linearity             | 3D            | shipped | V–I linearity within 1%                                      |
+| 3D ohmic V-I linearity             | 3D            | shipped | V-I linearity within 1%                                      |
 | Benchmarks                         | 5             | shipped | pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d   |
-| Conservation / mesh convergence    | 1D            | shipped | charge neutrality, Cauchy rates ≥ 1.8/doubling               |
+| Conservation / mesh convergence    | 1D            | shipped | charge neutrality, Cauchy rates >= 1.8/doubling              |
 | Test suite                         | pure + FEM    | shipped | 206 tests, 95.58% coverage                                   |
 | V&V                                | 10 studies    | shipped | 62/62 PASS                                                   |
 | CI                                 | lint+test+FEM | shipped | green on dev and main                                        |
 
-### Scope
-
-kronos-semi is an **eight-milestone FEM-framework demonstration** targeting the quasi-static, steady-state subset of the COMSOL Semiconductor Module: equilibrium Poisson and coupled drift-diffusion with SRH recombination over 1D/2D/3D meshes, multi-region dielectrics, and ohmic/gate/insulating boundary conditions. The verifier suite proves the numerics against analytical (Shockley, SNS, depletion-approx C–V, ohmic V–I) and manufactured (MMS) solutions.
-
-What it deliberately does **not** implement, relative to a full commercial Semiconductor Module:
-
-- Transient (time-dependent) solver — steady-state only.
-- Impact ionization and avalanche generation.
-- Heterojunction band-offset models and position-dependent band structure.
-- Trap-assisted and band-to-band tunneling.
-- Fermi–Dirac statistics (Boltzmann throughout; valid below ~10¹⁹ cm⁻³).
-- Mobility models beyond constant — no Caughey–Thomas, no Lombardi surface mobility.
-- Non-equilibrium Green's function (NEGF) or quantum-corrected transport.
-- Schottky contacts, tunnel junctions, or contact resistance models.
-- Thermal coupling (self-heating, lattice temperature).
-- Optical generation and photovoltaic carrier sources.
-
-These are deferred as out-of-scope for the eight-milestone framework demonstration; the architecture accommodates them as follow-on work (see [docs/ROADMAP.md](docs/ROADMAP.md) Post-submission).
-
-For a breakdown of what each day shipped, see the capability matrix above and [CHANGELOG.md](CHANGELOG.md).
-
-## Quick start on Colab (zero setup)
-
-Click the badge above. The first cell installs dolfinx on Colab via [FEM on Colab](https://fem-on-colab.github.io/) (~30 s); subsequent cells clone this repo, load a JSON, run the solve, and plot results against analytical curves.
-
-If you prefer a direct link:
-```
-https://colab.research.google.com/github/rwalkerlewis/kronos-semi/blob/main/notebooks/01_pn_junction_1d.ipynb
-```
+For a breakdown of what each milestone shipped, see the capability matrix above and [CHANGELOG.md](CHANGELOG.md).
 
 ## Local install
 
@@ -78,6 +88,16 @@ pip install -e ".[dev]"
 ```
 
 The pure-Python modules (`schema`, `materials`, `scaling`, `doping`, `constants`) don't need dolfinx and can be installed standalone via `pip install -e .` into any environment; the FEM-heavy modules (`mesh`, `physics.poisson`, `solver`, `run`) need dolfinx available at import time.
+
+## Planning documents
+
+Before contributing (human or AI), read these in order:
+
+- [PLAN.md](PLAN.md): authoritative current state, next task, invariants, and non-goals.
+- [docs/PHYSICS.md](docs/PHYSICS.md): governing equations, nondimensionalization, and boundary-condition conventions.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): five-layer component design and dependency rules.
+- [docs/adr/](docs/adr/): architecture decision records; open a new ADR before changing any invariant.
+- [docs/ROADMAP.md](docs/ROADMAP.md): capability matrix, scope vs. COMSOL Semiconductor Module, and delivery history.
 
 ## Docker
 
@@ -101,7 +121,21 @@ docker compose exec dev bash
 docker compose up jupyter
 ```
 
-## Running the benchmark
+## Running benchmarks
+
+The primary interface is the benchmark CLI. Pass a benchmark name to run the full solve, verify, and plot pipeline:
+
+```bash
+docker compose run --rm benchmark pn_1d
+docker compose run --rm benchmark pn_1d_bias
+docker compose run --rm benchmark pn_1d_bias_reverse
+docker compose run --rm benchmark mos_2d
+docker compose run --rm benchmark resistor_3d
+```
+
+Each benchmark is defined by a JSON file under `benchmarks/<name>/`. The CLI loads the JSON, runs the solver, checks verifier criteria, and writes plots to `results/<name>/`.
+
+To call the solver from Python (for scripting or notebook use), load the JSON with `semi.schema.load` and pass the resulting config to `semi.run.run`:
 
 ```python
 from semi import schema, run
@@ -155,9 +189,9 @@ Doping densities are specified in cm⁻³ (device-physics tradition); everything
 
 ## Design notes
 
-### Why Slotboom variables (planned for M2+)
+### Why Slotboom variables
 
-Naive Galerkin FEM on drift-diffusion is unstable when drift dominates diffusion, which is almost everywhere in a real device. The standard FEM remedy is to rewrite the continuity equations in terms of quasi-Fermi potentials (Slotboom variables), which makes the current a pure gradient and the resulting form well-posed without stabilization. The equilibrium case implemented here is a special case where Φₙ = Φₚ = 0 and the continuity equations are trivially satisfied.
+Naive Galerkin FEM on drift-diffusion is unstable when drift dominates diffusion, which is almost everywhere in a real device. The standard FEM remedy is to rewrite the continuity equations in terms of quasi-Fermi potentials (Slotboom variables), which makes the current a pure gradient and the resulting form well-posed without stabilization. The Slotboom form is implemented in `semi/physics/drift_diffusion.py` and verified by the MMS-DD suite (62/62 PASS). See `docs/adr/0004-slotboom-variables-for-dd.md` for the design rationale.
 
 ### Why nondimensional scaling
 
@@ -169,14 +203,16 @@ The `NonlinearProblem` class in 0.10 wraps PETSc SNES directly (the old `NewtonS
 
 ## Roadmap
 
-- **M1** ✓ Equilibrium Poisson, 1D pn junction, depletion-approx verification
-- **M2** ✓ Slotboom drift-diffusion, coupled (ψ, Φₙ, Φₚ) Newton
+- **M1** ✓ Equilibrium Poisson, 1D pn junction, Docker env
+- **M2** ✓ Slotboom drift-diffusion, coupled (psi, Phi_n, Phi_p) Newton
 - **M3** ✓ Adaptive continuation; forward-bias IV curve vs Shockley diode equation
 - **M4** ✓ V&V suite; MMS, mesh convergence, conservation, CI
 - **M5** ✓ Refactor and test pass (run.py split, bcs.py extracted, coverage 96%)
 - **M6** ✓ 2D MOS capacitor (oxide + silicon multi-region, submesh for carriers)
 - **M7** ✓ 3D doped resistor (gmsh loader, bipolar sweep, V-I linearity)
-- **Post-submission** Full 2D MOSFET with source/drain/gate/body contacts; 3D FinFET; field-dependent mobility; Auger recombination; Schottky contacts
+- **M8** (in flight) Submission polish: notebooks, catalog, CHANGELOG
+
+Post-submission stretch goals (field-dependent mobility, Auger, Fermi-Dirac, transient, full MOSFET) are documented in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Verification
 

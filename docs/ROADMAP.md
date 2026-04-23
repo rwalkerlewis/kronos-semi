@@ -1,11 +1,66 @@
 # Roadmap
 
-Full day-by-day plan for the kronos-semi evaluation submission. This
-expands on the roadmap table in `PLAN.md`. Each day lists a goal,
-concrete deliverables, verification criteria (the commands you run to
-prove it is done), and dependencies on prior days.
+kronos-semi is a FEniCSx-based finite-element semiconductor device simulator that mimics the capabilities of the COMSOL Semiconductor Module. Simulations are driven by a single JSON file (optionally referencing an external geometry/mesh artifact) and are otherwise plain text. The project ships 1D, 2D, and 3D benchmark problems and a zero-setup Colab notebook (cloud-hosted, no local install) so reviewers can run everything from a browser.
 
-Read `PLAN.md` for the short version and the current in-flight task.
+## Capability matrix
+
+All eight milestones (M1 through M8) are shipped or in flight. The table below reflects the state at the end of M7 (M8 is the final documentation and notebook polish pass, currently in flight).
+
+| Capability | Dimensions | Status | Verifier |
+|---|---|---|---|
+| Equilibrium Poisson | 1D / 2D / 3D | shipped | MMS finest-pair rates L2 = 2.0, H1 = 1.0 |
+| Coupled Slotboom drift-diffusion | 1D / 2D | shipped | MMS finest-pair rates L2 >= 1.99 across variants |
+| SRH recombination | 1D / 2D | shipped | verified against SNS analytical at reverse bias |
+| Ohmic contact BCs | 1D / 2D / 3D | shipped | Shockley diode within 10% at forward bias |
+| Gate contact BCs with phi_ms | 2D | shipped | MOS C-V within 10% in depletion window |
+| Multi-region Poisson (Si/SiO2) | 2D | shipped | multi-region MMS L2 = 2.0 |
+| File-sourced gmsh .msh meshes | 3D | shipped | builtin vs gmsh R-match within 1% |
+| Adaptive bias continuation | uni + bipolar | shipped | pn junction forward + reverse, 3D resistor |
+| 3D ohmic V-I linearity | 3D | shipped | V-I linearity within 1% |
+| Benchmarks | 5 | shipped | pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d |
+| Conservation / mesh convergence | 1D | shipped | charge neutrality, Cauchy rates >= 1.8/doubling |
+| Test suite | pure + FEM | shipped | 206 tests, 95.58% coverage |
+| V&V | 10 studies | shipped | 62/62 PASS |
+| CI | lint+test+FEM | shipped | green on dev and main |
+
+## Scope vs. COMSOL Semiconductor Module
+
+kronos-semi covers the quasi-static, steady-state subset of the COMSOL Semiconductor Module:
+
+**In scope (shipped):**
+- Poisson equation with multi-region dielectric (Si/SiO2)
+- Drift-diffusion in Slotboom (quasi-Fermi potential) form
+- SRH recombination with configurable trap energy
+- Ohmic contacts and ideal gate contacts
+- 1D interval, 2D rectangle, and 3D box meshes (builtin)
+- 3D unstructured tetrahedral meshes via gmsh .msh files
+- Bias sweeps with adaptive step-size continuation
+- Method-of-Manufactured-Solutions and conservation V&V suite
+
+**Explicitly out of scope (post-submission stretch goals):**
+- Caughey-Thomas or Lombardi field-dependent mobility
+- Auger and radiative recombination
+- Fermi-Dirac statistics (Boltzmann throughout)
+- AC small-signal analysis
+- Transient (time-dependent) solver
+- Band-to-band or trap-assisted tunneling
+- Heterojunctions and position-dependent band structure
+- Schottky contacts
+- Full MOSFET, FinFET, or 3D transistor geometries
+
+## JSON input contract
+
+Every simulation is driven by a JSON file validated against the jsonschema Draft-07 schema in `semi/schema.py`. The JSON specifies: mesh source (builtin geometry or path to an external .msh file), regions with materials and tags, doping profiles, contacts, physics options, and solver options. A JSON file plus the package version fully determines the simulation. See `docs/adr/0001-json-as-input-format.md` for the rationale.
+
+## Colab onboarding
+
+Each benchmark notebook opens from a Colab badge. The first cell installs FEniCSx via FEM-on-Colab (~30 s), clones the repo, and loads a JSON benchmark file. No local installation is required. See the README for Colab links.
+
+## Delivery history
+
+The milestone entries below record the per-day goal, deliverables, verification criteria, and dependencies for the eight shipped milestones. This is the historical record of how each capability was built; the capability matrix above is the concise entry point for reviewers.
+
+Read `PLAN.md` for the current in-flight task.
 
 ## M1: Equilibrium Poisson, 1D pn junction, Docker env
 

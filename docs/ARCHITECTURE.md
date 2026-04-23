@@ -1,10 +1,8 @@
 # Architecture
 
-kronos-semi is organized as five layers. Higher layers depend on lower
-layers; lower layers must never import from higher layers. The
-pure-Python core (Layer 3) has an additional constraint: it must not
-import dolfinx, so that schema, material, and doping logic can be
-tested in a lightweight CI environment and used standalone.
+kronos-semi is a FEniCSx-based finite-element semiconductor device simulator driven by a single JSON file (optionally referencing an external geometry/mesh artifact). It is organized as five layers. Higher layers depend on lower layers; lower layers must never import from higher layers. The pure-Python core (Layer 3) has an additional constraint: it must not import dolfinx, so that schema, material, and doping logic can be tested in a lightweight CI environment and used standalone.
+
+For the project mission and scope relative to the COMSOL Semiconductor Module, see [docs/ROADMAP.md](ROADMAP.md) and [README.md](../README.md).
 
 ## Layer diagram
 
@@ -93,10 +91,14 @@ Modules: `semi.mesh`, `semi.physics.*`, `semi.solver`, `semi.run`.
 - **Provides:**
   - `mesh`: builtin interval/rectangle/box mesh construction plus
     region and facet tagging.
-  - `physics.poisson`: equilibrium Poisson UFL residual builder.
-  - Future `physics.drift_diffusion`: Slotboom continuity forms (M2: Coupled drift-diffusion).
+  - `physics.poisson`: equilibrium Poisson UFL residual builder (single-region and multi-region).
+  - `physics.drift_diffusion`: Slotboom continuity forms (electron and hole continuity as separate form builders, plus a combined block residual).
+  - `physics.recombination`: SRH recombination kernel as a UFL expression builder.
   - `solver`: `solve_nonlinear` wrapping `dolfinx.fem.petsc.NonlinearProblem`.
-  - `run`: top-level `run(cfg) -> SimulationResult` orchestrator.
+  - `runners/equilibrium.py`, `runners/bias_sweep.py`, `runners/_common.py`: per-solver-type orchestration.
+  - `bcs.py`: contact BC resolution and Dirichlet BC builders (pure-Python tier; no dolfinx at module scope).
+  - `postprocess.py`: current extraction and plotting helpers.
+  - `run`: top-level `run(cfg) -> SimulationResult` dispatcher (74 lines).
 - **Depends on:** dolfinx 0.10, petsc4py, mpi4py, ufl, basix, plus
   Layers 1-3.
 - **Must never depend on:** matplotlib, jupyter, IPython. Plotting and
@@ -121,11 +123,8 @@ Modules: `semi.mesh`, `semi.physics.*`, `semi.solver`, `semi.run`.
 
 ## Test matrix
 
-- **Offline (GitHub Actions, no dolfinx):** Layers 2-3 with the
-  full 36-test pytest suite, plus ruff lint.
-- **In-Docker (manual or GHA with dolfinx image):** full suite plus
-  `docker compose run --rm benchmark <name>` for each benchmark
-  directory. This exercises Layer 4 end to end.
+- **Offline (GitHub Actions, no dolfinx):** Layers 2-3 with the pure-Python pytest suite, plus ruff lint. Python 3.10, 3.11, and 3.12.
+- **In-Docker (GHA with dolfinx image):** full suite (206 tests at 95.58% coverage) plus all five benchmark verifiers and the V&V suite (`scripts/run_verification.py all`, 62/62 PASS) inside the `ghcr.io/fenics/dolfinx/dolfinx:stable` image. CI timeout is 15 minutes once the image is cached.
 
 ## Module boundaries at a glance
 

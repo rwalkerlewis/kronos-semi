@@ -1,9 +1,10 @@
-# MMS Derivation: Coupled Drift-Diffusion (Phase 4 Gate)
+# MMS Derivation: Coupled Drift-Diffusion (Phase 4 V&V)
 
 This document is the mathematical specification for the Phase-4 Method of
 Manufactured Solutions (MMS) verification of the coupled drift-diffusion
-block residual in `semi/physics/drift_diffusion.py`. It is a gate
-artifact: no Python is written until this document is approved.
+block residual in `semi/physics/drift_diffusion.py`. The implementation
+is shipped and all nine studies pass at the rates documented here; this
+document is the stable reference derivation.
 
 The MMS target is the three-field Slotboom-form system
 (`build_dd_block_residual`, lines 140-151), whose scaled residual is

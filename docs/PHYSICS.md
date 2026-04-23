@@ -20,7 +20,7 @@ $$
     = q\,\bigl( p - n + N_D^+ - N_A^- \bigr)
 $$
 
-For M1: Equilibrium Poisson scope (equilibrium, complete ionization) we take
+For equilibrium problems (complete ionization, steady state) we take
 $N_D^+ = N_D$ and $N_A^- = N_A$.
 
 ### 1.2 Carrier statistics (Boltzmann)
@@ -420,7 +420,8 @@ $$
 No carriers are defined in the oxide; continuity equations are solved
 only in semiconductor regions. The normal component of
 $\varepsilon \nabla \psi$ is continuous across the oxide/semiconductor
-interface (natural in the Galerkin form). Gate BCs are deferred to the M6: 2D MOS capacitor benchmark.
+interface (natural in the Galerkin form). Gate BCs are implemented for
+the 2D MOS capacitor benchmark; see Section 6.
 
 ### 3.3 Insulating boundaries
 

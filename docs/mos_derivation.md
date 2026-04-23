@@ -1,10 +1,19 @@
-# MOS Derivation: 2D MOS Capacitor (M6: 2D MOS capacitor)
+# MOS Derivation: 2D MOS Capacitor
 
-This document is the mathematical specification for the M6: 2D MOS
+This document is the mathematical specification for the 2D MOS
 capacitor benchmark, gate contact wiring, multi-region Poisson
-assembly, and C-V verification. It is a gate artifact in the same
-sense as `docs/mms_dd_derivation.md` for M4: V&V suite: no implementation code
-is written until this document is reviewed and approved.
+assembly, and C-V verification. The implementation is shipped and all
+four verifier checks pass; this document is the stable reference
+derivation.
+
+Note on psi-reference convention: Section 6 below derives surface
+potential as `psi_s = psi(x, y_int) - psi(x, y_bulk)` (bulk Fermi
+level reference, the textbook convention). The shipped code uses the
+project-wide `psi = 0` at the intrinsic Fermi level convention
+enforced by `semi/bcs.py`. Both conventions produce the same C(V)
+curve once V_FB is computed against the matching reference. A
+reconciliation of this convention drift is tracked in
+`PLAN.md` Post-submission cleanups.
 
 The scope is:
 
@@ -24,7 +33,7 @@ The scope is:
    continuity at the interface, per-region forcing derived from a
    cellwise eps_r, and the finest-pair rate targets.
 
-Scaled symbols follow Day-2 and Day-4 conventions:
+Scaled symbols follow the conventions established in `docs/PHYSICS.md` Sections 2.1 and 2.5:
 
 ```
 psi_hat   = psi   / V_t      (electrostatic potential)
@@ -148,8 +157,8 @@ n_hat = ni_hat * exp( psi_hat   - phi_n_hat )
 p_hat = ni_hat * exp( phi_p_hat - psi_hat   )
 ```
 
-and SRH (used as a verification hook; Day-6 equilibrium and small-bias
-C-V sweeps sit near equilibrium where R_hat is small). Materials: Si
+and SRH (used as a verification hook; the MOS benchmark at equilibrium and small-bias
+C-V sweeps sits near equilibrium where R_hat is small). Materials: Si
 with `eps_r_Si = 11.7` and `n_i(Si, 300K) = 1.0e10 cm^-3`.
 
 ### 2.2 Oxide region (Omega_ox)
@@ -195,10 +204,10 @@ eps_r(x) = eps_r_Si   if cell lies in Omega_Si
            eps_r_ox   if cell lies in Omega_ox
 ```
 
-This is the minimum structural change to `semi/physics/poisson.py`:
-today `eps_r` is a `fem.Constant` (see line 63 of `poisson.py`); Day-6
-replaces it with a Function interpolated from the region tag map. The
-single-region path (all cells have the same role) is preserved as a
+This is the multi-region Poisson change to `semi/physics/poisson.py`:
+in the shipped code, `eps_r` is a DG0 cellwise Function interpolated
+from the region tag map (see `semi/physics/poisson.py::build_equilibrium_poisson_form_mr`).
+The single-region path (all cells have the same role) is preserved as a
 scalar fast path so the 1D benchmarks do not regress.
 
 ---
