@@ -133,7 +133,9 @@ at 1%, and 3D slice plots) merged via PR #9 from
 
 ## Next task
 
-**M10: (next milestone).** To be defined after M9 merges.
+**M10: HTTP server (see docs/IMPROVEMENT_GUIDE.md §4).** FastAPI `POST /solve`,
+`GET /runs/{id}`, WebSocket progress stream; worker pool via ProcessPoolExecutor.
+Consumes the M9 artifact directory layout. Deliverable: new `kronos_server/` package.
 
 ## Roadmap
 
