@@ -161,3 +161,20 @@ def test_write_read_artifact(bench_json, tmp_path):
     # 4. input_sha256 matches the actual file
     expected = hashlib.sha256(bench_json.read_bytes()).hexdigest()
     assert manifest["input_sha256"] == expected, "input_sha256 mismatch"
+
+
+@pytest.mark.skipif(not HAS_DOLFINX, reason="dolfinx not available")
+def test_write_artifact_cfg_sha_when_no_input_path(tmp_path):
+    """When input_json_path is omitted, input_sha256 is derived from result.cfg."""
+    from semi.io.artifact import write_artifact
+    from semi.run import run
+    from semi.schema import load as schema_load
+
+    bench_json = BENCHMARKS_DIR / "pn_1d" / "pn_junction.json"
+    cfg = schema_load(str(bench_json))
+    result = run(cfg)
+    run_dir = write_artifact(result, tmp_path / "runs", input_json_path=None)
+
+    manifest = json.loads((run_dir / "manifest.json").read_text())
+    expected = hashlib.sha256(json.dumps(result.cfg, sort_keys=True).encode()).hexdigest()
+    assert manifest["input_sha256"] == expected
