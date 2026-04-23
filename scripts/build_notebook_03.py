@@ -1,6 +1,6 @@
 """
 Build the Colab notebook 03 that walks through the 2D MOS capacitor C-V
-benchmark. Day 6 content: multi-region (Si/SiO2) equilibrium Poisson
+benchmark. M6 content: multi-region (Si/SiO2) equilibrium Poisson
 with gate contact BCs and a quasi-static C-V sweep against the
 depletion-approximation theory curve.
 """
@@ -204,7 +204,7 @@ print(f"Final SNES (at V_gate={result_sweep.iv[-1]['V']:+.3f} V): "
 
 cells.append(nbf.v4.new_markdown_cell(r"""### Verifier-window disclosure: $V_{FB}+0.1 \to V_{FB}+0.2$
 
-The benchmark's verifier window is $V_{gate} \in [V_{FB}+0.2,\ V_T-0.1]$ V, **not** $[V_{FB}+0.1,\ V_T-0.1]$ V as originally planned on Day 6.
+The benchmark's verifier window is $V_{gate} \in [V_{FB}+0.2,\ V_T-0.1]$ V, **not** $[V_{FB}+0.1,\ V_T-0.1]$ V as originally planned on M6.
 
 **What happened.** The first Day-6 implementation used $V_{FB}+0.1$ as the low edge. Under our $\psi=0$-at-intrinsic BC convention the worst relative error in that window was **10.06%** at $V_{gate} = -0.25$ V, just past the 10% tolerance. This is a depletion-approximation modeling limit: at $\psi_s \lesssim 2 V_t$ the free-carrier tail extends across a significant fraction of the depletion width and the sharp-edge approximation breaks down toward 10%. It is not a solver accuracy problem — a finer mesh does not move the number.
 

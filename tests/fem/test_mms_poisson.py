@@ -143,7 +143,7 @@ def test_mms_poisson_2d_multiregion_convergence():
     FE problem is well-posed and the finest-pair L^2 rate must hit
     theoretical 2.0. Pytest uses a 1.85 floor so solver-tolerance
     jitter does not destabilise the gate; the stricter 1.99 floor
-    lives in run_verification.py per the Day 6 acceptance criterion
+    lives in run_verification.py per the M6 acceptance criterion
     in docs/mos_derivation.md section 7.
     """
     from semi.verification.mms_poisson import run_mr_convergence_study

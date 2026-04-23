@@ -40,18 +40,18 @@ submission packaging) is in flight on `dev/submission-polish`.
 CI hardening (branch glob plus Dockerized FEM job) merged on
 `ci/docker-benchmark-matrix`. M3: Adaptive continuation (adaptive bias continuation,
 Sah-Noyce-Shockley verifier, reverse-bias generation check) merged
-via PR #5 from `dev/day3-bias-hardening`. Day 4 (Verification &
+via PR #5 from `dev/day3-bias-hardening`. M4 (Verification &
 Validation suite: MMS-Poisson, mesh convergence, discrete
 conservation, MMS for coupled drift-diffusion, CI integration,
-documentation) merged via PR #6 from `dev/day4-vnv`. Day 5 (refactor
+documentation) merged via PR #6 from `dev/day4-vnv`. M5 (refactor
 pass: `semi/bcs.py` extraction, `semi/run.py` split into a 74-line
 dispatcher plus `runners/` and `postprocess.py`, coverage to 96.25%
 with a 95% CI gate, completed `docs/PHYSICS.md` Section 2.5, ADR 0007)
-merged via PR #7 from `dev/day5-refactor`. Day 6 (2D MOS capacitor:
+merged via PR #7 from `dev/day5-refactor`. M6 (2D MOS capacitor:
 multi-region Poisson over oxide plus silicon, gate contact, continuity
 on a semiconductor submesh, C-V verifier matching depletion-approximation
 MOS theory within 10% in [V_FB + 0.2, V_T - 0.1] V, multi-region MMS)
-merged via PR #8 from `dev/day6-mos-2d`. Day 7 (3D doped resistor with
+merged via PR #8 from `dev/day6-mos-2d`. M7 (3D doped resistor with
 gmsh `.msh` loader, bipolar-sweep driver path, V-I linearity verifier
 at 1%, and 3D slice plots) merged via PR #9 from
 `dev/day7-resistor-3d` at `a604b12`.

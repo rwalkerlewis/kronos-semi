@@ -67,7 +67,7 @@ def test_sns_reference_zero_at_v_zero():
 def test_sns_reference_forward_dominated_by_rec_at_low_bias():
     """At V=0.15 V with tau=1e-8 s the SNS recombination branch is
     many orders of magnitude above pure Shockley diffusion, which is
-    the whole reason the Day 3 verifier needed this term."""
+    the whole reason the M3 verifier needed this term."""
     V = 0.15
     J_total, J_diff, J_rec, _J_s = sns_total_reference(
         N_A, N_D, N_I, EPS, MU_N, MU_P, TAU_N, TAU_P, V_T, V=V,
@@ -113,8 +113,8 @@ def test_srh_generation_grows_with_reverse_bias():
 def test_srh_generation_order_of_magnitude_deep_reverse():
     """For this device (tau=1e-8, N=1e17) the deep-reverse generation
     current is dominated by SRH, not Shockley diffusion, and is on the
-    order of 1e-2 A/m^2. The Day 2 reverse-bias spec (J saturating to
-    J_s ~ 1e-7 A/m^2) does not hold; the Day 3 verifier compares to
+    order of 1e-2 A/m^2. The M2 reverse-bias spec (J saturating to
+    J_s ~ 1e-7 A/m^2) does not hold; the M3 verifier compares to
     this quantity instead."""
     J_net, _W0, _V_bi = srh_generation_reference(
         N_A, N_D, N_I, EPS, TAU_N, TAU_P, V_T, V=-2.0,

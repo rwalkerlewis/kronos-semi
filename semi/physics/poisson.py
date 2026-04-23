@@ -17,7 +17,7 @@ where lambda^2 = eps_0 V_t / (q C_0 L_0^2).
 
 This gives the built-in potential of pn junctions, MOS C-V curves at
 zero bias, etc. Under bias, we'd need the full drift-diffusion system;
-this module is Day 1 scope.
+this module is M1 scope.
 """
 from __future__ import annotations
 
@@ -38,8 +38,8 @@ def build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, eps_r):
         Scaling object providing lambda2, n_i/C_0 ratio.
     eps_r : float | dolfinx.fem.Function
         Relative permittivity. Scalar (single-region fast path,
-        byte-identical with Day 2-5) or a cellwise DG0 Function
-        (multi-region, Day 6). The scalar branch wraps the value in
+        byte-identical with M2-M5) or a cellwise DG0 Function
+        (multi-region, M6). The scalar branch wraps the value in
         `fem.Constant`; the Function branch uses it directly in the
         bilinear form so coefficient-jump assembly picks up the
         piecewise eps_r at quadrature.

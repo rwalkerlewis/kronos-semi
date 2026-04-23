@@ -10,7 +10,7 @@ options tuned for semiconductor problems:
     - SNES monitor on by default so we can diagnose convergence issues
 
 For large 3D problems, LU is overkill and we'd switch to GAMG or
-fieldsplit preconditioning, but that's a Day 6+ concern.
+fieldsplit preconditioning, but that's a M6+ concern.
 """
 from __future__ import annotations
 

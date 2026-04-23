@@ -1,7 +1,7 @@
 """
 Build the Colab notebook 02 that walks through the 1D pn-junction bias
-sweep. Day 2 forward branch (Shockley / SNS reference) followed by Day
-3 reverse branch (SRH-generation reference).
+sweep. M2 forward branch (Shockley / SNS reference) followed by M3
+reverse branch (SRH-generation reference).
 """
 from pathlib import Path
 

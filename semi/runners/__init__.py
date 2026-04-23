@@ -3,7 +3,7 @@ Runner implementations for the public `semi.run.run` dispatcher.
 
 Each runner here owns one solver-type code path. Public modules:
 
-    equilibrium    Day 1 equilibrium Poisson under Boltzmann statistics.
+    equilibrium    M1 equilibrium Poisson under Boltzmann statistics.
     bias_sweep     Coupled Slotboom drift-diffusion with adaptive
                    continuation across an applied bias range.
 

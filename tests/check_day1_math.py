@@ -1,5 +1,5 @@
 """
-Sanity-check the physics math in the Day 1 notebook WITHOUT dolfinx.
+Sanity-check the physics math in the M1 notebook WITHOUT dolfinx.
 Verifies: scaling constants, built-in potential math, depletion widths,
 peak field. If any of these are wrong, the notebook will be wrong too.
 """

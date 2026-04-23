@@ -1,7 +1,7 @@
 """
 End-to-end tests for the MOS capacitor C-V runner.
 
-Exercises the Day 6 `mos_cv` solver type:
+Exercises the M6 `mos_cv` solver type:
     - Multi-region equilibrium Poisson with cellwise eps_r
     - Gate contact BC + ohmic body contact
     - Integrated gate charge bookkeeping

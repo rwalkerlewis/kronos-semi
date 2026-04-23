@@ -317,12 +317,12 @@ def verify_pn_1d_bias(result) -> list[tuple[str, bool, str]]:
     Compare simulated J(V) to Sah-Noyce-Shockley theory over the full
     forward range.
 
-    Day 2 shipped a qualitative-only low-bias check because the ideal
+    M2 shipped a qualitative-only low-bias check because the ideal
     Shockley curve underestimates current where depletion-region SRH
-    recombination dominates. Day 3 adds the SNS depletion term so the
+    recombination dominates. M3 adds the SNS depletion term so the
     reference is quantitative across V in [0.15, 0.6] V within 15%.
     V = 0.6 V is checked against Shockley-diffusion alone within 10%
-    as a regression on the Day 2 acceptance criterion.
+    as a regression on the M2 acceptance criterion.
 
     If a reverse-bias branch is present (V < 0), verification of the
     saturation region is delegated to `verify_pn_1d_bias_reverse` via
@@ -388,7 +388,7 @@ def verify_pn_1d_bias(result) -> list[tuple[str, bool, str]]:
             f"ref={J_ref[worst_i]:.3e})",
         ))
 
-    # Regression on the Day 2 high-bias Shockley-diffusion check.
+    # Regression on the M2 high-bias Shockley-diffusion check.
     row06 = min(iv, key=lambda r: abs(r["V"] - 0.6))
     if abs(row06["V"] - 0.6) < 0.03:
         J_sim_06 = abs(float(row06["J"]))
@@ -1069,7 +1069,7 @@ def _resistor_geometry(cfg, mesh_obj=None) -> tuple[float, float]:
 
 @register("resistor_3d")
 def verify_resistor_3d(result) -> list[tuple[str, bool, str]]:
-    """V-I linearity verifier for the 3D ohmic resistor (Day 7).
+    """V-I linearity verifier for the 3D ohmic resistor (M7).
 
     Steps (see docs/resistor_derivation.md section 3):
       1. Sweep covers 5 points in [-0.01, +0.01] V.

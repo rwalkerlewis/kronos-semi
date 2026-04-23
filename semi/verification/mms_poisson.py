@@ -405,11 +405,11 @@ CLI_NS_2D = [16, 32, 64, 128]
 
 
 # ---------------------------------------------------------------------------
-# Multi-region Poisson MMS (Day 6)
+# Multi-region Poisson MMS (M6)
 #
 # The single-region studies above fix eps_r to a scalar Constant. This
 # variant exercises the coefficient-jump assembly with a piecewise DG0
-# eps_r(x) matching the Day-6 MOS stack: eps_r_Si = 11.7 over the bottom
+# eps_r(x) matching the M6 MOS stack: eps_r_Si = 11.7 over the bottom
 # fraction of the square, eps_r_ox = 3.9 over the top. The exact
 # solution
 #
@@ -747,7 +747,7 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
     )
     studies["2d_quad_smoke"] = [smoke_row]
 
-    # 2D multi-region (Si/SiO2 coefficient jump) -- Day 6.
+    # 2D multi-region (Si/SiO2 coefficient jump) -- M6.
     mr_results = run_mr_convergence_study(CLI_NS_MR)
     mr_rows = to_table_rows(mr_results)
     write_artifacts(

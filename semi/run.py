@@ -2,7 +2,7 @@
 Top-level entry point: run a simulation from a validated config dict.
 
 Supports:
-    solver.type == "equilibrium"      equilibrium Poisson (Day 1).
+    solver.type == "equilibrium"      equilibrium Poisson (M1).
     solver.type == "drift_diffusion"  coupled solve at baked biases.
     solver.type == "bias_sweep"       bias ramp: walk a contact's
                                       voltage_sweep and solve coupled.
