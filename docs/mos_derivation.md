@@ -311,7 +311,7 @@ The block residual `(F_psi, F_phi_n, F_phi_p)` has:
 ### 4.2 Boundary conditions on the submesh
 
 Dirichlet conditions for phi_n, phi_p are applied only on ohmic
-contact facets that lie on the submesh boundary. In the Day-6 device
+contact facets that lie on the submesh boundary. In the M6 device
 this is exclusively the body facet at y = 0. The Si/SiO2 interface
 `Gamma` is on the submesh exterior but carries no Dirichlet, so the
 natural `J . n = 0` condition applies (Section 3.2).
@@ -385,7 +385,7 @@ phi_ms = phi_m - ( chi_s + E_g/2 - phi_F_bulk )
 and `phi_F_bulk = V_t * ln(N_A / n_i)` for a p-type substrate (sign
 flipped for n-type). For an "ideal gate" (phi_m set equal to the
 silicon mid-gap plus phi_F correction, giving zero flatband offset),
-`phi_ms = 0` and `V_FB = 0`. This is the Day-6 baseline. A non-zero
+`phi_ms = 0` and `V_FB = 0`. This is the M6 baseline. A non-zero
 phi_ms is read from the `workfunction` JSON key on the contact;
 ContactBC already has the `work_function` field (see
 `semi/bcs.py:37-48`), so no schema extension is needed.
@@ -454,7 +454,7 @@ voltage is
 V_FB = phi_ms
 ```
 
-For the Day-6 ideal-gate baseline, V_FB = 0.
+For the M6 ideal-gate baseline, V_FB = 0.
 
 ### 6.2 Surface potential and Fermi potential
 
@@ -532,7 +532,7 @@ Strong inversion begins at psi_s = 2 phi_F:
 V_T = V_FB + 2 phi_F + sqrt( 4 eps_s q N_A phi_F ) / C_ox
 ```
 
-Numerical check for the Day-6 device (V_FB = 0, phi_F = 0.417 V,
+Numerical check for the M6 device (V_FB = 0, phi_F = 0.417 V,
 eps_s = 11.7 eps_0, N_A = 1e23 m^-3, C_ox = 6.906e-3 F/m^2):
 
 ```
@@ -636,7 +636,7 @@ is either 2.0 in L^2 or it is not.
 
 Same two-region rectangle as Section 1, with eps_r_Si = 11.7 and
 eps_r_ox = 3.9. The implementation builds this from a minimal box-
-tagged mesh (not the full Day-6 device), with parameters:
+tagged mesh (not the full M6 device), with parameters:
 
 ```
 W     = 1.0e-7 m        square-ish domain
@@ -754,7 +754,7 @@ All four levels respect the interface (y_int is a grid line) by
 choosing N with a factor such that `y_int` falls on a mesh node.
 For the dimensions in Section 7.1 with t_Si = 0.7e-7, y_top = 1.0e-7,
 we need N divisible by 10 in the y direction, or we use a rectangle
-generator that explicitly inserts y_int as a grid node. The Day-6
+generator that explicitly inserts y_int as a grid node. The M6
 implementation uses the existing `regions_by_box` path, which produces
 a structured rectangle with box-aligned tag boundaries.
 
@@ -775,8 +775,8 @@ rate_L2 >= 1.75
 rate_H1 >= 0.80
 ```
 
-The stricter 1.99 self-convergence threshold is reserved for the Day-6
-acceptance criterion (item 10 in the Day-6 spec); the code-gate
+The stricter 1.99 self-convergence threshold is reserved for the M6
+acceptance criterion (item 10 in the M6 spec); the code-gate
 threshold is the looser 1.75 so small amplitude or rounding
 variations do not block CI unnecessarily.
 
@@ -798,7 +798,7 @@ existing Poisson MMS pattern (see
 
 ## 8. Summary of deliverables implied by this derivation
 
-For reference against the Day-6 prompt spec:
+For reference against the M6 prompt spec:
 
 1. `docs/mos_derivation.md` (this file).
 2. `semi/mesh.py`: `build_submesh_by_role` via
@@ -818,7 +818,7 @@ For reference against the Day-6 prompt spec:
    `mms_poisson_2d_multiregion` per Section 7.
 10. `docs/PHYSICS.md` Section 6: condensed MOS physics reference
     (cross-linked to this derivation).
-11. `CHANGELOG.md`, `docs/ROADMAP.md`, `PLAN.md` updated on Day-6
+11. `CHANGELOG.md`, `docs/ROADMAP.md`, `PLAN.md` updated on M6
     completion.
 12. Optional ADR 0008 if the submesh approach warrants a design
     record beyond the dolfinx-mechanical `create_submesh` call.

@@ -44,6 +44,9 @@ dev = [
     "ruff>=0.1",
 ]
 
+[project.scripts]
+semi-run = "semi.io.cli:main"
+
 [project.urls]
 Repository = "https://github.com/rwalkerlewis/kronos-semi"
 Issues = "https://github.com/rwalkerlewis/kronos-semi/issues"

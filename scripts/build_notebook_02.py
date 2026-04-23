@@ -17,11 +17,11 @@ Couples Poisson to drift-diffusion continuity equations in Slotboom $(\psi, \Phi
 - **Forward bias** (0 to 0.6 V): Sah-Noyce-Shockley $J_\text{diff} + J_\text{rec}$, with the ideal long-diode Shockley diffusion curve as a second overlay. Current is dominated by depletion-region SRH recombination at low bias and by diffusion at high bias.
 - **Reverse bias** (0 to -2 V): net SRH generation in the expanding depletion region, $J_\text{gen,net}(V) = (q n_i / 2 \tau_\text{eff})\,(W(V) - W(0))$, plus the ideal Shockley saturation floor $J_s$.
 
-Both sweeps use adaptive bias continuation (Newton step halving on divergence, re-growth on easy iterations) and start from the Day-1 equilibrium iterate.
+Both sweeps use adaptive bias continuation (Newton step halving on divergence, re-growth on easy iterations) and start from the M1 equilibrium iterate.
 
 ## Notebook set
 
-This is the second of four Colab walkthroughs that exercise the [end-of-Day-7 capability matrix](https://github.com/rwalkerlewis/kronos-semi#status) from the README:
+This is the second of four Colab walkthroughs that exercise the [end-of-M7 capability matrix](https://github.com/rwalkerlewis/kronos-semi#status) from the README:
 
 | Notebook | Covers |
 |----------|--------|

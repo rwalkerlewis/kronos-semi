@@ -328,7 +328,7 @@ Read `PLAN.md` for the current in-flight task.
   tolerance on both paths; M1-M6 benchmarks (`pn_1d`,
   `pn_1d_bias`, `pn_1d_bias_reverse`, `mos_2d`) stay byte-identical;
   the M4-M6 V&V suite stays green (every MMS rate within 0.01 of
-  the post-Day-6 values, including `2d_multiregion`).
+  the post-M6 values, including `2d_multiregion`).
 - **Goal (as delivered):** confirmed the simulator framework extends
   to 3D with no physics changes. Equilibrium Poisson and the
   Slotboom drift-diffusion forms (`semi/physics/poisson.py`,
@@ -387,7 +387,7 @@ Read `PLAN.md` for the current in-flight task.
 - **Deliverables:**
   - Sync `PLAN.md` "Current state" and this roadmap to reflect the
     M7 merge and M8 in flight.
-  - Rewrite the `README.md` status section as an end-of-Day-7
+  Rewrite the `README.md` status section as an end-of-M7
     capability matrix (M1-M7 shipped across PRs #2-#9), with a
     short scope-out prose block enumerating COMSOL Semiconductor-Module
     features that are deliberately out of scope.
@@ -410,7 +410,7 @@ Read `PLAN.md` for the current in-flight task.
   - Every notebook executed on a real Colab runtime (not just
     `jupyter nbconvert --execute` locally) with wall time and
     final-cell observation recorded in the PR body.
-  - README and CHANGELOG accurately describe the end-of-Day-7
+  README and CHANGELOG accurately describe the end-of-M7
     capability set.
   - CI green on every commit on the branch
     (`gh run list --branch dev/submission-polish` verbatim).

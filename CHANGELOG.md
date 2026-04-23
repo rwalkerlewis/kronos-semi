@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.9.0] - M9: Result artifact writer
+
+### Added
+- `schemas/manifest.v1.json`: JSON-schema Draft-07 describing the run-artifact
+  manifest contract. Covers engine metadata, solver summary, field list,
+  mesh topology, optional bias-sweep entries, and warnings.
+- `semi/io/artifact.py`: `write_artifact(result, out_dir, run_id, input_json_path)`
+  writes a versioned run directory containing `manifest.json`, `input.json`,
+  `mesh/mesh.xdmf`, `fields/<name>.bp` (or `.xdmf` fallback), `iv/<contact>.csv`,
+  and `convergence/snes.csv`.
+- `semi/io/reader.py`: `read_manifest(run_dir)` loads and schema-validates
+  `manifest.json` using only stdlib JSON plus optional jsonschema; no dolfinx
+  or numpy dependency, safe for M10 server subprocess.
+- `semi/io/__init__.py`: exposes `write_artifact` and `read_manifest`.
+- `semi/io/cli.py`: `main()` function powering the `semi-run` CLI entry point.
+- `tests/test_artifact.py`: assertions across pure-Python schema tests and
+  FEM-heavy parametrized benchmark tests (skipif when dolfinx unavailable).
+- `[project.scripts]` entry in `pyproject.toml`: `semi-run = "semi.io.cli:main"`.
+
+### Changed
+- `PLAN.md`: M9 moved to completed work log; next task set to M10.
+- `CHANGELOG.md`: M9 entry added.
+
 ## [0.8.0] - M8: Submission polish
 
 ### Added

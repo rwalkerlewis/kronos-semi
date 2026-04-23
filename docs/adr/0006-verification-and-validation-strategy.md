@@ -20,7 +20,7 @@ sign or coefficient errors that happen to cancel at a single
 resolution. Several failure modes are invisible to them by
 construction:
 
-- A Poisson coefficient off by a factor (the Day-1 `lambda2` vs.
+- A Poisson coefficient off by a factor (the M1 `lambda2` vs.
   `L_D^2` bug went undetected for the first pass because V_bi is set
   by the BCs alone).
 - A residual block whose sign is flipped: the coupled Newton may still
@@ -58,7 +58,7 @@ The candidate verification activities considered:
 
 ## Decision
 
-Ship a four-phase V&V suite as the Day-4 deliverable. The suite runs
+Ship a four-phase V&V suite as the M4 deliverable. The suite runs
 automatically inside the `docker-fem` CI job via
 `scripts/run_verification.py all` and uploads every CSV and PNG
 artifact under `results/`.

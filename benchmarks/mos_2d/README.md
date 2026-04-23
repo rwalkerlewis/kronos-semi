@@ -37,7 +37,7 @@ and `C_sim = dQ_gate/dV_gate` via centered finite difference.
 ## Verification target
 
 Depletion-approximation C-V curve within 10% in the window
-[V_FB + 0.2, V_T - 0.1] V. For the ideal-gate Day-6 device under our
+[V_FB + 0.2, V_T - 0.1] V. For the ideal-gate M6 device under our
 psi=0-at-intrinsic BC convention:
 
     V_FB = phi_ms - phi_F = 0 - 0.417 V = -0.417 V
