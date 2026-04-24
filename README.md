@@ -4,17 +4,17 @@
 
 A JSON-driven finite-element semiconductor device simulator built on FEniCSx
 (dolfinx 0.10). Solves Poisson-coupled drift-diffusion with SRH recombination
-on 1D, 2D, and 3D meshes. Originally delivered as an evaluation task; the
-project is transitioning from submission artifact to a production engine
-intended to sit behind a COMSOL-Semiconductor-style web UI.
+on 1D, 2D, and 3D meshes, with an HTTP API for programmatic access.
+Originally delivered as an evaluation task; the project is now a working
+production engine suitable for web UI integration.
 
 If you're a contributor or a coding agent, start at the [Orientation](#orientation)
 section.
 
-## Status (v0.8.0, end of M8)
+## Status (v0.10.0, end of M10)
 
-Milestones M1 through M8 are merged on `main`. The capability matrix is what
-the engine actually does today, verified in CI:
+Milestones M1 through M10 are merged on `main`. The capability matrix is
+what the engine actually does today, verified in CI:
 
 | Capability                         | Dimensions    | Status  | Verifier                                                     |
 |------------------------------------|---------------|---------|--------------------------------------------------------------|
@@ -29,31 +29,32 @@ the engine actually does today, verified in CI:
 | 3D ohmic V-I linearity             | 3D            | shipped | V-I linearity within 1%                                      |
 | Benchmarks                         | 5             | shipped | pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d   |
 | Conservation / mesh convergence    | 1D            | shipped | charge neutrality, Cauchy rates >= 1.8/doubling              |
-| Test suite                         | pure + FEM    | shipped | 206 tests, 95.58% coverage                                   |
 | V&V                                | 10 studies    | shipped | 62/62 PASS                                                   |
+| On-disk result artifact (M9)       | all           | shipped | round-trip tests on all 5 benchmarks, manifest Draft-07 validated |
+| `semi-run` CLI (M9)                | all           | shipped | end-to-end artifact writer exercised in CI                   |
+| HTTP server (M10)                  | all           | shipped | 15 server tests, end-to-end POST /solve + WebSocket progress |
+| Test suite                         | pure + FEM    | shipped | 230 tests, >=95% coverage                                    |
 | CI                                 | lint+test+FEM | shipped | green on dev and main                                        |
 
 See [CHANGELOG.md](CHANGELOG.md) for per-milestone deliverables.
 
-## Where this is going (M9+)
+## Where this is going (M11+)
 
-M1–M8 produced a numerically sound engine with good verification. The gap
-between "verified submission" and "production engine behind a web UI" is
-mostly not physics; it is integration. The roadmap for closing that gap
-lives in [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md). Summary:
+M1 through M10 produced a numerically sound engine with an HTTP API. The
+remaining work is mostly additional physics and the linear-solver scaling
+needed for real 3D devices. The roadmap lives in
+[docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md).
 
-| Milestone | Summary                                          | Blocking for                     |
-|-----------|--------------------------------------------------|----------------------------------|
-| M9        | Result artifact writer + manifest.json           | Everything downstream            |
-| M10       | HTTP server: POST /solve, GET /runs/{id}         | Any UI integration               |
-| M11       | Schema versioning + UI-facing schema companion   | Form-builder-driven UI           |
-| M12       | Mesh input beyond axis-aligned boxes             | Real (non-rectangular) devices   |
-| M13       | Transient solver                                 | C-V transients, diode turn-on    |
-| M14       | AC small-signal analysis                         | True C-V, admittance spectroscopy|
-| M15       | GPU linear solver path                           | Anything above ~200k DOFs        |
-| M16       | Physics completeness pass (mobility, Auger, FD, Schottky, tunneling) | Real device models |
-| M17       | Heterojunctions / position-dependent band structure | HEMTs, HBTs                   |
-| M18       | UI: first cut (separate repo)                    | Shipping a product               |
+| Milestone | Summary                                                      | Blocking for                     |
+|-----------|--------------------------------------------------------------|----------------------------------|
+| M11       | Schema versioning + UI-facing schema companion               | Form-builder-driven UI           |
+| M12       | Mesh input beyond axis-aligned boxes                         | Real (non-rectangular) devices   |
+| M13       | Transient solver                                             | C-V transients, diode turn-on    |
+| M14       | AC small-signal analysis                                     | True C-V, admittance spectroscopy|
+| M15       | GPU linear solver path                                       | Anything above ~200k DOFs        |
+| M16       | Physics completeness pass (mobility, Auger, FD, Schottky, tunneling) | Real device models       |
+| M17       | Heterojunctions / position-dependent band structure          | HEMTs, HBTs                      |
+| M18       | UI: first cut (separate repo)                                | Shipping a product               |
 
 Each milestone in the guide has explicit deliverables and acceptance tests.
 
@@ -120,10 +121,62 @@ cd kronos-semi
 pip install -e ".[dev]"
 ```
 
+For HTTP server support, include the `server` extra:
+
+```bash
+pip install -e ".[dev,server]"
+```
+
 The pure-Python layer (`schema`, `materials`, `scaling`, `doping`,
 `constants`) does not need dolfinx and installs standalone via
 `pip install -e .` — useful for schema validation and unit tests in
-CI environments without a FEM toolchain.
+CI environments without a FEM toolchain. The `server` process also
+imports no dolfinx at module scope; FEM work happens in spawned worker
+subprocesses.
+
+## Running the HTTP server (M10)
+
+The `kronos-server` console entry point starts a FastAPI server that
+exposes the engine over HTTP:
+
+```bash
+kronos-server                           # 127.0.0.1:8000 by default
+KRONOS_SERVER_PORT=8080 kronos-server   # or via env vars
+```
+
+Under Docker Compose, the `server` service runs the same entry point:
+
+```bash
+docker compose up -d server
+curl http://localhost:8000/health
+curl http://localhost:8000/capabilities | python -m json.tool
+```
+
+### Example: submit a solve over HTTP
+
+```bash
+# Submit a benchmark as a JSON body
+RUN_ID=$(curl -sf -X POST http://localhost:8000/solve \
+  -H "Content-Type: application/json" \
+  -d @benchmarks/pn_1d/pn_junction.json \
+  | python -c 'import sys,json; print(json.load(sys.stdin)["run_id"])')
+
+# Poll until complete
+while true; do
+  STATUS=$(curl -sf http://localhost:8000/runs/$RUN_ID \
+    | python -c 'import sys,json; print(json.load(sys.stdin)["status"])')
+  [ "$STATUS" = "completed" ] && break
+  sleep 2
+done
+
+# Fetch the manifest and an IV CSV
+curl -sf http://localhost:8000/runs/$RUN_ID/manifest
+curl -sf http://localhost:8000/runs/$RUN_ID/iv/cathode
+```
+
+OpenAPI spec at `http://localhost:8000/openapi.json`, Swagger UI at
+`/docs`. Full endpoint reference in
+[CHANGELOG.md](CHANGELOG.md) under the `[0.10.0]` entry.
 
 ## Docker
 
@@ -131,10 +184,11 @@ Reproducible dev environment on top of `ghcr.io/fenics/dolfinx/dolfinx:stable`:
 
 ```bash
 docker compose build
-docker compose run --rm test                       # pytest
+docker compose run --rm test                       # pytest (230 tests)
 docker compose run --rm benchmark pn_1d            # run a benchmark
 docker compose up -d dev && docker compose exec dev bash
 docker compose up jupyter                          # JupyterLab on :8888
+docker compose up -d server                        # HTTP server on :8000
 ```
 
 ## Running benchmarks
@@ -147,9 +201,9 @@ docker compose run --rm benchmark mos_2d
 docker compose run --rm benchmark resistor_3d
 ```
 
-Each benchmark is a JSON file under `benchmarks/<name>/`. The CLI loads it,
+Each benchmark is a JSON file under `benchmarks/<n>/`. The CLI loads it,
 runs the solver, checks a registered verifier, and writes plots to
-`results/<name>/`.
+`results/<n>/`.
 
 From Python:
 
@@ -167,6 +221,17 @@ result = run.run(cfg)
 `result` is a `SimulationResult` dataclass; see
 [docs/WALKTHROUGH.md §11](docs/WALKTHROUGH.md) for the full schema and
 caveats about dolfinx-backed fields not being serializable.
+
+To persist a result to disk for later reading (including from an
+environment without dolfinx), use the M9 artifact writer:
+
+```bash
+semi-run benchmarks/pn_1d/pn_junction.json --out runs/
+```
+
+The resulting `runs/<run_id>/` directory contains a schema-validated
+`manifest.json`, the input JSON, mesh and field files, IV CSVs, and
+convergence logs.
 
 ## JSON input example
 
@@ -212,7 +277,7 @@ else is SI. The full schema is defined in `semi/schema.py`.
 
 kronos-semi covers the **quasi-static, steady-state** subset.
 
-**In scope (shipped, M1–M8):**
+**In scope (shipped, M1–M10):**
 
 - Poisson with multi-region dielectric (Si/SiO2)
 - Drift-diffusion in Slotboom (quasi-Fermi potential) form
@@ -221,6 +286,8 @@ kronos-semi covers the **quasi-static, steady-state** subset.
 - 1D, 2D, and 3D structured meshes (builtin); 3D unstructured meshes via gmsh
 - Bias sweeps with adaptive step-size continuation (unipolar and bipolar)
 - Method-of-Manufactured-Solutions and conservation V&V suite
+- Machine-readable on-disk result artifacts (schema-validated manifests)
+- HTTP API with solve submission, progress streaming, and artifact fetch
 
 **Out of scope today (planned for M13–M17, see [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md)):**
 
@@ -266,6 +333,16 @@ The `NonlinearProblem` class in 0.10 wraps PETSc SNES directly (the old
 diagnostics, and block-system support for the coupled (ψ, Φ_n, Φ_p)
 solve. See [ADR 0003](docs/adr/0003-dolfinx-0-10-api.md).
 
+### Why no dolfinx in the server process
+
+`kronos_server/` never imports dolfinx, UFL, or PETSc at module scope.
+FEM work happens only in worker subprocesses spawned via
+`ProcessPoolExecutor(mp_context="spawn")`. A server process can start
+and serve `/health`, `/ready`, `/capabilities`, and `/schema` in a
+pure-Python environment without the FEM stack, which is useful for
+smoke-tested deployments and for UI developers who want a static mock
+server.
+
 ## Verification
 
 Analytical results are regenerated at import time by
@@ -276,20 +353,20 @@ junction.
 
 ```bash
 python tests/check_day1_math.py    # runs offline, no dolfinx required
-pytest tests/                       # 206 tests under Docker
+pytest tests/                       # 230 tests under Docker
 python scripts/run_verification.py  # V&V suite, 62 studies
 ```
 
 ## Planning documents (read order for contributors)
 
 1. [PLAN.md](PLAN.md) — current state, next task, invariants. **Single source of truth** for what to work on.
-2. [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md) — M9+ roadmap, acceptance tests, anti-goals.
+2. [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md) — M11+ roadmap, acceptance tests, anti-goals.
 3. [docs/PHYSICS_INTRO.md](docs/PHYSICS_INTRO.md) — physics tutorial for programmers.
 4. [docs/PHYSICS.md](docs/PHYSICS.md) — governing equations, scaling, BCs (reference).
 5. [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) — end-to-end code trace with file:line anchors.
 6. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — five-layer component design and import rules.
 7. [docs/adr/](docs/adr/) — locked decisions. Open a new ADR before changing any invariant.
-8. [docs/ROADMAP.md](docs/ROADMAP.md) — per-milestone delivery history (M1–M8).
+8. [docs/ROADMAP.md](docs/ROADMAP.md) — per-milestone delivery history (M1–M10).
 
 ## License
 
