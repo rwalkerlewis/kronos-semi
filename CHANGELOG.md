@@ -1,5 +1,73 @@
 # Changelog
 
+## [0.11.0] - M11: Schema versioning
+
+### Added
+- `schemas/input.v1.json`: the project's Draft-07 input schema, extracted
+  verbatim from the old `semi.schema.SCHEMA` dict. Every `type: object`
+  node carries a `description`; leaf properties carry descriptions and,
+  where applicable, `default`/`examples` annotations that a UI form
+  builder can render as labels and help text.
+- Required top-level `schema_version` field on every input JSON
+  (pattern `^\d+\.\d+\.\d+$`). The engine constant
+  `semi.schema.ENGINE_SUPPORTED_SCHEMA_MAJOR = 1` is compared against
+  the input's major version; mismatched majors raise `SchemaError`.
+  Minor/patch skew is accepted silently.
+- Symmetric major-version gate on the *output* side:
+  `semi.io.reader.ENGINE_SUPPORTED_MANIFEST_MAJOR = 1` is compared
+  against the `schema_version` of a manifest being read back;
+  mismatches raise `ValueError`. Manifests without `schema_version`
+  (pre-M9 artifacts) are still loadable with a warning.
+- `GET /schema` now returns
+  `{"schema": <Draft-07 schema>, "version": "1.0.0", "supported_major": 1}`
+  instead of the bare schema, so UI clients can discover the advertised
+  schema version and the engine's supported major in one round trip.
+- `schema_version: "1.0.0"` as the first key of every shipped benchmark
+  JSON (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`, `mos_2d`,
+  `resistor_3d`, `resistor_gmsh`).
+- `tests/test_schema_versioning.py`: 8 pure-Python tests gating
+  Draft-07 validity of the extracted schema, description presence on
+  every object node, benchmark-JSON semver compliance, major-mismatch
+  rejection, minor-skew acceptance, missing-`schema_version`
+  rejection, loader caching (identity), and manifest major-mismatch
+  rejection.
+
+### Changed
+- `semi/schema.py` is now a loader: the module-level `SCHEMA` dict is
+  populated from `schemas/input.v1.json` via an `@lru_cache`'d
+  `_load_schema()`. The public API (`SCHEMA`, `validate`, `load`,
+  `dumps`, `SchemaError`) is unchanged; downstream imports need no
+  edits.
+- `tests/test_kronos_server.py::test_schema` asserts the new
+  `{schema, version, supported_major}` shape rather than a bare
+  schema.
+- `pyproject.toml` version bumped `0.10.0 -> 0.11.0`.
+  `[tool.hatch.build.targets.wheel]` now `force-include`s `schemas/`
+  so `pip install kronos-semi` ships both `input.v1.json` and
+  `manifest.v1.json` inside the wheel.
+- `semi/__init__.py` `__version__` bumped `0.10.0 -> 0.11.0`.
+
+### Known issues
+- **Input schema is permissive about unknown keys.** The top-level
+  schema and every nested object lack `"additionalProperties": false`,
+  so a UI typo in a field name (e.g., `"voltag": 0.5` instead of
+  `"voltage"`) validates successfully and is silently ignored. The
+  manifest schema (M9) is strict via `additionalProperties: false`
+  throughout; the input schema should be too, eventually. Flipping
+  this is a breaking change -- every existing external JSON with
+  extra keys would fail. Defer to a major schema bump (v2.0.0) in a
+  later milestone.
+- **No separate `schema_version` for sub-blocks.** Today, if the
+  `physics` block gains a new required key in v1.1.0, every caller
+  must upgrade atomically. A per-block version would allow partial
+  upgrades. Not needed now; flag for when it actually bites.
+- **Defaults documented in schema annotations but synthesized by
+  `_fill_defaults`.** Two sources of truth that must stay in sync.
+  M11 hand-copies them; a future refactor could drive defaults from
+  the schema directly (e.g., using a library like
+  `jsonschema-default`). Low priority unless the list of defaults
+  grows significantly.
+
 ## [0.10.0] - M10: HTTP server
 
 ### Added

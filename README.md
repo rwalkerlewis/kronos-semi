@@ -11,9 +11,9 @@ production engine suitable for web UI integration.
 If you're a contributor or a coding agent, start at the [Orientation](#orientation)
 section.
 
-## Status (v0.10.0, end of M10)
+## Status (v0.11.0, end of M11)
 
-Milestones M1 through M10 are merged on `main`. The capability matrix is
+Milestones M1 through M11 are merged on `main`. The capability matrix is
 what the engine actually does today, verified in CI:
 
 | Capability                         | Dimensions    | Status  | Verifier                                                     |
@@ -33,21 +33,22 @@ what the engine actually does today, verified in CI:
 | On-disk result artifact (M9)       | all           | shipped | round-trip tests on all 5 benchmarks, manifest Draft-07 validated |
 | `semi-run` CLI (M9)                | all           | shipped | end-to-end artifact writer exercised in CI                   |
 | HTTP server (M10)                  | all           | shipped | 15 server tests, end-to-end POST /solve + WebSocket progress |
-| Test suite                         | pure + FEM    | shipped | 230 tests, >=95% coverage                                    |
+| Schema versioning + UI form-builder annotations (M11) | all | shipped | every object node has description; schema extracted to JSON file |
+| Test suite                         | pure + FEM    | shipped | 238 tests, >=95% coverage                                    |
 | CI                                 | lint+test+FEM | shipped | green on dev and main                                        |
 
 See [CHANGELOG.md](CHANGELOG.md) for per-milestone deliverables.
 
-## Where this is going (M11+)
+## Where this is going (M12+)
 
-M1 through M10 produced a numerically sound engine with an HTTP API. The
-remaining work is mostly additional physics and the linear-solver scaling
-needed for real 3D devices. The roadmap lives in
+M1 through M11 produced a numerically sound engine with a versioned,
+UI-facing JSON input contract and an HTTP API. The remaining work is
+mostly additional physics and the linear-solver scaling needed for real
+3D devices. The roadmap lives in
 [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md).
 
 | Milestone | Summary                                                      | Blocking for                     |
 |-----------|--------------------------------------------------------------|----------------------------------|
-| M11       | Schema versioning + UI-facing schema companion               | Form-builder-driven UI           |
 | M12       | Mesh input beyond axis-aligned boxes                         | Real (non-rectangular) devices   |
 | M13       | Transient solver                                             | C-V transients, diode turn-on    |
 | M14       | AC small-signal analysis                                     | True C-V, admittance spectroscopy|
@@ -184,7 +185,7 @@ Reproducible dev environment on top of `ghcr.io/fenics/dolfinx/dolfinx:stable`:
 
 ```bash
 docker compose build
-docker compose run --rm test                       # pytest (230 tests)
+docker compose run --rm test                       # pytest (238 tests)
 docker compose run --rm benchmark pn_1d            # run a benchmark
 docker compose up -d dev && docker compose exec dev bash
 docker compose up jupyter                          # JupyterLab on :8888
@@ -271,7 +272,13 @@ Minimal 1D pn junction:
 ```
 
 Doping densities in JSON are in cm⁻³ (device-physics tradition); everything
-else is SI. The full schema is defined in `semi/schema.py`.
+else is SI. The full schema lives in `schemas/input.v1.json` (JSON
+Schema Draft-07, every object node annotated with a UI-facing
+description); `semi/schema.py` loads it and exposes it as
+`semi.schema.SCHEMA`. Every input JSON must declare a top-level
+`"schema_version": "1.0.0"`; the engine refuses inputs whose major
+version does not match `ENGINE_SUPPORTED_SCHEMA_MAJOR` in
+`semi/schema.py` (currently `1`).
 
 ## Scope vs COMSOL Semiconductor Module
 
@@ -353,7 +360,7 @@ junction.
 
 ```bash
 python tests/check_day1_math.py    # runs offline, no dolfinx required
-pytest tests/                       # 230 tests under Docker
+pytest tests/                       # 238 tests under Docker
 python scripts/run_verification.py  # V&V suite, 62 studies
 ```
 

@@ -17,9 +17,25 @@ router = APIRouter()
 
 @router.get("/schema")
 def get_schema() -> dict[str, Any]:
-    """The input JSON schema as an object. UI form-builders consume this."""
-    from semi.schema import SCHEMA
-    return SCHEMA
+    """The input JSON schema plus version metadata. UI form-builders consume this.
+
+    Returns ``{"schema": <Draft-07 schema>, "version": "1.0.0",
+    "supported_major": 1}``. The embedded ``schema`` matches
+    ``semi.schema.SCHEMA`` verbatim; ``version`` is the advertised schema
+    version (taken from the ``schema_version`` property's ``examples``);
+    ``supported_major`` is the engine's accepted major version.
+    """
+    from semi.schema import ENGINE_SUPPORTED_SCHEMA_MAJOR, SCHEMA
+    version = (
+        SCHEMA.get("properties", {})
+        .get("schema_version", {})
+        .get("examples", ["1.0.0"])[0]
+    )
+    return {
+        "schema": SCHEMA,
+        "version": version,
+        "supported_major": ENGINE_SUPPORTED_SCHEMA_MAJOR,
+    }
 
 
 @router.get("/materials")

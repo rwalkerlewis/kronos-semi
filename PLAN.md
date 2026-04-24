@@ -35,12 +35,13 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M10 are merged into `main`. M9 delivered the on-disk artifact
-contract; M10 now exposes the engine over HTTP via a new top-level
-`kronos_server/` package. `CHANGELOG.md` records the `[0.10.0] - M10:
-HTTP server` entry. The project has delivered the KronosAI evaluation
-milestones plus the first two pieces of the production-engine track
-(artifact writer and HTTP API).
+M1 through M11 are merged into `main`. M9 delivered the on-disk artifact
+contract; M10 exposed the engine over HTTP; M11 versions the input
+schema and ships the UI-facing schema companion. `CHANGELOG.md` records
+the `[0.11.0] - M11: Schema versioning` entry. The project has
+delivered the KronosAI evaluation milestones plus the first three
+pieces of the production-engine track (artifact writer, HTTP API, and
+versioned UI-facing input schema).
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
@@ -90,10 +91,8 @@ The capability matrix (verified in CI) is authoritative: see `README.md`
 The gaps between the current state and a production UI-backed engine
 are enumerated and sequenced in
 [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md), milestones
-M11 through M18. Summary:
+M12 through M18. Summary:
 
-- **No schema versioning.** Input JSON still lacks `schema_version`.
-  M11.
 - **Mesh input is axis-aligned-only** except for imported gmsh files
   that came pre-meshed. M12.
 - **No transient, no AC small-signal.** Steady-state only. M13, M14.
@@ -103,21 +102,8 @@ M11 through M18. Summary:
 
 ## Next task
 
-**M11: Schema versioning + UI-facing schema companion.** Scoped in full
-in [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §4 (M11).
-
-- **Goal:** make the input JSON schema introspectable and versioned so
-  a UI form-builder can render labels, defaults, and help text without
-  a separate config layer, and so the engine can refuse inputs from an
-  incompatible major version.
-- **Scope, in:** a required top-level `schema_version` field in every
-  input; a standalone `schemas/input.v1.json` file loaded by
-  `semi/schema.py`; `title`/`description`/`default`/`examples` added to
-  every schema node; an assertion test that every `type: object` node
-  has a `description`.
-- **Scope, out:** any physics change, M10 server surface changes,
-  manifest schema changes.
-- **Preconditions:** M10 merged on `main`.
+**M12: Mesh input beyond axis-aligned boxes** (see
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §M12).
 
 ## Roadmap
 
@@ -133,8 +119,8 @@ in [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §4 (M11).
 | M8: Submission polish | Notebooks, catalog, CHANGELOG, v0.8.0 tag | Done |
 | M9: Result artifact writer | manifest.json, on-disk field/IV files, semi-run CLI | Done |
 | M10: HTTP server | POST /solve, GET /runs/{id}, WebSocket progress | Done |
-| M11: Schema versioning | UI-facing schema companion, form-builder annotations | Next |
-| M12: Mesh beyond boxes | XDMF loader, gmsh .geo ingress, 2D MOSFET benchmark | Planned |
+| M11: Schema versioning | UI-facing schema companion, form-builder annotations | Done |
+| M12: Mesh beyond boxes | XDMF loader, gmsh .geo ingress, 2D MOSFET benchmark | Next |
 | M13: Transient solver | Backward-Euler + BDF2, diode turn-on benchmark | Planned |
 | M14: AC small-signal | Complex-frequency admittance, true C-V | Planned |
 | M15: GPU linear solver | PETSc CUDA/HIP, AMGX preconditioner, 500k-DOF 3D benchmark | Planned |
@@ -233,6 +219,25 @@ items.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M11 (2026-04-23):** Schema versioning + UI-facing schema companion.
+  Extracted the input schema verbatim from `semi/schema.py` into
+  `schemas/input.v1.json` (Draft-07); `semi/schema.py` now loads that
+  file through an `@lru_cache`'d loader and exposes the same public
+  `SCHEMA`/`validate`/`load` surface. Added required top-level
+  `schema_version` (semver) with a major-version gate in
+  `semi.schema.validate` (`ENGINE_SUPPORTED_SCHEMA_MAJOR = 1`); minor/
+  patch skew is accepted silently. Annotated every `type: object`
+  node with a UI-facing description (22/22) and hand-copied
+  `_fill_defaults` defaults into the schema via `default`/`examples`.
+  `GET /schema` now returns `{schema, version, supported_major}`
+  instead of the bare schema. Added a symmetric manifest major-version
+  gate in `semi/io/reader.py`
+  (`ENGINE_SUPPORTED_MANIFEST_MAJOR = 1`). Added
+  `tests/test_schema_versioning.py` (8 pure-Python tests).
+  `pyproject.toml` version bumped to `0.11.0`; the wheel now
+  `force-include`s `schemas/` so pip-installed kronos-semi ships the
+  schema files. 238 tests pass, coverage 95.5%, ruff clean.
 
 - **M10 (2026-04-23):** HTTP server; new `kronos_server/` top-level package
   (FastAPI app, `ProcessPoolExecutor` worker pool, file-backed progress

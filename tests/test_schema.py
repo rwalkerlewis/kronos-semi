@@ -10,6 +10,7 @@ from semi import schema
 @pytest.fixture
 def minimal_cfg():
     return {
+        "schema_version": "1.0.0",
         "name": "test",
         "dimension": 1,
         "mesh": {
@@ -166,6 +167,7 @@ def test_continuation_rejects_nonpositive_max_step(minimal_cfg):
 
 def test_doping_gaussian_schema():
     cfg = {
+        "schema_version": "1.0.0",
         "name": "g", "dimension": 2,
         "mesh": {"source": "builtin", "extents": [[0, 1], [0, 1]], "resolution": [10, 10]},
         "regions": {"a": {"material": "Si"}},
