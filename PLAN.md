@@ -36,11 +36,36 @@ recombination for 1D/2D/3D devices.
 ## Current state
 
 M1 through M11 are merged into `main`. M12 is in flight on
-`dev/m12-mesh-beyond-boxes` with a known multi-region runner gap: the
-MOSFET benchmark exercises the new `geometry` input but fails its
-triode-regime +-20 percent verifier (simulated I_D ~ 30x the
-analytical value) because `bias_sweep` does not use the multi-region
-DD machinery shipped in M6 (`DDBlockSpacesMR`, `build_submesh_by_role`).
+`dev/m12-mesh-beyond-boxes`. The multi-region DD machinery from M6
+(`DDBlockSpacesMR`, `build_submesh_by_role`, cellwise `eps_r`) is now
+wired through `semi/runners/bias_sweep.py`: configs whose `regions` mix
+`semiconductor`- and `insulator`-role entries route through the MR
+path; single-region configs (pn_1d, pn_1d_bias, pn_1d_bias_reverse,
+resistor_3d) stay on the original path and remain bit-identical.
+Assertions: parent mesh psi is continuous across the Si/SiO2 interface,
+the `eps_r` DG0 coefficient is 3.9 in oxide / 11.7 in silicon, phi_n
+and phi_p live on a semiconductor submesh, and `entity_maps` threads
+the mixed-domain block assembly through SNES.
+
+The MOSFET benchmark gmsh `.geo` file was also made watertight at the
+Si/SiO2 interface (the oxide loop now reuses the silicon top-edge line
+with reversed orientation instead of declaring a duplicate line). This
+dropped the parent mesh from 6908 to 6842 vertices -- the 66 duplicates
+along the interface had been severing psi continuity before MR even got
+a chance to run.
+
+Despite those fixes, the MOSFET verifier still fails by ~30x because
+the benchmark has no n+ source/drain implants. A current-conservation
+check at the final (V_GS=1.5 V, V_DS=0.1 V) state finds I_n ~ 4e-13 A/m
+(the electron channel current the analytical triode formula predicts as
+~10 A/m) and I_p ~ 300 A/m (hole leakage through the p-body from drain
+to body). The Shockley ohmic BC on a uniform p-body pins phi_p at
+V_applied at source and drain, so the drain->body path carries bulk
+hole current that swamps the intended channel-electron current. This is
+upstream of the MR runner: adding n+ wells, switching to carrier-
+selective contacts, or reformulating the verifier to compare I_n only
+would each close the gap, but each is out of scope for M12 per the
+worker prompt ("do not add S/D doping").
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
@@ -100,11 +125,21 @@ M12 through M18. Summary:
 ## Next task
 
 **M12: Mesh beyond boxes** (still in flight on
-`dev/m12-mesh-beyond-boxes`). The specific next work item is wiring
-`DDBlockSpacesMR` and `build_submesh_by_role` through
-`semi/runners/bias_sweep.py`, analogous to how `semi/runners/mos_cv.py`
-uses them today. Until this is done the MOSFET benchmark verifier fails
-by 11 orders of magnitude against analytical theory.
+`dev/m12-mesh-beyond-boxes`). The multi-region DD wiring through
+`bias_sweep` has landed, all four single-region benchmarks still pass
+bit-identical, and the full suite (254 tests, 95.4% coverage) is green.
+The open gap is the MOSFET verifier: the benchmark as written (uniform
+p-body, ohmic source/drain/body contacts, no n+ implants) cannot
+produce a channel-electron-dominated I_D with the current Shockley BC
+model. The remaining close-out decision is between (a) adding an n+
+source/drain doping profile to the benchmark, (b) introducing a
+carrier-selective contact type (`contact.type: "ohmic_n"` pinning
+phi_n only and leaving phi_p natural), or (c) narrowing the verifier
+to compare I_n instead of total J. Options (b) and (c) are upstream of
+the benchmark and are the kinds of fix M12 can still legitimately
+contain; option (a) is a benchmark change and probably belongs to M16
+alongside the surface-mobility model the MOSFET verifier already
+acknowledges it is missing. Pick one and land it.
 
 ## Roadmap
 

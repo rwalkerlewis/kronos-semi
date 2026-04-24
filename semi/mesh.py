@@ -340,6 +340,68 @@ def build_submesh_by_role(msh, cell_tags, regions_cfg: dict, role: str = "semico
     return submesh, entity_map, vertex_map, geom_map
 
 
+def map_parent_facets_to_submesh(parent_msh, submesh, vertex_map, parent_facets):
+    """Translate parent-mesh facet indices to submesh facet indices.
+
+    For each parent facet in `parent_facets`, look up its vertex set via
+    the parent mesh's facet-to-vertex connectivity, map those vertices
+    into the submesh via `vertex_map` (a `dolfinx.mesh.EntityMap` of
+    dimension 0 returned by `create_submesh`), and return the submesh
+    facet carrying the same vertex set. Parent facets whose vertices do
+    not all lie in the submesh are silently dropped; those facets are
+    not boundaries of the submesh (e.g. an oxide-only facet when the
+    submesh is silicon-only).
+
+    Used by the multi-region bias-sweep path to translate parent
+    `facet_tags` into submesh-facet Dirichlet BCs for phi_n / phi_p on
+    the semiconductor while psi continues to be solved on the parent.
+    """
+    import numpy as np
+
+    tdim = parent_msh.topology.dim
+    fdim = tdim - 1
+    parent_msh.topology.create_connectivity(fdim, 0)
+    submesh.topology.create_connectivity(fdim, 0)
+    parent_f2v = parent_msh.topology.connectivity(fdim, 0)
+    sub_f2v = submesh.topology.connectivity(fdim, 0)
+
+    parent_facets = np.asarray(list(parent_facets), dtype=np.int32)
+    if parent_facets.size == 0:
+        return np.array([], dtype=np.int32)
+
+    unique_parent_verts = set()
+    for pf in parent_facets:
+        for v in parent_f2v.links(int(pf)):
+            unique_parent_verts.add(int(v))
+    parent_vert_arr = np.asarray(
+        sorted(unique_parent_verts), dtype=np.int32,
+    )
+    sub_vert_arr = np.asarray(
+        vertex_map.sub_topology_to_topology(parent_vert_arr, True),
+        dtype=np.int64,
+    )
+    parent_to_sub = {
+        int(p): int(s) for p, s in zip(parent_vert_arr, sub_vert_arr)
+    }
+
+    sub_facet_index = submesh.topology.index_map(fdim)
+    num_sub_facets = sub_facet_index.size_local + sub_facet_index.num_ghosts
+    sub_by_vertices: dict[tuple, int] = {}
+    for f_sub in range(num_sub_facets):
+        verts = tuple(sorted(int(v) for v in sub_f2v.links(f_sub)))
+        sub_by_vertices[verts] = f_sub
+
+    out: list[int] = []
+    for pf in parent_facets:
+        mapped = [parent_to_sub.get(int(v), -1) for v in parent_f2v.links(int(pf))]
+        if any(m < 0 for m in mapped):
+            continue
+        sub_f = sub_by_vertices.get(tuple(sorted(mapped)))
+        if sub_f is not None:
+            out.append(sub_f)
+    return np.asarray(out, dtype=np.int32)
+
+
 def build_eps_r_function(msh, cell_tags, regions_cfg: dict):
     """
     Build a DG0 cellwise `eps_r(x)` Function on the parent mesh.

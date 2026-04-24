@@ -51,7 +51,8 @@ def resolve_contact_facets(cfg, msh, facet_tags, contact_name):
 
 
 def evaluate_current_at_contact(spaces, sc, ref_mat, facet_info,
-                                mu_n_SI, mu_p_SI) -> float:
+                                mu_n_SI, mu_p_SI,
+                                entity_maps=None) -> float:
     """
     Evaluate J = J_n + J_p at a contact via a UFL weak form:
 
@@ -61,6 +62,12 @@ def evaluate_current_at_contact(spaces, sc, ref_mat, facet_info,
     Integrated over the contact facet and divided by its measure.
     Positive J = current flowing outward (out of the device through
     the contact).
+
+    `entity_maps`, when supplied, is passed to `fem.form` so the
+    mixed-domain compiler can thread phi_n / phi_p (living on a
+    semiconductor submesh) onto the parent-mesh `ds` measure used for
+    the contact integral. The single-region path leaves this `None`,
+    which keeps assembly byte-identical with the pre-M12 runner.
     """
     import ufl
     from dolfinx import fem
@@ -98,7 +105,10 @@ def evaluate_current_at_contact(spaces, sc, ref_mat, facet_info,
 
     Jn = Q * mu_n_SI * n_ufl * ufl.dot(grad_phi_n_phys, n_vec)
     Jp = Q * mu_p_SI * p_ufl * ufl.dot(grad_phi_p_phys, n_vec)
-    current_form = fem.form((Jn + Jp) * ds)
+    form_kwargs = {}
+    if entity_maps is not None:
+        form_kwargs["entity_maps"] = list(entity_maps)
+    current_form = fem.form((Jn + Jp) * ds, **form_kwargs)
     area_form = fem.form(1.0 * ds)
 
     I_local = fem.assemble_scalar(current_form)
@@ -119,13 +129,15 @@ def evaluate_current_at_contact(spaces, sc, ref_mat, facet_info,
 
 
 def record_iv(iv_rows, V_applied, spaces, sc, ref_mat,
-              sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI):
+              sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI,
+              entity_maps=None):
     """Append one (V, J) row to `iv_rows`, evaluating J at the sweep contact."""
     if sweep_contact is None or sweep_facet_info is None:
         iv_rows.append({"V": float(V_applied), "J": 0.0})
         return
     J = evaluate_current_at_contact(
         spaces, sc, ref_mat, sweep_facet_info, mu_n_SI, mu_p_SI,
+        entity_maps=entity_maps,
     )
     iv_rows.append({"V": float(V_applied), "J": float(J)})
 

@@ -1,5 +1,58 @@
 # Changelog
 
+## [0.12.0] - M12 (in flight): multi-region DD through bias_sweep
+
+### Added
+- `semi/mesh.py::map_parent_facets_to_submesh(parent, sub, vertex_map, facets)`:
+  translates parent-mesh facet indices to the corresponding submesh
+  facet indices using the `dolfinx.mesh.EntityMap` returned by
+  `create_submesh`. Parent facets whose vertices do not all lie in
+  the submesh are silently dropped (they are not submesh boundaries).
+- `tests/fem/test_bias_sweep_multiregion.py`: five tests covering
+  (a) MR / SR role-based dispatch detection, (b) parent-to-submesh
+  facet transfer on a Si/SiO2 mock device with body and gate
+  contacts, (c) end-to-end MR bias_sweep run producing a valid IV,
+  and (d) the SR path keeping phi_n on the full mesh.
+
+### Changed
+- `semi/runners/bias_sweep.py` now dispatches on region roles. Configs
+  with mixed `semiconductor` + `insulator` regions use the M6
+  multi-region machinery: `DDBlockSpacesMR` on a parent + submesh
+  pair, `build_submesh_by_role` restricting phi_n / phi_p to the
+  semiconductor, cellwise DG0 `eps_r(x)` for the Poisson coefficient
+  jump, and `build_dd_block_residual_mr` with `entity_maps` threaded
+  through the block SNES. Single-region configs continue on the
+  original path unchanged; the four single-region benchmarks
+  (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`, `resistor_3d`) remain
+  bit-identical.
+- `semi/postprocess.py::evaluate_current_at_contact` and `record_iv`
+  accept an optional `entity_maps` argument so the drain-facet
+  current integral can compile on the parent mesh while reading
+  phi_n / phi_p from the semiconductor submesh. When `entity_maps
+  is None` the single-region path is assembled as before.
+- `benchmarks/mosfet_2d/mosfet_2d.geo`: the oxide boundary loop now
+  reuses the silicon top-edge line (with reversed orientation)
+  rather than declaring an independent coincident line. Without this
+  fix the gmsh mesh had 66 duplicate vertices at the Si/SiO2
+  interface and psi was discontinuous across them, defeating the MR
+  coefficient-jump assembly before it could run.
+
+### Known issues
+- The 2D MOSFET verifier still fails at ±20%: simulated |I_D| ≈
+  3.0e+02 A/m vs analytical 9.9 A/m (ratio ~30x). Diagnosis via
+  per-contact current conservation: I_n at the drain is ~4e-13 A/m
+  (the electron channel current the triode formula targets as
+  ~10 A/m) and I_p is ~3.0e+02 A/m (bulk hole current from drain to
+  body through the uniform p-body). The benchmark has no n+
+  source/drain implants, so the Shockley ohmic BC pins phi_p at
+  V_applied on every ohmic contact, turning the drain-to-body path
+  into a hole resistor whose current dominates the total. Closing
+  this gap is deferred pending a decision between (i) adding n+
+  source/drain doping to the benchmark, (ii) introducing a
+  carrier-selective contact type, or (iii) narrowing the verifier to
+  compare I_n rather than total J. See `PLAN.md` "Next task" for
+  context.
+
 ## [0.11.0] - M11: Schema versioning
 
 ### Added

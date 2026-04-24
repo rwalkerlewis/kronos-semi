@@ -64,8 +64,11 @@ Line(6) = {6, 5};        // source-right to gate-left on silicon top
 Line(7) = {5, 4};        // source contact, left-corner -> source end
 Line(8) = {4, 1};        // left edge
 
-// Oxide edges (counter-clockwise: bottom on silicon, up right, across top, down left)
-Line(9)  = {6, 7};       // oxide bottom (shares geometry with line 5, but oriented opposite)
+// Oxide edges (counter-clockwise: bottom on silicon, up right, across top, down left).
+// The oxide bottom REUSES line 5 (reversed, -5) so that gmsh meshes a single
+// shared edge between silicon and oxide, producing a watertight mesh at the
+// Si/SiO2 interface. A separate Line(6,7) would create duplicate vertices
+// along the interface and break the parent-mesh P1 continuity of psi.
 Line(10) = {7, 10};      // oxide right
 Line(11) = {10, 9};      // oxide top (gate contact)
 Line(12) = {9, 6};       // oxide left
@@ -74,7 +77,7 @@ Line(12) = {9, 6};       // oxide left
 Line Loop(100) = {1, 2, 3, 4, 5, 6, 7, 8};
 Plane Surface(1) = {100};
 
-Line Loop(200) = {9, 10, 11, 12};
+Line Loop(200) = {-5, 10, 11, 12};
 Plane Surface(2) = {200};
 
 // Physical groups -- names and tags must match the input JSON's
