@@ -119,10 +119,15 @@ def test_capabilities(client):
 
 
 def test_schema(client):
-    from semi.schema import SCHEMA
+    from semi.schema import ENGINE_SUPPORTED_SCHEMA_MAJOR, SCHEMA
     r = client.get("/schema")
     assert r.status_code == 200
-    assert r.json() == SCHEMA
+    body = r.json()
+    assert body["schema"] == SCHEMA
+    assert body["supported_major"] == ENGINE_SUPPORTED_SCHEMA_MAJOR
+    assert isinstance(body["version"], str)
+    major, _, _ = body["version"].partition(".")
+    assert int(major) == ENGINE_SUPPORTED_SCHEMA_MAJOR
 
 
 def test_openapi_and_docs(client):

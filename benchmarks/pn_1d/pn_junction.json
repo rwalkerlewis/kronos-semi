@@ -1,4 +1,5 @@
 {
+  "schema_version": "1.0.0",
   "name": "pn_junction_1d",
   "description": "Symmetric 1D pn junction, 2 um total, junction at 1 um, N_A=N_D=1e17 cm^-3. Equilibrium Poisson verification against depletion approximation.",
   "dimension": 1,

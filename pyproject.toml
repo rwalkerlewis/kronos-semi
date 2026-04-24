@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kronos-semi"
-version = "0.1.0"
+version = "0.11.0"
 description = "JSON-driven FEM semiconductor device simulator on FEniCSx"
 readme = "README.md"
 license = {text = "MIT"}
@@ -60,6 +60,10 @@ Issues = "https://github.com/rwalkerlewis/kronos-semi/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["semi", "kronos_server"]
+# Ship the JSON-schema companion files inside the wheel so `pip install
+# kronos-semi` brings along `schemas/input.v1.json` (loaded by semi.schema
+# at import time) and `schemas/manifest.v1.json` (used by semi.io.reader).
+force-include = {"schemas" = "schemas"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

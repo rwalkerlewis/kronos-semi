@@ -25,6 +25,7 @@ def _tiny_mos_cfg(v_values=(-0.3, 0.0, 0.3)):
     is enough because the device is translation invariant in x.
     """
     return {
+        "schema_version": "1.0.0",
         "name": "mos_cap_tiny",
         "dimension": 2,
         "mesh": {

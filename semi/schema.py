@@ -1,6 +1,10 @@
 """
 JSON schema for semiconductor simulation input.
 
+The schema itself lives in ``schemas/input.v1.json`` (Draft-07); this module
+loads it once at import time and exposes it as ``SCHEMA`` for engine and
+server code.
+
 Design principles:
     - Flat where possible, nested where it aids clarity
     - Units: lengths in meters, potentials in volts, densities in cm^-3
@@ -11,265 +15,43 @@ Design principles:
 
 Top-level structure:
     {
-      "name": "...",                case name, used in output paths
+      "schema_version": "1.0.0",     MAJOR.MINOR.PATCH; major gated by engine
+      "name": "...",                 case name, used in output paths
       "dimension": 1 | 2 | 3,
-      "mesh": { ... },              how to get the mesh (builtin or file)
-      "regions": { name: {...} },   material per region
-      "doping": [ ... ],            list of doping profile specs
-      "contacts": [ ... ],          contact BCs (ohmic, gate, insulating)
-      "physics": { ... },           model selections
-      "solver": { ... },            Newton/continuation parameters
-      "sweep": { ... },             optional bias sweep
-      "output": { ... }             output controls
+      "mesh": { ... },               how to get the mesh (builtin or file)
+      "regions": { name: {...} },    material per region
+      "doping": [ ... ],             list of doping profile specs
+      "contacts": [ ... ],           contact BCs (ohmic, gate, insulating)
+      "physics": { ... },            model selections
+      "solver": { ... },             Newton/continuation parameters
+      "sweep": { ... },              optional bias sweep
+      "output": { ... }              output controls
     }
 """
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-SCHEMA: dict[str, Any] = {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "type": "object",
-    "required": ["name", "dimension", "mesh", "regions", "doping", "contacts"],
-    "properties": {
-        "name": {"type": "string"},
-        "description": {"type": "string"},
-        "dimension": {"type": "integer", "enum": [1, 2, 3]},
+_SCHEMA_PATH = Path(__file__).parent.parent / "schemas" / "input.v1.json"
 
-        "mesh": {
-            "type": "object",
-            "oneOf": [
-                {
-                    "description": "Load mesh from file (gmsh .msh, xdmf)",
-                    "required": ["source", "path"],
-                    "properties": {
-                        "source": {"const": "file"},
-                        "path": {"type": "string"},
-                        "format": {"type": "string", "enum": ["gmsh", "xdmf"]},
-                    },
-                },
-                {
-                    "description": "Generate a built-in mesh (interval/rectangle/box)",
-                    "required": ["source", "extents", "resolution"],
-                    "properties": {
-                        "source": {"const": "builtin"},
-                        "extents": {
-                            "type": "array",
-                            "description": "Bounds per dimension: [[xmin,xmax],[ymin,ymax],...]",
-                            "items": {
-                                "type": "array",
-                                "items": {"type": "number"},
-                                "minItems": 2, "maxItems": 2,
-                            },
-                        },
-                        "resolution": {
-                            "type": "array",
-                            "items": {"type": "integer", "minimum": 1},
-                        },
-                        "regions_by_box": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["name", "tag", "bounds"],
-                            },
-                        },
-                        "facets_by_plane": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["name", "tag", "axis", "value"],
-                            },
-                        },
-                    },
-                },
-            ],
-        },
+# Major version of the input schema this engine build accepts. Inputs whose
+# `schema_version` major differs from this number are rejected by `validate`.
+# Minor/patch skew is accepted silently.
+# TODO(M11+): publish schemas/input.v1.json to a stable URL on every tag
+# (e.g. https://schemas.kronos-semi.org/input/v1.0.0.json).
+ENGINE_SUPPORTED_SCHEMA_MAJOR = 1
 
-        "regions": {
-            "type": "object",
-            "description": "Region name -> properties. Names match mesh cell tags.",
-            "additionalProperties": {
-                "type": "object",
-                "required": ["material"],
-                "properties": {
-                    "material": {"type": "string"},
-                    "tag": {"type": "integer"},
-                    "role": {"type": "string", "enum": ["semiconductor", "insulator"]},
-                },
-            },
-        },
 
-        "doping": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "required": ["region", "profile"],
-                "properties": {
-                    "region": {"type": "string"},
-                    "profile": {
-                        "oneOf": [
-                            {
-                                "type": "object",
-                                "required": ["type", "N_D", "N_A"],
-                                "properties": {
-                                    "type": {"const": "uniform"},
-                                    "N_D": {"type": "number"},
-                                    "N_A": {"type": "number"},
-                                },
-                            },
-                            {
-                                "type": "object",
-                                "required": ["type", "axis", "location",
-                                             "N_D_left", "N_A_left",
-                                             "N_D_right", "N_A_right"],
-                                "properties": {
-                                    "type": {"const": "step"},
-                                    "axis": {"type": "integer", "enum": [0, 1, 2]},
-                                    "location": {"type": "number"},
-                                    "N_D_left": {"type": "number"},
-                                    "N_A_left": {"type": "number"},
-                                    "N_D_right": {"type": "number"},
-                                    "N_A_right": {"type": "number"},
-                                },
-                            },
-                            {
-                                "type": "object",
-                                "required": ["type", "center", "sigma", "peak", "dopant"],
-                                "properties": {
-                                    "type": {"const": "gaussian"},
-                                    "center": {"type": "array", "items": {"type": "number"}},
-                                    "sigma": {"type": "array", "items": {"type": "number"}},
-                                    "peak": {"type": "number"},
-                                    "dopant": {"type": "string", "enum": ["donor", "acceptor"]},
-                                    "background_N_D": {"type": "number"},
-                                    "background_N_A": {"type": "number"},
-                                },
-                            },
-                        ],
-                    },
-                },
-            },
-        },
+@lru_cache(maxsize=1)
+def _load_schema() -> dict[str, Any]:
+    with open(_SCHEMA_PATH) as f:
+        return json.load(f)
 
-        "contacts": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "required": ["name", "facet", "type"],
-                "properties": {
-                    "name": {"type": "string"},
-                    "facet": {
-                        "oneOf": [{"type": "string"}, {"type": "integer"}],
-                    },
-                    "type": {"type": "string", "enum": ["ohmic", "gate", "insulating"]},
-                    "voltage": {"type": "number"},
-                    "voltage_sweep": {
-                        "type": "object",
-                        "description": "Forward bias ramp on this contact.",
-                        "required": ["start", "stop", "step"],
-                        "properties": {
-                            "start": {"type": "number"},
-                            "stop": {"type": "number"},
-                            "step": {"type": "number", "exclusiveMinimum": 0.0},
-                        },
-                    },
-                    "workfunction": {"type": "number"},
-                    "oxide_region": {"type": "string"},
-                },
-            },
-        },
 
-        "physics": {
-            "type": "object",
-            "properties": {
-                "temperature": {"type": "number"},
-                "recombination": {
-                    "type": "object",
-                    "properties": {
-                        "srh": {"type": "boolean"},
-                        "tau_n": {"type": "number"},
-                        "tau_p": {"type": "number"},
-                        "E_t": {
-                            "type": "number",
-                            "description": "Trap level measured from the intrinsic level, eV. Zero for a mid-gap trap.",
-                        },
-                        "auger": {"type": "boolean"},
-                    },
-                },
-                "mobility": {
-                    "type": "object",
-                    "properties": {
-                        "model": {"type": "string", "enum": ["constant"]},
-                        "mu_n": {"type": "number"},
-                        "mu_p": {"type": "number"},
-                    },
-                },
-                "statistics": {"type": "string", "enum": ["boltzmann"]},
-            },
-        },
-
-        "solver": {
-            "type": "object",
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "enum": [
-                        "newton_block",
-                        "equilibrium",
-                        "drift_diffusion",
-                        "bias_sweep",
-                        "mos_cv",
-                    ],
-                },
-                "max_iterations": {"type": "integer"},
-                "atol": {"type": "number"},
-                "rtol": {"type": "number"},
-                "damping": {"type": "number"},
-                "linear_solver": {"type": "object"},
-                "continuation": {
-                    "type": "object",
-                    "properties": {
-                        "steps": {"type": "integer"},
-                        "adaptive": {"type": "boolean"},
-                        "min_step": {"type": "number", "exclusiveMinimum": 0.0},
-                        "max_halvings": {"type": "integer", "minimum": 0},
-                        "max_step": {"type": "number", "exclusiveMinimum": 0.0},
-                        "easy_iter_threshold": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "description": "SNES converging in strictly fewer than this many iterations counts as easy.",
-                        },
-                        "grow_factor": {
-                            "type": "number",
-                            "exclusiveMinimum": 1.0,
-                            "description": "Multiplier on the continuation step after easy_iter_threshold consecutive easy solves.",
-                        },
-                    },
-                },
-            },
-        },
-
-        "sweep": {
-            "type": "object",
-            "properties": {
-                "contact": {"type": "string"},
-                "values": {"type": "array", "items": {"type": "number"}},
-            },
-        },
-
-        "output": {
-            "type": "object",
-            "properties": {
-                "directory": {"type": "string"},
-                "fields": {"type": "array", "items": {"type": "string"}},
-                "write_xdmf": {"type": "boolean"},
-                "write_iv": {"type": "boolean"},
-            },
-        },
-    },
-}
+SCHEMA: dict[str, Any] = _load_schema()
 
 
 class SchemaError(Exception):
@@ -282,6 +64,10 @@ def validate(cfg: dict[str, Any]) -> dict[str, Any]:
     Validate a config dict against SCHEMA and fill defaults.
 
     Uses jsonschema if available; otherwise does minimal required-key checks.
+    After successful structural validation the major component of
+    ``schema_version`` is checked against ``ENGINE_SUPPORTED_SCHEMA_MAJOR``;
+    mismatched majors raise ``SchemaError``.
+
     Returns the config (possibly modified in-place) with defaults filled.
 
     Raises SchemaError with all errors concatenated on failure.
@@ -301,6 +87,19 @@ def validate(cfg: dict[str, Any]) -> dict[str, Any]:
         missing = [k for k in SCHEMA["required"] if k not in cfg]
         if missing:
             raise SchemaError(f"Missing required fields: {missing}") from None
+
+    requested_version = cfg["schema_version"]
+    try:
+        requested_major = int(str(requested_version).split(".")[0])
+    except (ValueError, AttributeError):
+        raise SchemaError(
+            f"schema_version {requested_version!r} is not a valid semver string"
+        ) from None
+    if requested_major != ENGINE_SUPPORTED_SCHEMA_MAJOR:
+        raise SchemaError(
+            f"schema_version {requested_version!r} has major {requested_major}; "
+            f"engine supports major {ENGINE_SUPPORTED_SCHEMA_MAJOR}"
+        )
 
     return _fill_defaults(cfg)
 
