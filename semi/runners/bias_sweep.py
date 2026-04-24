@@ -18,6 +18,7 @@ def run_bias_sweep(
     cfg: dict[str, Any],
     *,
     post_step_hook=None,
+    progress_callback=None,
 ):
     """
     Coupled drift-diffusion solver with optional bias ramping.
@@ -31,6 +32,10 @@ def run_bias_sweep(
     hook is expected to mutate `iv_row` in place (e.g. to record
     Phase 3 V&V continuity samples on top of the V / J the sweep
     already records). No return value is inspected.
+
+    `progress_callback`, if provided, is called with a plain dict per
+    successful bias step so the M10 HTTP server can surface SNES
+    progress on its WebSocket channel.
     """
     from dolfinx import fem
 
@@ -196,6 +201,11 @@ def run_bias_sweep(
               sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI)
     if post_step_hook is not None:
         post_step_hook(V_seed, spaces, iv_rows[-1])
+    if progress_callback is not None:
+        progress_callback({
+            "type": "step_done", "bias_step": 0, "V_applied": float(V_seed),
+            "iterations": int(info.get("iterations", 0)),
+        })
 
     def ramp_leg(V_start: float, V_target: float):
         """Adaptive single-direction ramp from V_start to V_target.
@@ -244,6 +254,13 @@ def run_bias_sweep(
                           sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI)
                 if post_step_hook is not None:
                     post_step_hook(V_try, spaces, iv_rows[-1])
+                if progress_callback is not None:
+                    progress_callback({
+                        "type": "step_done",
+                        "bias_step": len(iv_rows) - 1,
+                        "V_applied": float(V_try),
+                        "iterations": int(info.get("iterations", 0)),
+                    })
                 halvings = 0
                 controller.on_success(int(info.get("iterations", 0)))
                 continue

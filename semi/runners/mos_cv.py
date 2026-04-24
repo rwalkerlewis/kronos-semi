@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 
 
-def run_mos_cv(cfg: dict[str, Any]):
+def run_mos_cv(cfg: dict[str, Any], *, progress_callback=None):
     """
     Run a MOS capacitor C-V sweep.
 
@@ -156,6 +156,13 @@ def run_mos_cv(cfg: dict[str, Any]):
             "Q_gate": float(Q_gate),
             "J": 0.0,
         })
+        if progress_callback is not None:
+            progress_callback({
+                "type": "step_done",
+                "bias_step": len(iv_rows) - 1,
+                "V_applied": float(V_gate),
+                "iterations": int(info.get("iterations", 0)),
+            })
 
     x_dof = V.tabulate_dof_coordinates()
     psi_phys = psi.x.array * sc.V0

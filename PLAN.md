@@ -35,11 +35,12 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M9 are merged into `main`. The most recent M9 commit is `ba5f5d9`
-(result artifact writer); follow-up commit `7e426d2` updated planning docs.
-Version `v0.9.0` is recorded in `CHANGELOG.md`. The project has delivered
-the KronosAI evaluation milestones plus the first piece of the
-production-engine track (on-disk result artifact contract).
+M1 through M10 are merged into `main`. M9 delivered the on-disk artifact
+contract; M10 now exposes the engine over HTTP via a new top-level
+`kronos_server/` package. `CHANGELOG.md` records the `[0.10.0] - M10:
+HTTP server` entry. The project has delivered the KronosAI evaluation
+milestones plus the first two pieces of the production-engine track
+(artifact writer and HTTP API).
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
@@ -53,7 +54,7 @@ The capability matrix (verified in CI) is authoritative: see `README.md`
   (pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d), MMS
   and conservation V&V suite (62/62 PASS), four Colab notebooks,
   GitHub Actions CI.
-- **M9 deliverables (new in v0.9.0):**
+- **M9 deliverables (v0.9.0):**
   - `schemas/manifest.v1.json` — JSON Schema Draft-07 for run manifests,
     `additionalProperties: false` throughout.
   - `semi/io/artifact.py` — `write_artifact(result, out_dir, run_id)`
@@ -65,17 +66,32 @@ The capability matrix (verified in CI) is authoritative: see `README.md`
     across all five benchmarks.
   - Verified in Docker: gates 3, 4, 5 and sanity checks S1–S5 all pass
     (see `scripts/m9_verify.sh`).
+- **M10 deliverables (new in v0.10.0):**
+  - `kronos_server/` top-level package (FastAPI app, pydantic DTOs,
+    LocalFS storage, in-process `ProcessPoolExecutor` worker pool,
+    file-backed progress event stream).
+  - Endpoints: `POST /solve`, `GET /runs`, `GET /runs/{id}`, plus
+    `/runs/{id}/{manifest,input,fields/{name},iv/{contact},logs}`,
+    `WS /runs/{id}/stream`, `GET /schema`, `GET /materials`,
+    `GET /capabilities`, `GET /health`, `GET /ready`. CORS configurable
+    via `KRONOS_SERVER_CORS_ORIGINS`. OpenAPI at `/openapi.json` and
+    Swagger UI at `/docs` (auto-generated).
+  - `kronos-server` console entry point and `server` docker-compose
+    service on port 8000.
+  - Optional `progress_callback=None` threaded through
+    `semi/runners/{equilibrium,bias_sweep,mos_cv}.py` (only change to
+    `semi/` in M10).
+  - `tests/test_kronos_server.py` — 15 tests covering HTTP API,
+    WebSocket progress, and concurrent solves; all pass alongside the
+    existing suite (230 total).
 
 ### What does not work / not yet built
 
 The gaps between the current state and a production UI-backed engine
 are enumerated and sequenced in
 [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md), milestones
-M10 through M18. Summary:
+M11 through M18. Summary:
 
-- **No HTTP server / API surface.** M9 produces a disk artifact but
-  there is no web-facing way to submit JSON and fetch results. M10
-  addresses this.
 - **No schema versioning.** Input JSON still lacks `schema_version`.
   M11.
 - **Mesh input is axis-aligned-only** except for imported gmsh files
@@ -87,38 +103,21 @@ M10 through M18. Summary:
 
 ## Next task
 
-**M10: HTTP server.** Scoped in full in
-[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §4 (M10). A
-starter prompt for a coding agent is maintained separately by the
-project lead (not committed to the repo).
+**M11: Schema versioning + UI-facing schema companion.** Scoped in full
+in [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §4 (M11).
 
-- **Goal:** expose the M9 engine over HTTP so a web UI (or any network
-  client) can submit JSON, poll run status, stream Newton-solver
-  progress, and fetch result artifacts without importing dolfinx.
-- **Scope, in:**
-  - New top-level package `kronos_server/` with FastAPI app, pydantic
-    request/response models, LocalFS storage backend, in-process
-    `ProcessPoolExecutor` worker pool, WebSocket progress stream.
-  - Endpoints: `POST /solve`, `GET /runs`, `GET /runs/{id}` and its
-    sub-resources, `WS /runs/{id}/stream`, `GET /schema`,
-    `GET /materials`, `GET /capabilities`, `GET /health`, `GET /ready`.
-  - `[project.optional-dependencies]` server extra
-    (`fastapi`, `uvicorn`, `httpx`, `pydantic`).
-  - `kronos-server` console entry point.
-  - Docker Compose `server` service.
-  - `tests/test_kronos_server.py` with at least 10 tests including
-    WebSocket progress and concurrent-solve coverage.
-- **Scope, out:** any physics change, any change to the M9 artifact
-  writer or manifest schema, any change to the input schema, auth,
-  rate limiting, persistence beyond the on-disk run directory.
-- **Permitted minor change to `semi/`:** adding optional
-  `progress_callback=None` parameters to the three runners
-  (`equilibrium`, `bias_sweep`, `mos_cv`) so the WebSocket stream can
-  get structured SNES progress events rather than parsing stderr.
-  Budget: ~30 lines total across all three runners.
-- **Preconditions:** M9 merged on `main` at `ba5f5d9`.
-- **Acceptance gate:** the 8 acceptance commands specified in the M10
-  starter prompt all pass in Docker.
+- **Goal:** make the input JSON schema introspectable and versioned so
+  a UI form-builder can render labels, defaults, and help text without
+  a separate config layer, and so the engine can refuse inputs from an
+  incompatible major version.
+- **Scope, in:** a required top-level `schema_version` field in every
+  input; a standalone `schemas/input.v1.json` file loaded by
+  `semi/schema.py`; `title`/`description`/`default`/`examples` added to
+  every schema node; an assertion test that every `type: object` node
+  has a `description`.
+- **Scope, out:** any physics change, M10 server surface changes,
+  manifest schema changes.
+- **Preconditions:** M10 merged on `main`.
 
 ## Roadmap
 
@@ -133,8 +132,8 @@ project lead (not committed to the repo).
 | M7: 3D doped resistor | gmsh loader, bipolar sweep, V-I 1% | Done |
 | M8: Submission polish | Notebooks, catalog, CHANGELOG, v0.8.0 tag | Done |
 | M9: Result artifact writer | manifest.json, on-disk field/IV files, semi-run CLI | Done |
-| M10: HTTP server | POST /solve, GET /runs/{id}, WebSocket progress | Next |
-| M11: Schema versioning | UI-facing schema companion, form-builder annotations | Planned |
+| M10: HTTP server | POST /solve, GET /runs/{id}, WebSocket progress | Done |
+| M11: Schema versioning | UI-facing schema companion, form-builder annotations | Next |
 | M12: Mesh beyond boxes | XDMF loader, gmsh .geo ingress, 2D MOSFET benchmark | Planned |
 | M13: Transient solver | Backward-Euler + BDF2, diode turn-on benchmark | Planned |
 | M14: AC small-signal | Complex-frequency admittance, true C-V | Planned |
@@ -234,6 +233,14 @@ items.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M10 (2026-04-23):** HTTP server; new `kronos_server/` top-level package
+  (FastAPI app, `ProcessPoolExecutor` worker pool, file-backed progress
+  stream), `kronos-server` console entry, `server` docker-compose
+  service, `[server]` optional extra in `pyproject.toml`, 15 new server
+  tests (`tests/test_kronos_server.py`). Added optional
+  `progress_callback=None` to `semi/runners/{equilibrium,bias_sweep,mos_cv}.py`
+  (only permitted `semi/` change).
 
 - **M9 (2026-04-23):** Result artifact writer; `semi/io/artifact.py`, `schemas/manifest.v1.json`, `semi-run` CLI.
 

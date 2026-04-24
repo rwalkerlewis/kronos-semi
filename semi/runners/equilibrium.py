@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 
 
-def run_equilibrium(cfg: dict[str, Any]):
+def run_equilibrium(cfg: dict[str, Any], *, progress_callback=None):
     """M1 equilibrium Poisson solver (Boltzmann statistics)."""
     from dolfinx import fem
 
@@ -54,7 +54,14 @@ def run_equilibrium(cfg: dict[str, Any]):
     psi.x.scatter_forward()
 
     F = build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, ref_mat.epsilon_r)
+    if progress_callback is not None:
+        progress_callback({"type": "step_started", "bias_step": 0, "V_applied": 0.0})
     info = solve_nonlinear(F, psi, bcs, prefix=f"{cfg['name']}_")
+    if progress_callback is not None:
+        progress_callback({
+            "type": "step_done", "bias_step": 0, "V_applied": 0.0,
+            "iterations": int(info.get("iterations", 0)),
+        })
 
     x_dof = V.tabulate_dof_coordinates()
     psi_phys = psi.x.array * sc.V0

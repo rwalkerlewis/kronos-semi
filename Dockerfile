@@ -70,14 +70,18 @@ RUN pip install --break-system-packages \
         "nbformat>=5.0" \
         "ruff>=0.1" \
         "jupyterlab>=4.0" \
-        "ipykernel>=6.0"
+        "ipykernel>=6.0" \
+        "fastapi>=0.115,<0.120" \
+        "uvicorn[standard]>=0.32,<0.40" \
+        "httpx>=0.27,<0.29" \
+        "pydantic>=2.8,<3.0"
 
 # Copy the rest of the source and install the package editable. The bind
 # mount in docker-compose will overlay /workspaces/kronos-semi at runtime,
 # but installing here ensures `import semi` works if the image is run without
 # a bind mount (e.g., CI).
 COPY . .
-RUN pip install --break-system-packages -e ".[dev]"
+RUN pip install --break-system-packages -e ".[dev,server]"
 
 RUN chown -R ${USER_UID}:${USER_GID} /workspaces
 
