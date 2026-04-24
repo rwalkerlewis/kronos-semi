@@ -93,10 +93,13 @@ def test_build_mesh_unknown_source_raises():
         build_mesh(cfg)
 
 
-def test_build_mesh_file_source_xdmf_raises_notimplemented():
+def test_build_mesh_file_source_xdmf_missing_file_raises():
+    """M12 wired XDMF through `dolfinx.io.XDMFFile`; a missing file
+    surfaces as a dolfinx HDF5 error rather than a NotImplementedError.
+    The XDMF happy-path is covered in `tests/fem/test_mesh_xdmf.py`."""
     cfg = _interval_cfg()
     cfg["mesh"] = {"source": "file", "path": "dummy.xdmf", "format": "xdmf"}
-    with pytest.raises(NotImplementedError, match="XDMF"):
+    with pytest.raises(RuntimeError):
         build_mesh(cfg)
 
 

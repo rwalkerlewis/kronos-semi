@@ -3,13 +3,17 @@
   "title": "kronos-semi input v1",
   "description": "Top-level input configuration for a kronos-semi simulation run. Describes the device geometry, materials, doping, contacts, physics models, solver parameters, and output controls. This schema is the contract between the UI form-builder and the engine; see docs/IMPROVEMENT_GUIDE.md §4 M11.",
   "type": "object",
-  "required": ["schema_version", "name", "dimension", "mesh", "regions", "doping", "contacts"],
+  "required": ["schema_version", "name", "dimension", "regions", "doping", "contacts"],
+  "oneOf": [
+    {"required": ["mesh"], "not": {"required": ["geometry"]}},
+    {"required": ["geometry"], "not": {"required": ["mesh"]}}
+  ],
   "properties": {
     "schema_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.0.0.",
-      "examples": ["1.0.0"]
+      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.1.0.",
+      "examples": ["1.0.0", "1.1.0"]
     },
     "name": {
       "type": "string",
@@ -147,6 +151,50 @@
           }
         }
       ]
+    },
+    "geometry": {
+      "type": "object",
+      "title": "Parametric geometry",
+      "description": "Parametric geometry fed to gmsh at solve time. The engine runs gmsh in a subprocess to produce the .msh, then loads it. Use this when your device is not axis-aligned; use `mesh` for builtin boxes or pre-meshed .msh files.",
+      "required": ["source", "path", "physical_groups"],
+      "properties": {
+        "source": {
+          "const": "gmsh_geo",
+          "description": "Only gmsh_geo is supported today. Future: parasolid, OCC, etc."
+        },
+        "path": {
+          "type": "string",
+          "description": "Path to the .geo file, relative to the JSON source directory."
+        },
+        "characteristic_length": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Target element size in meters. Passed to gmsh as `-clmax <value>` on the command line. Meaning depends on the .geo file's own Mesh.CharacteristicLength* settings.",
+          "examples": [5.0e-8]
+        },
+        "physical_groups": {
+          "type": "object",
+          "title": "Physical-group map",
+          "description": "Named physical groups defined in the .geo, used to populate region and facet tags after meshing. Keys are names matching the `regions` block and the `contacts[].facet` fields; values declare the group dimension and tag.",
+          "additionalProperties": {
+            "type": "object",
+            "title": "Physical group",
+            "description": "One gmsh physical group entry: topological dimension and integer tag used in the .geo's `Physical ...` statements.",
+            "required": ["dim", "tag"],
+            "properties": {
+              "dim": {
+                "type": "integer",
+                "enum": [0, 1, 2, 3],
+                "description": "Topological dimension of the physical group (0=point, 1=line, 2=surface, 3=volume)."
+              },
+              "tag": {
+                "type": "integer",
+                "description": "The integer tag used in the .geo's `Physical ...` statements."
+              }
+            }
+          }
+        }
+      }
     },
     "regions": {
       "type": "object",

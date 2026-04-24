@@ -88,9 +88,10 @@ def resolve_contacts(
         under `mesh.facets_by_plane`, or if the resolved tag has no
         facets in `facet_tags` (when `facet_tags` is not None).
     """
+    mesh_cfg = cfg.get("mesh") or {}
     tag_by_name = {
         p["name"]: int(p["tag"])
-        for p in cfg["mesh"].get("facets_by_plane", [])
+        for p in mesh_cfg.get("facets_by_plane", [])
     }
 
     out: list[ContactBC] = []

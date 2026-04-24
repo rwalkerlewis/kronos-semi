@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.1.0",
+  "name": "mosfet_2d",
+  "description": "2D long-channel n-MOSFET cross-section (M12). 5 um-wide / 2 um-deep p-body (N_A=5e17 cm^-3) with a 2 um long gate over a 5 nm SiO2 oxide. Source / drain are ohmic contacts on the top of the silicon at x in [0, 1 um] and [4 um, 5 um]; body contact is full bottom. Drain is swept 0 to 0.1 V with V_GS=1.5 V baked in. Verifier compares simulated |I_D(V_DS=0.1, V_GS=1.5)| to the long-channel triode formula within 20 percent; the tolerance is fixed because M16 field-dependent mobility is not in scope.",
+  "dimension": 2,
+  "geometry": {
+    "source": "gmsh_geo",
+    "path": "mosfet_2d.geo",
+    "characteristic_length": 5.0e-8,
+    "physical_groups": {
+      "silicon": {"dim": 2, "tag": 1},
+      "oxide":   {"dim": 2, "tag": 2},
+      "source":  {"dim": 1, "tag": 10},
+      "drain":   {"dim": 1, "tag": 11},
+      "body":    {"dim": 1, "tag": 12},
+      "gate":    {"dim": 1, "tag": 13}
+    }
+  },
+  "regions": {
+    "silicon": {"material": "Si",   "tag": 1, "role": "semiconductor"},
+    "oxide":   {"material": "SiO2", "tag": 2, "role": "insulator"}
+  },
+  "doping": [
+    {
+      "region": "silicon",
+      "profile": {
+        "type": "step", "axis": 1, "location": 1.95e-6,
+        "N_D_left": 0.0, "N_A_left": 5.0e17,
+        "N_D_right": 0.0, "N_A_right": 5.0e17
+      }
+    }
+  ],
+  "contacts": [
+    {"name": "source", "facet": 10, "type": "ohmic", "voltage": 0.0},
+    {
+      "name": "drain",
+      "facet": 11,
+      "type": "ohmic",
+      "voltage": 0.0,
+      "voltage_sweep": {"start": 0.0, "stop": 0.1, "step": 0.02}
+    },
+    {"name": "body", "facet": 12, "type": "ohmic", "voltage": 0.0},
+    {
+      "name": "gate",
+      "facet": 13,
+      "type": "gate",
+      "voltage": 1.5,
+      "workfunction": 0.0,
+      "oxide_region": "oxide"
+    }
+  ],
+  "physics": {
+    "temperature": 300.0,
+    "statistics": "boltzmann",
+    "mobility": {"mu_n": 1400.0, "mu_p": 450.0},
+    "recombination": {"srh": false, "tau_n": 1.0e-7, "tau_p": 1.0e-7, "E_t": 0.0}
+  },
+  "solver": {
+    "type": "bias_sweep",
+    "continuation": {
+      "min_step": 1.0e-4,
+      "max_halvings": 8,
+      "max_step": 0.02,
+      "easy_iter_threshold": 4,
+      "grow_factor": 1.5
+    }
+  },
+  "output": {
+    "directory": "./results/mosfet_2d",
+    "fields": ["potential", "n", "p", "phi_n", "phi_p", "iv"]
+  }
+}

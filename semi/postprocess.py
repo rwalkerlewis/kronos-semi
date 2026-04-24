@@ -20,8 +20,9 @@ def resolve_contact_facets(cfg, msh, facet_tags, contact_name):
     """
     from dolfinx import fem
 
+    mesh_cfg = cfg.get("mesh") or {}
     tag_by_name = {p["name"]: int(p["tag"])
-                   for p in cfg["mesh"].get("facets_by_plane", [])}
+                   for p in mesh_cfg.get("facets_by_plane", [])}
     contact = next(c for c in cfg["contacts"] if c["name"] == contact_name)
     facet_ref = contact["facet"]
     tag = tag_by_name[facet_ref] if isinstance(facet_ref, str) else int(facet_ref)
@@ -30,8 +31,8 @@ def resolve_contact_facets(cfg, msh, facet_tags, contact_name):
     facets = facet_tags.find(tag)
 
     outward_sign = 1
-    extents = cfg["mesh"].get("extents", [])
-    for p in cfg["mesh"].get("facets_by_plane", []):
+    extents = mesh_cfg.get("extents", [])
+    for p in mesh_cfg.get("facets_by_plane", []):
         if int(p["tag"]) == tag:
             axis = int(p["axis"])
             if axis < len(extents):

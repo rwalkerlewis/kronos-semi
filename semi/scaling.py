@@ -104,11 +104,11 @@ def make_scaling_from_config(cfg: dict, reference_material) -> Scaling:
 
 
 def _infer_length(cfg: dict) -> float:
-    mesh = cfg["mesh"]
-    if mesh["source"] == "builtin":
+    mesh = cfg.get("mesh")
+    if mesh and mesh.get("source") == "builtin":
         extents = mesh["extents"]
         return max(b[1] - b[0] for b in extents)
-    return 1.0e-6  # fallback for file-based meshes
+    return 1.0e-6  # fallback for file-based meshes and parametric geometry
 
 
 def _infer_density(cfg: dict) -> float:

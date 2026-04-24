@@ -4,9 +4,14 @@ Mesh construction and tagging.
 Supports:
     - Builtin meshes: interval (1D), rectangle (2D), box (3D)
       with region tagging via axis-aligned boxes and facet tagging via planes
-    - File-based meshes: gmsh .msh via `dolfinx.io.gmsh.read_from_msh`.
-      Physical groups stored in the .msh are returned directly as
-      cell_tags and facet_tags; the JSON box/plane tagger is bypassed.
+    - File-based meshes: gmsh .msh via `dolfinx.io.gmsh.read_from_msh`
+      and XDMF via `dolfinx.io.XDMFFile`. Physical groups stored in the
+      file are returned directly as cell_tags and facet_tags; the JSON
+      box/plane tagger is bypassed.
+    - Parametric `geometry` input: a `.geo` file plus physical-group map
+      (M12). The `.geo` is handed to gmsh in a subprocess via
+      `semi.geometry.realize`, the resulting `.msh` is cached by content
+      hash, then the cached file is loaded via the gmsh path above.
 
 The output of `build_mesh` is a tuple (mesh, cell_tags, facet_tags) where
 the tag meshtag objects follow the convention used throughout dolfinx.
@@ -34,7 +39,29 @@ def build_mesh(cfg: dict[str, Any]):
     cell_tags : dolfinx.mesh.MeshTags (on cells), or None if no regions_by_box
     facet_tags : dolfinx.mesh.MeshTags (on facets), or None if no facets_by_plane
     """
-    # Lazy imports — these fail loudly if dolfinx isn't installed
+    # Parametric `geometry` input (M12): realize via gmsh subprocess and
+    # synthesize a file-source mesh block so the rest of the pipeline
+    # reuses the existing gmsh-loader code path unchanged.
+    if "geometry" in cfg and "mesh" not in cfg:
+        from . import geometry as _geom
+
+        geo_cfg = cfg["geometry"]
+        source_dir = cfg.get("_source_dir")
+        msh_path = _geom.realize(
+            geo_cfg,
+            source_dir=Path(source_dir) if source_dir is not None else Path("."),
+            dimension=int(cfg["dimension"]),
+        )
+        synthetic_mesh_cfg = {
+            "source": "file",
+            "format": "gmsh",
+            "path": str(msh_path),
+        }
+        return _build_from_file(
+            synthetic_mesh_cfg,
+            dim=int(cfg["dimension"]),
+            source_dir=None,
+        )
 
     mesh_cfg = cfg["mesh"]
     source = mesh_cfg["source"]
@@ -113,9 +140,21 @@ def _build_from_file(mesh_cfg: dict, dim: int, source_dir: str | None = None):
         )
         return meshdata.mesh, meshdata.cell_tags, meshdata.facet_tags
     if fmt == "xdmf":
-        raise NotImplementedError(
-            "XDMF mesh loading not yet wired; use gmsh '.msh' instead."
-        )
+        from dolfinx.io import XDMFFile
+        from mpi4py import MPI
+
+        with XDMFFile(MPI.COMM_WORLD, str(raw_path), "r") as f:
+            msh = f.read_mesh(name="mesh")
+            try:
+                cell_tags = f.read_meshtags(msh, name="cell_tags")
+            except RuntimeError:
+                cell_tags = None
+            try:
+                msh.topology.create_connectivity(msh.topology.dim - 1, msh.topology.dim)
+                facet_tags = f.read_meshtags(msh, name="facet_tags")
+            except RuntimeError:
+                facet_tags = None
+        return msh, cell_tags, facet_tags
     raise ValueError(f"Unknown mesh file format {fmt!r}")
 
 

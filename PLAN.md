@@ -35,13 +35,12 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M11 are merged into `main`. M9 delivered the on-disk artifact
-contract; M10 exposed the engine over HTTP; M11 versions the input
-schema and ships the UI-facing schema companion. `CHANGELOG.md` records
-the `[0.11.0] - M11: Schema versioning` entry. The project has
-delivered the KronosAI evaluation milestones plus the first three
-pieces of the production-engine track (artifact writer, HTTP API, and
-versioned UI-facing input schema).
+M1 through M11 are merged into `main`. M12 is in flight on
+`dev/m12-mesh-beyond-boxes` with a known multi-region runner gap: the
+MOSFET benchmark exercises the new `geometry` input but fails its
+triode-regime +-20 percent verifier (simulated I_D ~ 30x the
+analytical value) because `bias_sweep` does not use the multi-region
+DD machinery shipped in M6 (`DDBlockSpacesMR`, `build_submesh_by_role`).
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
@@ -93,8 +92,6 @@ are enumerated and sequenced in
 [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md), milestones
 M12 through M18. Summary:
 
-- **Mesh input is axis-aligned-only** except for imported gmsh files
-  that came pre-meshed. M12.
 - **No transient, no AC small-signal.** Steady-state only. M13, M14.
 - **Linear solver is CPU-LU only.** Unusable above ~200k DOFs. M15.
 - **Physics gaps:** no field-dependent mobility, Auger, Fermi-Dirac,
@@ -102,8 +99,12 @@ M12 through M18. Summary:
 
 ## Next task
 
-**M12: Mesh input beyond axis-aligned boxes** (see
-[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §M12).
+**M12: Mesh beyond boxes** (still in flight on
+`dev/m12-mesh-beyond-boxes`). The specific next work item is wiring
+`DDBlockSpacesMR` and `build_submesh_by_role` through
+`semi/runners/bias_sweep.py`, analogous to how `semi/runners/mos_cv.py`
+uses them today. Until this is done the MOSFET benchmark verifier fails
+by 11 orders of magnitude against analytical theory.
 
 ## Roadmap
 
@@ -120,8 +121,8 @@ M12 through M18. Summary:
 | M9: Result artifact writer | manifest.json, on-disk field/IV files, semi-run CLI | Done |
 | M10: HTTP server | POST /solve, GET /runs/{id}, WebSocket progress | Done |
 | M11: Schema versioning | UI-facing schema companion, form-builder annotations | Done |
-| M12: Mesh beyond boxes | XDMF loader, gmsh .geo ingress, 2D MOSFET benchmark | Next |
-| M13: Transient solver | Backward-Euler + BDF2, diode turn-on benchmark | Planned |
+| M12: Mesh beyond boxes | XDMF loader, gmsh .geo ingress, 2D MOSFET benchmark | In progress |
+| M13: Transient solver | Backward-Euler + BDF2, diode turn-on benchmark | Next |
 | M14: AC small-signal | Complex-frequency admittance, true C-V | Planned |
 | M15: GPU linear solver | PETSc CUDA/HIP, AMGX preconditioner, 500k-DOF 3D benchmark | Planned |
 | M16: Physics completeness | Caughey-Thomas, Lombardi, Auger, FD, Schottky, tunneling | Planned |

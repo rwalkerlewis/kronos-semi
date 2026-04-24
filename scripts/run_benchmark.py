@@ -1335,6 +1335,106 @@ _PLOTTERS["resistor_3d"] = plot_resistor_3d
 
 
 # --------------------------------------------------------------------------- #
+# mosfet_2d verifier and plotter                                              #
+# --------------------------------------------------------------------------- #
+
+@register("mosfet_2d")
+def verify_mosfet_2d(result) -> list[tuple[str, bool, str]]:
+    """Delegate to `benchmarks/mosfet_2d/verifier.py` for the triode check."""
+    import importlib.util
+    path = BENCHMARKS_DIR / "mosfet_2d" / "verifier.py"
+    spec = importlib.util.spec_from_file_location("mosfet_2d_verifier", path)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod.verify(result)
+
+
+def plot_mosfet_2d(result, out_dir: Path) -> list[Path]:
+    """Render a pair of diagnostic plots for the 2D MOSFET benchmark.
+
+    - `psi_2d.png`: tricontourf of psi(x, y) at the last (V_GS, V_DS).
+    - `id_vds.png`: simulated |I_D|(V_DS) against the analytical triode
+      line at V_GS = 1.5 V, annotated with V_T.
+    """
+    from matplotlib.tri import Triangulation
+
+    paths: list[Path] = []
+    if result.x_dof is None or result.x_dof.shape[1] < 2 or result.psi_phys is None:
+        return paths
+
+    x = result.x_dof[:, 0] * 1e9
+    y = result.x_dof[:, 1] * 1e9
+    psi = np.asarray(result.psi_phys)
+
+    try:
+        tri = Triangulation(x, y)
+        fig, ax = plt.subplots(figsize=(7, 4))
+        tcf = ax.tricontourf(tri, psi, levels=24, cmap="viridis")
+        cbar = fig.colorbar(tcf, ax=ax)
+        cbar.set_label(r"$\psi$ (V)")
+        ax.set_xlabel("x (nm)")
+        ax.set_ylabel("y (nm)")
+        ax.set_title(r"2D MOSFET: $\psi(x, y)$ at final bias")
+        ax.set_aspect("auto")
+        fig.tight_layout()
+        p = out_dir / "psi_2d.png"
+        fig.savefig(p, dpi=130)
+        plt.close(fig)
+        paths.append(p)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[plot_mosfet_2d] psi contour skipped: {exc}")
+
+    # I_D vs V_DS (per-unit-depth 2D scaled by W).
+    if result.iv:
+        dp = getattr(result, "_mosfet_params", None)
+        if dp is None:
+            import importlib.util
+            vpath = BENCHMARKS_DIR / "mosfet_2d" / "verifier.py"
+            spec = importlib.util.spec_from_file_location("mosfet_2d_verifier", vpath)
+            mod = importlib.util.module_from_spec(spec)
+            assert spec.loader is not None
+            spec.loader.exec_module(mod)
+            from semi.materials import get_material
+            si = get_material(result.cfg["regions"]["silicon"]["material"])
+            ox = get_material(result.cfg["regions"]["oxide"]["material"])
+            dp = mod._mosfet_device_params(result.cfg, result.scaling, si, ox)
+
+        V_arr = np.array([r["V"] for r in result.iv])
+        # J in iv rows is A/m^2 averaged over the drain facet; multiply
+        # by L_drain to get per-unit-depth current (A/m).
+        I_sim = np.abs(np.array([r.get("J", 0.0) for r in result.iv])) * dp["L_drain"]
+        gate = next(c for c in result.cfg["contacts"] if c["type"] == "gate")
+        V_GS = float(gate.get("voltage", 0.0))
+        I_theory = np.array([
+            dp["mu_n_eff"] * dp["C_ox"] / dp["L"]
+            * max(V_GS - dp["V_T"], 0.0) * v
+            for v in V_arr
+        ])
+
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.plot(V_arr, I_sim, "o-", label=r"$|I_D|$ simulated (A/m)")
+        ax.plot(V_arr, I_theory, "--", label=r"triode theory (A/m)")
+        ax.set_xlabel(r"$V_{DS}$ (V)")
+        ax.set_ylabel(r"$|I_D|$ per unit depth (A/m)")
+        ax.set_title(
+            rf"MOSFET triode: $V_{{GS}}$={V_GS:.2f} V, $V_T$={dp['V_T']:.3f} V"
+        )
+        ax.legend()
+        ax.grid(alpha=0.3)
+        fig.tight_layout()
+        p = out_dir / "id_vds.png"
+        fig.savefig(p, dpi=130)
+        plt.close(fig)
+        paths.append(p)
+
+    return paths
+
+
+_PLOTTERS["mosfet_2d"] = plot_mosfet_2d
+
+
+# --------------------------------------------------------------------------- #
 # Driver                                                                      #
 # --------------------------------------------------------------------------- #
 
