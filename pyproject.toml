@@ -62,6 +62,14 @@ addopts = "-v --tb=short"
 [tool.coverage.run]
 source = ["semi"]
 branch = false
+omit = [
+    # CLI scaffolding — exercised end-to-end in the docker-fem CI step via
+    # scripts/run_verification.py and `semi-run` invocations in benchmark
+    # runners. Deliberately excluded from pytest coverage to keep the
+    # threshold honest about what unit tests verify vs. what CI integration
+    # verifies.
+    "semi/io/cli.py",
+]
 
 [tool.coverage.report]
 # Exclude pragmas, defensive runtime checks, CLI driver scaffolding, and

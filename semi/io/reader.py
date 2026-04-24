@@ -14,6 +14,6 @@ def read_manifest(run_dir: Path) -> dict:
             with open(schema_path) as sf:
                 schema = json.load(sf)
             jsonschema.Draft7Validator(schema).validate(data)
-    except ImportError:
+    except ImportError:  # pragma: no cover
         pass
     return data
