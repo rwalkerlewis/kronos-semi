@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.10.0] - M10: HTTP server
+
+### Added
+- `kronos_server/` top-level package exposing the M9 engine over HTTP.
+  FastAPI app factory (`build_app`), in-process `ProcessPoolExecutor`
+  worker pool (`JobManager`), LocalFS storage backend, file-backed
+  progress event stream (`progress.ndjson`), pydantic request/response
+  models, and CORS middleware. No dolfinx, UFL, or PETSc imports at
+  module scope in the server process; FEM-heavy imports happen only
+  inside worker subprocesses spawned with `mp_context="spawn"`.
+- HTTP endpoints: `POST /solve` (202/400), `GET /runs`,
+  `GET /runs/{id}` (returning the full manifest plus status),
+  `GET /runs/{id}/{manifest,input,fields/{name},iv/{contact},logs}`,
+  `GET /schema`, `GET /materials`, `GET /capabilities`, `GET /health`,
+  `GET /ready` (200/503).
+- WebSocket endpoint: `WS /runs/{id}/stream` tails the progress file and
+  emits `step_done` and `run_done` messages; closes with code 4404 on
+  unknown run, 1000 on completion.
+- `kronos-server` console entry point (`pyproject.toml`) with env-var
+  driven host/port/workers/runs-dir/cors-origins configuration.
+- `server` service in `docker-compose.yml`, bound to port 8000.
+- `[project.optional-dependencies]` extra `server = [fastapi, uvicorn,
+  httpx, pydantic]`.
+- Optional `progress_callback=None` parameter on
+  `semi/runners/{equilibrium,bias_sweep,mos_cv}.py`, called per bias
+  step; this is the only permitted change to `semi/` in M10.
+- `tests/test_kronos_server.py` — 15 tests covering pure-Python and
+  FEM-backed paths: health/ready, capabilities, schema, materials,
+  OpenAPI, input validation, 404 handling, CORS preflight, end-to-end
+  solve+manifest match, field download, IV download, input download,
+  WebSocket progress (≥ 5 `step_done` on `pn_1d_bias`), and concurrent
+  solves (3 simultaneous).
+
+### Changed
+- `Dockerfile`: `pip install -e ".[dev,server]"` so the baked image
+  includes the server extra.
+- `pyproject.toml` `[tool.hatch.build.targets.wheel]` packages now
+  include `kronos_server`.
+- `PLAN.md`: M10 moved to completed work log; next task set to M11.
+
 ## [0.9.0] - M9: Result artifact writer
 
 ### Added
