@@ -35,13 +35,15 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M11 are merged into `main`. M9 delivered the on-disk artifact
+M1 through M12 are merged into `main`. M9 delivered the on-disk artifact
 contract; M10 exposed the engine over HTTP; M11 versions the input
-schema and ships the UI-facing schema companion. `CHANGELOG.md` records
-the `[0.11.0] - M11: Schema versioning` entry. The project has
-delivered the KronosAI evaluation milestones plus the first three
-pieces of the production-engine track (artifact writer, HTTP API, and
-versioned UI-facing input schema).
+schema and ships the UI-facing schema companion; M12 closes out the
+MOSFET benchmark with n+ Gaussian source/drain implants and amends the
+SNES tolerances for high-injection multi-region problems. `CHANGELOG.md`
+records the `[0.12.0] - M12` entry. The project has delivered the
+KronosAI evaluation milestones plus the first four pieces of the
+production-engine track (artifact writer, HTTP API, versioned UI-facing
+input schema, and MOSFET benchmark).
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
@@ -85,16 +87,23 @@ The capability matrix (verified in CI) is authoritative: see `README.md`
   - `tests/test_kronos_server.py` — 15 tests covering HTTP API,
     WebSocket progress, and concurrent solves; all pass alongside the
     existing suite (230 total).
+- **M12 deliverables (new in v0.12.0):**
+  - `benchmarks/mosfet_2d/mosfet_2d.json` — 2D n-channel MOSFET with
+    Gaussian n+ source/drain implants (peak 5 × 10¹⁹ cm⁻³).
+  - `semi/runners/bias_sweep.py` SNES tolerance amendment: `rtol` 1e-14
+    → 1e-10, `atol` 1e-14 → 1e-7, `max_it` 60 → 100. `stol` unchanged.
+  - `docs/adr/0008-snes-tolerances.md` — ADR documenting the tolerance
+    change rationale and validation.
+  - `tests/fem/test_bias_sweep_multiregion.py` — new test: 3-step
+    forward bias ramp asserts ≥ 3 IV points and non-decreasing J_n.
 
 ### What does not work / not yet built
 
 The gaps between the current state and a production UI-backed engine
 are enumerated and sequenced in
 [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md), milestones
-M12 through M18. Summary:
+M13 through M18. Summary:
 
-- **Mesh input is axis-aligned-only** except for imported gmsh files
-  that came pre-meshed. M12.
 - **No transient, no AC small-signal.** Steady-state only. M13, M14.
 - **Linear solver is CPU-LU only.** Unusable above ~200k DOFs. M15.
 - **Physics gaps:** no field-dependent mobility, Auger, Fermi-Dirac,
@@ -102,8 +111,8 @@ M12 through M18. Summary:
 
 ## Next task
 
-**M12: Mesh input beyond axis-aligned boxes** (see
-[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §M12).
+**M13: Transient solver** (see
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §M13).
 
 ## Roadmap
 
@@ -120,7 +129,7 @@ M12 through M18. Summary:
 | M9: Result artifact writer | manifest.json, on-disk field/IV files, semi-run CLI | Done |
 | M10: HTTP server | POST /solve, GET /runs/{id}, WebSocket progress | Done |
 | M11: Schema versioning | UI-facing schema companion, form-builder annotations | Done |
-| M12: Mesh beyond boxes | XDMF loader, gmsh .geo ingress, 2D MOSFET benchmark | Next |
+| M12: MOSFET n+ + SNES amendment | Gaussian implants, relaxed SNES tols, ADR 0008 | Done |
 | M13: Transient solver | Backward-Euler + BDF2, diode turn-on benchmark | Planned |
 | M14: AC small-signal | Complex-frequency admittance, true C-V | Planned |
 | M15: GPU linear solver | PETSc CUDA/HIP, AMGX preconditioner, 500k-DOF 3D benchmark | Planned |
@@ -219,6 +228,17 @@ items.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M12 (2026-04-25):** MOSFET n+ doping + SNES tolerance amendment.
+  Added `benchmarks/mosfet_2d/mosfet_2d.json` with three doping entries:
+  uniform p-type body (N_A = 1 × 10¹⁶ cm⁻³) plus Gaussian n+ source and
+  drain implants (peak 5 × 10¹⁹ cm⁻³, σ = (0.4 µm, 0.15 µm)). Amended
+  SNES tolerances in `semi/runners/bias_sweep.py`: `rtol` 1e-14 → 1e-10,
+  `atol` 1e-14 → 1e-7, `max_it` 60 → 100 (stol unchanged). Documented
+  the decision in `docs/adr/0008-snes-tolerances.md`. Added
+  `tests/fem/test_bias_sweep_multiregion.py` with a 3-step forward ramp
+  test asserting ≥ 3 IV points and non-decreasing J_n. Version bumped to
+  0.12.0. PR closes #25.
 
 - **M11 (2026-04-23):** Schema versioning + UI-facing schema companion.
   Extracted the input schema verbatim from `semi/schema.py` into
