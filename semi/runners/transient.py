@@ -244,11 +244,15 @@ def run_transient(
     f_hist_n.x.array[:] = 0.0
     f_hist_p.x.array[:] = 0.0
 
-    # dt_const is updated if we ever change dt (not in M13, but keeps the
-    # form reusable without recompilation)
+    # dt_hat = dt / t0 is the dimensionless time step consistent with the
+    # scaled spatial coefficients (L0^2 * mu_hat, etc.) in the residual.
+    # Using physical dt_val here would make the temporal term ~t0/dt_phys
+    # times larger than the spatial terms, leaving the carrier fields frozen.
+    dt_hat = dt_val / sc.t0
+
     from petsc4py import PETSc
 
-    dt_const = fem.Constant(msh, PETSc.ScalarType(dt_val))
+    dt_const = fem.Constant(msh, PETSc.ScalarType(dt_hat))
     alpha0_const = fem.Constant(msh, PETSc.ScalarType(alpha_0))
 
     F_list = _build_transient_residual(
@@ -421,8 +425,8 @@ def run_transient(
             idx = -(k - 1) - 1  # n_hist[-1] = most recent (n^n), n_hist[-2] = n^{n-1}
             hist_n_arr += use_bdf.coeffs[k] * n_hist[idx]
             hist_p_arr += use_bdf.coeffs[k] * p_hist[idx]
-        f_hist_n.x.array[:] = hist_n_arr / dt_val
-        f_hist_p.x.array[:] = hist_p_arr / dt_val
+        f_hist_n.x.array[:] = hist_n_arr / dt_hat
+        f_hist_p.x.array[:] = hist_p_arr / dt_hat
         f_hist_n.x.scatter_forward()
         f_hist_p.x.scatter_forward()
 
@@ -529,7 +533,9 @@ def _build_transient_residual(
     tau_n_hat, tau_p_hat : float
     E_t_over_Vt : float
     dt_const : dolfinx.fem.Constant
-        Time step size as a fem.Constant.
+        Dimensionless time step dt_hat = dt_physical / sc.t0.  Must be in
+        scaled time units so the temporal coefficient alpha0/dt_hat is
+        dimensionally consistent with the L0^2*mu_hat spatial coefficients.
     alpha0_const : dolfinx.fem.Constant
         BDF alpha_0 coefficient as a fem.Constant (updated each step
         when switching from BDF1 to BDF2).
