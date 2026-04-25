@@ -91,14 +91,16 @@ def run_transient(
     """
     from dolfinx import fem
 
-    from ..bcs import build_psi_dirichlet_bcs, resolve_contacts
+    import copy
+    import ufl
+
+    from ..bcs import resolve_contacts
     from ..doping import build_profile
     from ..fem.mass import assemble_lumped_mass
     from ..mesh import build_mesh
-    from ..physics.drift_diffusion import DDBlockSpaces, make_dd_block_spaces
+    from ..physics.drift_diffusion import make_dd_block_spaces
     from ..postprocess import (
         fmt_tag,
-        record_iv,
         resolve_contact_facets,
     )
     from ..results import TransientResult
@@ -180,12 +182,14 @@ def run_transient(
 
     # ------------------------------------------------------------------
     # Step 0: Solve equilibrium at t=0 to obtain initial psi
+    # The equilibrium solve uses zero bias on all contacts.
     # ------------------------------------------------------------------
-    eq_cfg = dict(cfg)
-    eq_cfg = dict(cfg)
-    eq_solver = {"type": "equilibrium"}
-    eq_cfg = {k: v for k, v in cfg.items()}
+    eq_cfg = copy.deepcopy(cfg)
     eq_cfg["solver"] = {"type": "equilibrium"}
+    # Zero out all contact voltages so we get true V=0 equilibrium
+    for c in eq_cfg["contacts"]:
+        c["voltage"] = 0.0
+        c.pop("voltage_sweep", None)
     eq_result = run_equilibrium(eq_cfg)
 
     # Copy equilibrium psi into our psi function
@@ -205,7 +209,6 @@ def run_transient(
     # Assemble lumped mass diagonal (for future M14 use, and for
     # diagnostic storage in meta)
     # ------------------------------------------------------------------
-    import ufl
     dx = ufl.Measure("dx", domain=msh)
     M_n_diag, M_p_diag = assemble_lumped_mass(V_n, V_p, dx)
 
