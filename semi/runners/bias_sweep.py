@@ -165,14 +165,21 @@ def run_bias_sweep(
                 bc.set(fn.x.array)
         for fn in (spaces.psi, spaces.phi_n, spaces.phi_p):
             fn.x.scatter_forward()
+        # SNES tolerances: rtol/atol are relaxed from 1e-14 to 1e-10/1e-7
+        # because the scaled Slotboom residuals span many orders of magnitude
+        # across psi, phi_n, and phi_p blocks at high injection levels, making
+        # sub-1e-10 relative convergence unachievable without sacrificing
+        # physical accuracy. stol is kept tight to enforce displacement
+        # convergence. max_it raised to 100 for robustness on fine MOSFET
+        # meshes.  See docs/adr/0008-snes-tolerances.md.
         return solve_nonlinear_block(
             F_list, [spaces.psi, spaces.phi_n, spaces.phi_p],
             bcs, prefix=f"{cfg['name']}_dd_{tag}_",
             petsc_options={
-                "snes_rtol": 1.0e-14,
-                "snes_atol": 1.0e-14,
+                "snes_rtol": 1.0e-10,
+                "snes_atol": 1.0e-7,
                 "snes_stol": 1.0e-14,
-                "snes_max_it": 60,
+                "snes_max_it": 100,
             },
         )
 

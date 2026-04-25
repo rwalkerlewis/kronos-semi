@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.12.0] - M12: MOSFET n+ doping + SNES tolerance amendment
+
+### Added
+- `benchmarks/mosfet_2d/mosfet_2d.json`: 2D n-channel MOSFET benchmark.
+  P-type Si body (5 µm × 2 µm, N_A = 1 × 10¹⁶ cm⁻³) with two Gaussian
+  n+ source/drain implants (center at x = 0.5 µm and 4.5 µm, σ = (0.4 µm,
+  0.15 µm), peak = 5 × 10¹⁹ cm⁻³, donor). Gate sweeps 0 → 1.5 V at
+  V_DS = 0.05 V.
+- `tests/fem/test_bias_sweep_multiregion.py`: new test module with
+  `test_bias_sweep_multiregion_multistep`. Runs a 3-step forward bias ramp
+  (0 → 0.15 V) on a minimal 1D multi-region config and asserts at least
+  3 IV points and non-decreasing electron current.
+- `docs/adr/0008-snes-tolerances.md`: ADR documenting the SNES tolerance
+  change rationale, validation, consequences, deferred work, and
+  alternatives.
+
+### Changed
+- `semi/runners/bias_sweep.py` SNES tolerances in `run_bias_sweep`:
+  - `snes_rtol`: 1.0e-14 → 1.0e-10 (achievable at high injection).
+  - `snes_atol`: 1.0e-14 → 1.0e-7 (absolute floor for continuity block).
+  - `snes_stol`: unchanged at 1.0e-14 (displacement convergence kept tight).
+  - `snes_max_it`: 60 → 100 (headroom for fine MOSFET meshes).
+  Added an inline comment referencing ADR 0008.
+- `README.md` Status section updated to v0.12.0.
+- `pyproject.toml` version bumped `0.11.0 → 0.12.0`.
+- `semi/__init__.py` `__version__` bumped `0.11.0 → 0.12.0`.
+
 ## [0.11.0] - M11: Schema versioning
 
 ### Added
