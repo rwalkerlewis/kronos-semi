@@ -117,6 +117,69 @@ def evaluate_current_at_contact(spaces, sc, ref_mat, facet_info,
     return float(J_total)
 
 
+def evaluate_partial_currents(spaces, sc, ref_mat, facet_info,
+                              mu_n_SI, mu_p_SI) -> tuple[float, float]:
+    """
+    Evaluate J_n and J_p separately at a contact.
+
+    Returns
+    -------
+    tuple (J_n, J_p) : each in A/m^2.
+        Electron and hole partial current densities at the contact.
+        Positive values mean current flows outward through the contact.
+    """
+    import ufl
+    from dolfinx import fem
+    from dolfinx.mesh import meshtags
+    from mpi4py import MPI
+    from petsc4py import PETSc
+
+    from .constants import Q
+    from .physics.slotboom import n_from_slotboom, p_from_slotboom
+
+    msh = spaces.V_psi.mesh
+    tag = int(facet_info["tag"])
+    facets = facet_info["facets"]
+    fdim = msh.topology.dim - 1
+
+    if len(facets) == 0:
+        return 0.0, 0.0
+
+    values = np.full(len(facets), tag, dtype=np.int32)
+    indices = np.asarray(facets, dtype=np.int32)
+    sort = np.argsort(indices)
+    facet_mt = meshtags(msh, fdim, indices[sort], values[sort])
+    ds = ufl.Measure("ds", domain=msh, subdomain_data=facet_mt, subdomain_id=tag)
+    n_vec = ufl.FacetNormal(msh)
+
+    ni_hat = fem.Constant(msh, PETSc.ScalarType(ref_mat.n_i / sc.C0))
+    psi = spaces.psi
+    phi_n = spaces.phi_n
+    phi_p = spaces.phi_p
+
+    n_ufl = n_from_slotboom(psi, phi_n, ni_hat) * sc.C0
+    p_ufl = p_from_slotboom(psi, phi_p, ni_hat) * sc.C0
+    grad_phi_n_phys = sc.V0 * ufl.grad(phi_n)
+    grad_phi_p_phys = sc.V0 * ufl.grad(phi_p)
+
+    Jn = Q * mu_n_SI * n_ufl * ufl.dot(grad_phi_n_phys, n_vec)
+    Jp = Q * mu_p_SI * p_ufl * ufl.dot(grad_phi_p_phys, n_vec)
+    jn_form = fem.form(Jn * ds)
+    jp_form = fem.form(Jp * ds)
+    area_form = fem.form(1.0 * ds)
+
+    Jn_local = fem.assemble_scalar(jn_form)
+    Jp_local = fem.assemble_scalar(jp_form)
+    A_local = fem.assemble_scalar(area_form)
+    Jn_val = msh.comm.allreduce(Jn_local, op=MPI.SUM)
+    Jp_val = msh.comm.allreduce(Jp_local, op=MPI.SUM)
+    A = msh.comm.allreduce(A_local, op=MPI.SUM)
+
+    if A == 0.0:
+        A = 1.0
+    return float(Jn_val / A), float(Jp_val / A)
+
+
 def record_iv(iv_rows, V_applied, spaces, sc, ref_mat,
               sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI):
     """Append one (V, J) row to `iv_rows`, evaluating J at the sweep contact."""

@@ -44,6 +44,10 @@ _SCHEMA_PATH = Path(__file__).parent.parent / "schemas" / "input.v1.json"
 # (e.g. https://schemas.kronos-semi.org/input/v1.0.0.json).
 ENGINE_SUPPORTED_SCHEMA_MAJOR = 1
 
+# Minor version tracking. Bumped when a backward-compatible schema addition
+# is made (M13: added transient solver type and schema_version 1.1.0).
+SCHEMA_SUPPORTED_MINOR = 1
+
 
 @lru_cache(maxsize=1)
 def _load_schema() -> dict[str, Any]:
