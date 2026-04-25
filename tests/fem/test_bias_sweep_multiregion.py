@@ -9,9 +9,6 @@ two-region (Si + SiO2) 1D geometry to verify:
 """
 from __future__ import annotations
 
-import numpy as np
-import pytest
-
 
 def _minimal_multiregion_bias_cfg(n_steps: int = 3, stop: float = 0.15) -> dict:
     """
