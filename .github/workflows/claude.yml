@@ -12,29 +12,24 @@ on:
 
 jobs:
   claude:
-    # Only run when @claude is mentioned, or when an issue is assigned to the Claude user.
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
-
     runs-on: ubuntu-latest
     timeout-minutes: 90
-
     permissions:
       contents: write
       pull-requests: write
       issues: write
       id-token: write
       actions: read
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
         with:
@@ -53,30 +48,3 @@ jobs:
             TodoWrite
             WebFetch
             WebSearch
-          custom_instructions: |
-            You are working on the kronos-semi repository. Before making
-            any changes:
-            1. Read PLAN.md to confirm the current milestone and next task.
-            2. Read docs/IMPROVEMENT_GUIDE.md for milestone scope.
-            3. Read docs/ARCHITECTURE.md for the five-layer design and import rules.
-
-            For FEM-heavy verification steps (running benchmarks, multi-region
-            tests, mesh-convergence tests), use the existing Docker-based CI
-            pipeline. The default ubuntu-latest runner may not have dolfinx
-            or gmsh available directly; rely on `docker compose run` where
-            those dependencies are needed.
-
-            Do not lower CI gates (95% coverage, MMS convergence rates,
-            analytical verification thresholds). If a gate fails, diagnose
-            the root cause; do not relax the threshold.
-
-            Do not modify physics kernels, runners, or schemas without
-            explicit instruction in the issue body.
-
-            When a milestone completes, update PLAN.md (Current state + Next
-            task), CHANGELOG.md, README.md Status section, and bump
-            __version__ in both semi/__init__.py and pyproject.toml.
-
-            Commit in a single well-described commit unless the issue explicitly
-            asks for multiple commits. Push to the branch named in the issue
-            (or create a new dev/mNN-<slug> branch if the issue does not name one).
