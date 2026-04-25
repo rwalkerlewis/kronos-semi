@@ -53,7 +53,7 @@ def assemble_lumped_mass(V_n: Any, V_p: Any, dx: Any) -> tuple:
     import ufl
     from dolfinx import fem
     from dolfinx.fem.petsc import assemble_vector
-    from mpi4py import MPI
+    from petsc4py import PETSc
 
     msh = V_n.mesh
 
@@ -61,12 +61,12 @@ def assemble_lumped_mass(V_n: Any, V_p: Any, dx: Any) -> tuple:
     v_n = ufl.TestFunction(V_n)
     L_n = fem.form(v_n * dx)
     M_n_diag = assemble_vector(L_n)
-    M_n_diag.ghostUpdate(addv=MPI.SUM, mode=MPI.REPLACE)
+    M_n_diag.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
 
     # Assemble M_p: integral(v_p) dx for each DOF in V_p
     v_p = ufl.TestFunction(V_p)
     L_p = fem.form(v_p * dx)
     M_p_diag = assemble_vector(L_p)
-    M_p_diag.ghostUpdate(addv=MPI.SUM, mode=MPI.REPLACE)
+    M_p_diag.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
 
     return M_n_diag, M_p_diag
