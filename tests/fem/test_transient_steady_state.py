@@ -26,6 +26,14 @@ from __future__ import annotations
 _L = 2.0e-6    # device length, m
 _TAU = 1.0e-9  # short lifetime for fast convergence to steady state, s
 _V_F = 0.3     # forward bias, V
+# Mesh resolution: 400 elements on a 2 µm device → h = 5 nm.
+# For 1e17 cm⁻³ doping (V_bi≈0.82 V, W≈150 nm, ψ_bi≈31.4):
+#   Pe = h·ψ_bi/(2·W) = 5 nm·31.4/(2·150 nm) ≈ 0.52 < 1
+# Pe < 1 is required so the Galerkin discretisation keeps n and p positive
+# throughout Newton iteration.  With the original N=100 (h=20 nm, Pe≈2.1),
+# the solver accumulates Galerkin oscillations that drive n/p negative by
+# the third time step, causing SNES to diverge.
+_N_MESH = 400
 
 
 def _make_cfg(solver_block: dict) -> dict:
@@ -38,7 +46,7 @@ def _make_cfg(solver_block: dict) -> dict:
         "mesh": {
             "source": "builtin",
             "extents": [[0.0, _L]],
-            "resolution": [100],
+            "resolution": [_N_MESH],
             "regions_by_box": [
                 {"name": "silicon", "tag": 1, "bounds": [[0.0, _L]]},
             ],
