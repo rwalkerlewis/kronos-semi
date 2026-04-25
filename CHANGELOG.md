@@ -1,6 +1,62 @@
 # Changelog
 
-## [0.12.0] - M12: MOSFET n+ doping + SNES tolerance amendment
+## [0.13.0] - M13: Transient solver (BDF1/BDF2)
+
+### Added
+- `semi/timestepping.py`: `BDFCoefficients` class for BDF1 (backward Euler)
+  and BDF2 time integration. Pure Python, no dolfinx at module scope.
+  Provides `.order`, `.coeffs` (tuple of α₀, …, αₖ), and `.apply(history, dt)`
+  which evaluates the discrete time derivative.
+- `semi/fem/__init__.py` and `semi/fem/mass.py`: `assemble_lumped_mass(V_n, V_p, dx)`
+  assembles the row-sum lumped mass diagonal for n and p spaces. Returns
+  `(M_n_diag, M_p_diag)` as PETSc vectors. Note: Poisson gets no mass entry.
+- `semi/results.py`: `TransientResult` dataclass with `t`, `iv`, `fields`, `meta`,
+  and `x_dof`. Follows JSON-as-contract invariant (no PETSc types in API).
+- `semi/runners/transient.py`: `run_transient(cfg, progress_callback=None)`
+  runner. Solves (ψ, n_hat, p_hat) primary-density form with fixed dt BDF
+  time integration. Seeds BDF2 with a BDF1 step. SNES tolerances match
+  `bias_sweep.py` defaults (ADR 0008). Returns `TransientResult`.
+- `semi/postprocess.py`: `evaluate_partial_currents` helper that returns
+  `(J_n, J_p)` separately at a contact (used by transient IV recording).
+- `schemas/input.v1.json`: `solver.type` enum extended with `"transient"`.
+  New transient-only fields: `t_end`, `dt`, `order` (default 2),
+  `max_steps` (default 10000), `output_every` (default 50).
+- `semi/schema.py`: `SCHEMA_SUPPORTED_MINOR = 1` constant tracking the
+  current minor schema version.
+- `benchmarks/pn_1d_turnon/`: 1D pn diode transient turn-on benchmark.
+  Initial state: equilibrium. Bias stepped to V_F = 0.6 V at t = 0⁺.
+  `verify.py` fits J_anode(t) = J_ss (1 − exp(−t/τ)) and asserts
+  |τ_eff − τ_p| / τ_p < 5 %.
+- `tests/fem/test_transient_steady_state.py`: steady-state limit test.
+  Runs pn_1d at V = 0.3 V with transient solver for t >> τ and compares
+  final J to `run_bias_sweep`. Asserts relative error < 1e−4.
+- `tests/mms/test_transient_convergence.py`: temporal MMS convergence test.
+  Four dt refinement levels; asserts BDF1 rate ≥ 0.95 and BDF2 rate ≥ 1.9
+  for ||error||_∞ in n and p.
+- `docs/adr/0009-transient-formulation.md`: ADR documenting the decision
+  to use carrier-density (n, p) form for transient continuity.
+- `docs/adr/0010-bdf-time-integration.md`: ADR documenting BDF1/BDF2
+  selection and consistent-mass rationale.
+
+### Changed
+- `semi/run.py`: dispatches `solver.type == "transient"` to `run_transient`.
+- `semi/runners/__init__.py`: exports `run_transient`.
+- `README.md` Status section updated to v0.13.0.
+- `pyproject.toml` version bumped `0.12.0 → 0.13.0`.
+- `semi/__init__.py` `__version__` bumped `0.12.0 → 0.13.0`.
+
+### Design notes
+- ADR 0009: The transient runner uses (ψ, n, p) primary variables rather
+  than Slotboom (ψ, φ_n, φ_p). This makes the time derivative ∂n/∂t
+  natural and keeps the mass matrix linear in the unknowns.
+- ADR 0010: BDF1 (backward Euler) and BDF2 are both A-stable, work
+  directly with the SNES block solver, and require no special assembly.
+  Consistent mass (Galerkin) is used in UFL forms; lumped mass diagonal
+  is provided via `assemble_lumped_mass` for M14 AC analysis.
+- Steady-state runner (`run_bias_sweep`) and `run_equilibrium` are
+  **unchanged**; they use the Slotboom (φ_n, φ_p) formulation.
+
+
 
 ### Added
 - `benchmarks/mosfet_2d/mosfet_2d.json`: 2D n-channel MOSFET benchmark.

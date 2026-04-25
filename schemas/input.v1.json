@@ -8,8 +8,8 @@
     "schema_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.0.0.",
-      "examples": ["1.0.0"]
+      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.1.0.",
+      "examples": ["1.0.0", "1.1.0"]
     },
     "name": {
       "type": "string",
@@ -440,10 +440,41 @@
             "equilibrium",
             "drift_diffusion",
             "bias_sweep",
-            "mos_cv"
+            "mos_cv",
+            "transient"
           ],
-          "description": "Which runner to dispatch. `equilibrium` solves Poisson at zero bias; `drift_diffusion` solves the coupled system at a single bias point; `bias_sweep` ramps a contact voltage; `mos_cv` walks a gate sweep and integrates gate charge; `newton_block` is a legacy alias.",
+          "description": "Which runner to dispatch. `equilibrium` solves Poisson at zero bias; `drift_diffusion` solves the coupled system at a single bias point; `bias_sweep` ramps a contact voltage; `mos_cv` walks a gate sweep and integrates gate charge; `transient` runs BDF1/BDF2 time integration; `newton_block` is a legacy alias.",
           "default": "equilibrium"
+        },
+        "t_end": {
+          "type": "number",
+          "exclusiveMinimum": 0.0,
+          "description": "Simulation end time in seconds. Only used when solver.type is `transient`.",
+          "examples": [1.0e-9]
+        },
+        "dt": {
+          "type": "number",
+          "exclusiveMinimum": 0.0,
+          "description": "Fixed time step size in seconds. Only used when solver.type is `transient`. Adaptive stepping is not supported in M13.",
+          "examples": [1.0e-12]
+        },
+        "order": {
+          "type": "integer",
+          "enum": [1, 2],
+          "description": "BDF time integration order. 1 = backward Euler (BDF1); 2 = BDF2. Only used when solver.type is `transient`.",
+          "default": 2
+        },
+        "max_steps": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Safety cap on the number of time steps for the transient runner.",
+          "default": 10000
+        },
+        "output_every": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Write field snapshots every N transient time steps. Only used when solver.type is `transient`.",
+          "default": 50
         },
         "max_iterations": {
           "type": "integer",

@@ -11,7 +11,7 @@ production engine suitable for web UI integration.
 If you're a contributor or a coding agent, start at the [Orientation](#orientation)
 section.
 
-## Status (v0.12.0, end of M12)
+## Status (v0.13.0, end of M13)
 
 Milestones M1 through M12 are merged on `main`. The capability matrix is
 what the engine actually does today, verified in CI:

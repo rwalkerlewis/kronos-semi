@@ -35,84 +35,51 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M12 are merged into `main`. M9 delivered the on-disk artifact
+M1 through M13 are merged into `main`. M9 delivered the on-disk artifact
 contract; M10 exposed the engine over HTTP; M11 versions the input
 schema and ships the UI-facing schema companion; M12 closes out the
 MOSFET benchmark with n+ Gaussian source/drain implants and amends the
-SNES tolerances for high-injection multi-region problems. `CHANGELOG.md`
-records the `[0.12.0] - M12` entry. The project has delivered the
-KronosAI evaluation milestones plus the first four pieces of the
-production-engine track (artifact writer, HTTP API, versioned UI-facing
-input schema, and MOSFET benchmark).
+SNES tolerances for high-injection multi-region problems; M13 delivers
+the transient solver with BDF1/BDF2 time integration in (ψ, n, p)
+primary-density form. `CHANGELOG.md` records the `[0.13.0] - M13` entry.
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
 
 ### What works (verified in Docker on current `main`)
 
-- Everything from M1–M8: Docker dev environment, pure-Python core, JSON
-  schema, builtin meshes, gmsh `.msh` loader, equilibrium Poisson,
-  coupled Slotboom drift-diffusion, SRH recombination, adaptive bias
-  continuation (including bipolar sweeps), five shipped benchmarks
-  (pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d), MMS
-  and conservation V&V suite (62/62 PASS), four Colab notebooks,
-  GitHub Actions CI.
-- **M9 deliverables (v0.9.0):**
-  - `schemas/manifest.v1.json` — JSON Schema Draft-07 for run manifests,
-    `additionalProperties: false` throughout.
-  - `semi/io/artifact.py` — `write_artifact(result, out_dir, run_id)`
-    produces a validated on-disk run tree.
-  - `semi/io/reader.py` — `read_manifest(run_dir)` runs stdlib-only (no
-    numpy, no dolfinx), suitable for M10 subprocess use.
-  - `semi/io/cli.py` + `semi-run` console entry point.
-  - `tests/test_artifact.py` — 3 pure-Python + 5 FEM round-trip tests
-    across all five benchmarks.
-  - Verified in Docker: gates 3, 4, 5 and sanity checks S1–S5 all pass
-    (see `scripts/m9_verify.sh`).
-- **M10 deliverables (new in v0.10.0):**
-  - `kronos_server/` top-level package (FastAPI app, pydantic DTOs,
-    LocalFS storage, in-process `ProcessPoolExecutor` worker pool,
-    file-backed progress event stream).
-  - Endpoints: `POST /solve`, `GET /runs`, `GET /runs/{id}`, plus
-    `/runs/{id}/{manifest,input,fields/{name},iv/{contact},logs}`,
-    `WS /runs/{id}/stream`, `GET /schema`, `GET /materials`,
-    `GET /capabilities`, `GET /health`, `GET /ready`. CORS configurable
-    via `KRONOS_SERVER_CORS_ORIGINS`. OpenAPI at `/openapi.json` and
-    Swagger UI at `/docs` (auto-generated).
-  - `kronos-server` console entry point and `server` docker-compose
-    service on port 8000.
-  - Optional `progress_callback=None` threaded through
-    `semi/runners/{equilibrium,bias_sweep,mos_cv}.py` (only change to
-    `semi/` in M10).
-  - `tests/test_kronos_server.py` — 15 tests covering HTTP API,
-    WebSocket progress, and concurrent solves; all pass alongside the
-    existing suite (230 total).
-- **M12 deliverables (new in v0.12.0):**
-  - `benchmarks/mosfet_2d/mosfet_2d.json` — 2D n-channel MOSFET with
-    Gaussian n+ source/drain implants (peak 5 × 10¹⁹ cm⁻³).
-  - `semi/runners/bias_sweep.py` SNES tolerance amendment: `rtol` 1e-14
-    → 1e-10, `atol` 1e-14 → 1e-7, `max_it` 60 → 100. `stol` unchanged.
-  - `docs/adr/0008-snes-tolerances.md` — ADR documenting the tolerance
-    change rationale and validation.
-  - `tests/fem/test_bias_sweep_multiregion.py` — new test: 3-step
-    forward bias ramp asserts ≥ 3 IV points and non-decreasing J_n.
+- Everything from M1–M12 (see CHANGELOG.md for details).
+- **M13 deliverables (new in v0.13.0):**
+  - `semi/timestepping.py` — `BDFCoefficients` class (BDF1 and BDF2).
+  - `semi/fem/mass.py` — `assemble_lumped_mass` for n and p spaces.
+  - `semi/results.py` — `TransientResult` dataclass.
+  - `semi/runners/transient.py` — `run_transient(cfg)` in (ψ, n, p) form.
+  - `semi/postprocess.py` — `evaluate_partial_currents` helper.
+  - `schemas/input.v1.json` — `solver.type` extended with `"transient"`.
+  - `semi/schema.py` — `SCHEMA_SUPPORTED_MINOR = 1`.
+  - `benchmarks/pn_1d_turnon/` — 1D pn diode transient turn-on benchmark.
+  - `tests/fem/test_transient_steady_state.py` — steady-state limit test.
+  - `tests/mms/test_transient_convergence.py` — temporal MMS convergence.
+  - `docs/adr/0009-transient-formulation.md` and `0010-bdf-time-integration.md`.
+  - ADR 0009: (n, p) primary form for transient continuity.
+  - ADR 0010: BDF1/BDF2 selection; consistent mass in UFL forms.
 
 ### What does not work / not yet built
 
 The gaps between the current state and a production UI-backed engine
 are enumerated and sequenced in
 [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md), milestones
-M13 through M18. Summary:
+M14 through M18. Summary:
 
-- **No transient, no AC small-signal.** Steady-state only. M13, M14.
+- **No AC small-signal.** M14.
 - **Linear solver is CPU-LU only.** Unusable above ~200k DOFs. M15.
 - **Physics gaps:** no field-dependent mobility, Auger, Fermi-Dirac,
   Schottky contacts, tunneling, heterojunctions. M16, M17.
 
 ## Next task
 
-**M13: Transient solver** (see
-[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §M13).
+**M14: AC small-signal analysis** (see
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §M14).
 
 ## Roadmap
 
@@ -130,7 +97,7 @@ M13 through M18. Summary:
 | M10: HTTP server | POST /solve, GET /runs/{id}, WebSocket progress | Done |
 | M11: Schema versioning | UI-facing schema companion, form-builder annotations | Done |
 | M12: MOSFET n+ + SNES amendment | Gaussian implants, relaxed SNES tols, ADR 0008 | Done |
-| M13: Transient solver | Backward-Euler + BDF2, diode turn-on benchmark | Planned |
+| M13: Transient solver | Backward-Euler + BDF2, diode turn-on benchmark | Done |
 | M14: AC small-signal | Complex-frequency admittance, true C-V | Planned |
 | M15: GPU linear solver | PETSc CUDA/HIP, AMGX preconditioner, 500k-DOF 3D benchmark | Planned |
 | M16: Physics completeness | Caughey-Thomas, Lombardi, Auger, FD, Schottky, tunneling | Planned |
