@@ -55,8 +55,6 @@ def assemble_lumped_mass(V_n: Any, V_p: Any, dx: Any) -> tuple:
     from dolfinx.fem.petsc import assemble_vector
     from petsc4py import PETSc
 
-    msh = V_n.mesh
-
     # Assemble M_n: integral(v_n) dx for each DOF in V_n
     v_n = ufl.TestFunction(V_n)
     L_n = fem.form(v_n * dx)

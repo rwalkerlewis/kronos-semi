@@ -175,7 +175,6 @@ def _run_convergence_study(order: int) -> tuple[list[float], list[float]]:
     a clean manufactured-solution test without needing a separate
     analytical reference.
     """
-    from semi.runners.equilibrium import run_equilibrium
 
     # Get equilibrium reference (t=0 state)
     # Use minimal config with ohmic contacts at the same biases as transient
@@ -222,7 +221,7 @@ def test_transient_convergence_bdf1():
     rate_n = _log_rate(DT_LIST, errors_n)
     rate_p = _log_rate(DT_LIST, errors_p)
 
-    print(f"\nBDF1 temporal convergence:")
+    print("\nBDF1 temporal convergence:")
     for i, dt in enumerate(DT_LIST):
         print(f"  dt={dt:.2e}  err_n={errors_n[i]:.3e}  err_p={errors_p[i]:.3e}")
     print(f"  Observed rates: n={rate_n:.3f}, p={rate_p:.3f}")
@@ -247,7 +246,7 @@ def test_transient_convergence_bdf2():
     rate_n = _log_rate(DT_LIST, errors_n)
     rate_p = _log_rate(DT_LIST, errors_p)
 
-    print(f"\nBDF2 temporal convergence:")
+    print("\nBDF2 temporal convergence:")
     for i, dt in enumerate(DT_LIST):
         print(f"  dt={dt:.2e}  err_n={errors_n[i]:.3e}  err_p={errors_p[i]:.3e}")
     print(f"  Observed rates: n={rate_n:.3f}, p={rate_p:.3f}")

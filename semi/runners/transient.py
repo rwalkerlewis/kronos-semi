@@ -53,16 +53,20 @@ phi_n/phi_p by the same amount, leaving n = ni*exp(psi - phi_n) fixed.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from ..physics.drift_diffusion import DDBlockSpaces
+    from ..results import TransientResult
 
 
 def run_transient(
     cfg: dict[str, Any],
     *,
     progress_callback=None,
-) -> "TransientResult":
+) -> TransientResult:
     """
     Coupled transient drift-diffusion solver.
 
@@ -89,10 +93,10 @@ def run_transient(
     -------
     TransientResult
     """
-    from dolfinx import fem
-
     import copy
+
     import ufl
+    from dolfinx import fem
 
     from ..bcs import resolve_contacts
     from ..doping import build_profile
@@ -489,7 +493,7 @@ def run_transient(
 def _build_transient_residual(
     psi, n_hat, p_hat, N_hat_fn,
     f_hist_n, f_hist_p,
-    spaces: "DDBlockSpaces",
+    spaces: DDBlockSpaces,
     sc,
     eps_r,
     mu_n_over_mu0: float,
