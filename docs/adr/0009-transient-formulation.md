@@ -1,7 +1,7 @@
 # ADR 0009: Transient Continuity Formulation — Density (n, p) vs Slotboom (φ_n, φ_p)
 
 **Date:** 2026-04-25
-**Status:** Accepted
+**Status:** Superseded by ADR 0011
 **Milestone:** M13 — Transient solver
 
 ---
