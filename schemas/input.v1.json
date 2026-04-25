@@ -487,6 +487,37 @@
             }
           }
         },
+        "snes": {
+          "type": "object",
+          "title": "PETSc SNES tolerance overrides for the bias_sweep DD block",
+          "description": "Per-config overrides for the SNES nonlinear solver tolerances inside the coupled drift-diffusion block. Defaults match docs/adr/0008-snes-tolerances.md (rtol=1e-10, atol=1e-7, stol=1e-14, max_it=100). Single-region 1D pn_1d_bias{,_reverse} benchmarks override these to machine-tight values to satisfy the 5%/15% current-continuity gates.",
+          "properties": {
+            "rtol": {
+              "type": "number",
+              "exclusiveMinimum": 0.0,
+              "description": "SNES relative residual tolerance.",
+              "default": 1.0e-10
+            },
+            "atol": {
+              "type": "number",
+              "exclusiveMinimum": 0.0,
+              "description": "SNES absolute residual tolerance.",
+              "default": 1.0e-7
+            },
+            "stol": {
+              "type": "number",
+              "exclusiveMinimum": 0.0,
+              "description": "SNES step-size tolerance.",
+              "default": 1.0e-14
+            },
+            "max_it": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum SNES iterations per Newton solve in the bias_sweep DD block.",
+              "default": 100
+            }
+          }
+        },
         "continuation": {
           "type": "object",
           "title": "Bias continuation controller",

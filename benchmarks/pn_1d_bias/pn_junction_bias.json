@@ -50,6 +50,12 @@
   },
   "solver": {
     "type": "bias_sweep",
+    "snes": {
+      "rtol": 1.0e-14,
+      "atol": 1.0e-14,
+      "stol": 1.0e-14,
+      "max_it": 60
+    },
     "continuation": {
       "min_step": 1.0e-4,
       "max_halvings": 6,

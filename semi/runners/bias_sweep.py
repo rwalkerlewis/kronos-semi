@@ -97,6 +97,19 @@ def run_bias_sweep(
     easy_iter_threshold = int(cont.get("easy_iter_threshold", 4))
     grow_factor = float(cont.get("grow_factor", 1.5))
 
+    # SNES tolerances for the coupled DD block solve. Defaults match the
+    # M12 close-out values documented in docs/adr/0008-snes-tolerances.md.
+    # Per-config overrides live under solver.snes so legacy benchmarks
+    # (pn_1d_bias, pn_1d_bias_reverse) can keep machine-tight convergence
+    # required to pass <5% / <15% current-continuity gates.
+    snes_opts = cfg.get("solver", {}).get("snes", {}) or {}
+    snes_petsc_options = {
+        "snes_rtol": float(snes_opts.get("rtol", 1.0e-10)),
+        "snes_atol": float(snes_opts.get("atol", 1.0e-7)),
+        "snes_stol": float(snes_opts.get("stol", 1.0e-14)),
+        "snes_max_it": int(snes_opts.get("max_it", 100)),
+    }
+
     F_list = build_dd_block_residual(
         spaces, N_hat_fn, sc, ref_mat.epsilon_r,
         mu_n_hat, mu_p_hat, tau_n_hat, tau_p_hat, E_t_over_Vt,
@@ -165,22 +178,10 @@ def run_bias_sweep(
                 bc.set(fn.x.array)
         for fn in (spaces.psi, spaces.phi_n, spaces.phi_p):
             fn.x.scatter_forward()
-        # SNES tolerances: rtol/atol are relaxed from 1e-14 to 1e-10/1e-7
-        # because the scaled Slotboom residuals span many orders of magnitude
-        # across psi, phi_n, and phi_p blocks at high injection levels, making
-        # sub-1e-10 relative convergence unachievable without sacrificing
-        # physical accuracy. stol is kept tight to enforce displacement
-        # convergence. max_it raised to 100 for robustness on fine MOSFET
-        # meshes.  See docs/adr/0008-snes-tolerances.md.
         return solve_nonlinear_block(
             F_list, [spaces.psi, spaces.phi_n, spaces.phi_p],
             bcs, prefix=f"{cfg['name']}_dd_{tag}_",
-            petsc_options={
-                "snes_rtol": 1.0e-10,
-                "snes_atol": 1.0e-7,
-                "snes_stol": 1.0e-14,
-                "snes_max_it": 100,
-            },
+            petsc_options=snes_petsc_options,
         )
 
     sweep_facet_info = None
