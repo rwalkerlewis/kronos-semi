@@ -27,3 +27,18 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           trigger_phrase: "@claude"
           claude_args: "--model claude-opus-4-7"
+          prompt: |
+            Implement what the issue or comment requests. After
+            committing and pushing your changes to the working
+            branch, open a pull request against main using
+            `gh pr create`. Use the issue title as the PR title.
+            Include "Closes #N" in the PR body where N is the
+            triggering issue number. If a PR for this branch
+            already exists, do not create another.
+
+            Do not lower CI gates. Do not modify physics kernels,
+            runners, or schemas without explicit instruction.
+            When a milestone completes, update PLAN.md, CHANGELOG.md,
+            and bump __version__ in semi/__init__.py and
+            pyproject.toml. Commit in a single descriptive commit
+            unless multiple commits are explicitly requested.
