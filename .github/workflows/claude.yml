@@ -1,5 +1,4 @@
 name: Claude
-
 on:
   issue_comment:
     types: [created]
@@ -9,7 +8,6 @@ on:
     types: [submitted]
   issues:
     types: [opened, assigned]
-
 jobs:
   claude:
     if: |
@@ -26,25 +24,11 @@ jobs:
       id-token: write
       actions: read
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Claude Code Action Official
-        uses: anthropics/claude-code-action@v1          
+      - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           model: claude-opus-4-7
           timeout_minutes: 60
-          allowed_tools: |
-            Bash
-            Edit
-            Glob
-            Grep
-            LS
-            MultiEdit
-            Read
-            Write
-            TodoWrite
-            WebFetch
-            WebSearch
