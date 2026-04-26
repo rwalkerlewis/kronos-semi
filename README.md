@@ -11,56 +11,74 @@ production engine suitable for web UI integration.
 If you're a contributor or a coding agent, start at the [Orientation](#orientation)
 section.
 
-## Status (v0.14.0, end of M14)
+## Status (v0.14.0, end of M14.1)
 
-Milestones M1 through M14 are merged on `main`. The capability matrix is
-what the engine actually does today, verified in CI:
+Milestones M1 through M14.1 are merged on `main`. M13.1 is a tracked
+follow-up (Scharfetter-Gummel rewrite of the transient continuity
+discretisation, see [issue #34](https://github.com/rwalkerlewis/kronos-semi/issues/34));
+the transient steady-state-limit test is currently `xfail` pending that
+work.
 
-| Capability                         | Dimensions    | Status  | Verifier                                                     |
-|------------------------------------|---------------|---------|--------------------------------------------------------------|
-| Equilibrium Poisson                | 1D / 2D / 3D  | shipped | MMS finest-pair rates L2 = 2.0, H1 = 1.0                     |
-| Coupled Slotboom drift-diffusion   | 1D / 2D       | shipped | MMS finest-pair rates L2 >= 1.99 across variants             |
-| SRH recombination                  | 1D / 2D       | shipped | verified against SNS analytical at reverse bias              |
-| Ohmic contact BCs                  | 1D / 2D / 3D  | shipped | Shockley diode within 10% at forward bias                    |
-| Gate contact BCs with phi_ms       | 2D            | shipped | MOS C-V within 10% in depletion window                       |
-| Multi-region Poisson (Si/SiO2)     | 2D            | shipped | multi-region MMS L2 = 2.0                                    |
-| File-sourced gmsh .msh meshes      | 3D            | shipped | builtin vs gmsh R-match within 1%                            |
-| Adaptive bias continuation         | uni + bipolar | shipped | pn junction forward + reverse, 3D resistor                   |
-| 3D ohmic V-I linearity             | 3D            | shipped | V-I linearity within 1%                                      |
-| Benchmarks                         | 8             | shipped | pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d, mosfet_2d, pn_1d_turnon, rc_ac_sweep |
-| Conservation / mesh convergence    | 1D            | shipped | charge neutrality, Cauchy rates >= 1.8/doubling              |
-| V&V                                | 10 studies    | shipped | 62/62 PASS                                                   |
-| On-disk result artifact (M9)       | all           | shipped | round-trip tests on all 5 benchmarks, manifest Draft-07 validated |
-| `semi-run` CLI (M9)                | all           | shipped | end-to-end artifact writer exercised in CI                   |
-| HTTP server (M10)                  | all           | shipped | 15 server tests, end-to-end POST /solve + WebSocket progress |
-| Schema versioning + UI form-builder annotations (M11) | all | shipped | every object node has description; schema extracted to JSON file |
-| 2D MOSFET with n+ implants (M12)   | 2D            | shipped | Gaussian source/drain doping; SNES tolerance ADR 0008        |
-| Transient (BDF1/BDF2) solver (M13) | 1D / 2D       | shipped | pn_1d_turnon; lumped mass infrastructure; ADRs 0009 / 0010   |
-| Small-signal AC sweep (M14)        | 1D / 2D       | shipped | rc_ac_sweep within 0.4 % of analytical depletion C; ADR 0011 |
-| Test suite                         | pure + FEM    | shipped | 239+ tests, >=95% coverage                                    |
-| CI                                 | lint+test+FEM | shipped | green on dev and main                                        |
+What the engine does today, in plain terms:
 
-See [CHANGELOG.md](CHANGELOG.md) for per-milestone deliverables.
+- **Equilibrium Poisson** in 1D, 2D, 3D, multi-region (Si/SiO2 with
+  cellwise eps_r and the natural flux-continuity interface condition).
+- **Coupled Slotboom drift-diffusion bias sweeps** (M2/M3) with adaptive
+  step-size continuation in `AdaptiveStepController`; SRH recombination
+  with configurable trap energy; supports unipolar and zero-spanning
+  bipolar sweeps.
+- **2D MOSFET** with Gaussian n+ source/drain implants (M12), built on
+  the multi-region Poisson + Slotboom DD stack.
+- **Transient solver** with BDF1 (backward Euler) and BDF2 time
+  integration (M13), in (psi, n, p) primary-density form; ADRs 0009 /
+  0010. Note: the (n,p) Galerkin discretisation diverges at tight SNES
+  atol; M13.1 (Scharfetter-Gummel edge-flux assembly, issue #34) is the
+  fix, currently in flight.
+- **MOS capacitor C-V via analytic AC** (M14.1, the just-landed cycle):
+  the `mos_cap_ac` runner solves the linearised Poisson sensitivity at
+  each gate bias to return dQ/dV directly in F/m^2, replacing the
+  noisier `numpy.gradient(Q, V)` of `mos_cv`. Worst error 6.79% vs the
+  depletion-approximation reference in the verifier window.
+- **Small-signal AC sweep** for two-terminal pn diodes (M14):
+  `(J + jωM) δu = -dF/dV δV` solved via real 2x2 block reformulation;
+  the `rc_ac_sweep` benchmark matches analytical depletion C within
+  0.4% over [1 Hz, 1 MHz]; ADR 0011.
+- **3D doped resistor** with V-I linearity within 1%, builtin or
+  gmsh-sourced unstructured meshes (M7).
+- **On-disk result artifacts** (M9): manifest.json + fields + IV CSVs +
+  convergence logs, schema-validated.
+- **HTTP API** (M10): `POST /solve`, progress over WebSocket, `GET
+  /runs/{id}/manifest`, etc. Server process imports no dolfinx at
+  module scope.
+- **Schema versioning + UI form-builder annotations** (M11):
+  `schemas/input.v1.json` Draft-07, every object node carries a
+  description.
+- **V&V**: MMS for Poisson (1D linear/nonlinear, 2D triangles, 2D
+  multi-region), mesh convergence, charge / current conservation, MMS
+  for coupled DD across three variants and three grids; finest-pair
+  rates at theoretical L2 = 2.000.
+- **CI**: lint + pure-Python on Python 3.10/3.11/3.12 + dolfinx
+  benchmarks + V&V on every push, coverage gate at 95%.
 
-## Where this is going (M12+)
+The full capability matrix is captured in [docs/ROADMAP.md](docs/ROADMAP.md);
+the per-milestone deliverables are in [CHANGELOG.md](CHANGELOG.md).
 
-M1 through M11 produced a numerically sound engine with a versioned,
-UI-facing JSON input contract and an HTTP API. The remaining work is
-mostly additional physics and the linear-solver scaling needed for real
-3D devices. The roadmap lives in
-[docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md).
+## Where this is going (post-M14.1)
 
-| Milestone | Summary                                                      | Blocking for                     |
-|-----------|--------------------------------------------------------------|----------------------------------|
-| M12       | Mesh input beyond axis-aligned boxes                         | Real (non-rectangular) devices   |
-| M13       | Transient solver                                             | C-V transients, diode turn-on    |
-| M14       | AC small-signal analysis                                     | True C-V, admittance spectroscopy|
-| M15       | GPU linear solver path                                       | Anything above ~200k DOFs        |
-| M16       | Physics completeness pass (mobility, Auger, FD, Schottky, tunneling) | Real device models       |
-| M17       | Heterojunctions / position-dependent band structure          | HEMTs, HBTs                      |
-| M18       | UI: first cut (separate repo)                                | Shipping a product               |
+M1 through M14.1 produced a numerically sound engine with a versioned,
+UI-facing JSON input contract, an HTTP API, transient and AC solvers,
+and a 2D MOSFET benchmark. The remaining work is one transient
+discretisation rewrite and the usual physics-completeness and
+linear-solver scaling axes. Detailed deliverables and acceptance tests
+live in [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md).
 
-Each milestone in the guide has explicit deliverables and acceptance tests.
+| Milestone | Summary                                                              | Status              |
+|-----------|----------------------------------------------------------------------|---------------------|
+| M13.1     | Scharfetter-Gummel edge-flux discretisation for transient continuity | In flight (issue #34) |
+| M15       | GPU linear solver path                                               | Planned             |
+| M16       | Physics completeness (Caughey-Thomas, Auger, FD, Schottky, tunneling) | Planned             |
+| M17       | Heterojunctions / position-dependent band structure                  | Planned             |
+| M18       | UI: first cut (separate repo)                                        | Out of scope here   |
 
 ## Orientation
 
@@ -188,7 +206,7 @@ Reproducible dev environment on top of `ghcr.io/fenics/dolfinx/dolfinx:stable`:
 
 ```bash
 docker compose build
-docker compose run --rm test                       # pytest (238 tests)
+docker compose run --rm test                       # pytest (256 tests + 1 xfail)
 docker compose run --rm benchmark pn_1d            # run a benchmark
 docker compose up -d dev && docker compose exec dev bash
 docker compose up jupyter                          # JupyterLab on :8888
@@ -287,7 +305,7 @@ version does not match `ENGINE_SUPPORTED_SCHEMA_MAJOR` in
 
 kronos-semi covers the **quasi-static, steady-state** subset.
 
-**In scope (shipped, M1–M10):**
+**In scope (shipped, M1 through M14.1):**
 
 - Poisson with multi-region dielectric (Si/SiO2)
 - Drift-diffusion in Slotboom (quasi-Fermi potential) form
@@ -298,21 +316,25 @@ kronos-semi covers the **quasi-static, steady-state** subset.
 - Method-of-Manufactured-Solutions and conservation V&V suite
 - Machine-readable on-disk result artifacts (schema-validated manifests)
 - HTTP API with solve submission, progress streaming, and artifact fetch
+- 2D MOSFET (M12) with Gaussian n+ source/drain implants
+- Transient BDF1/BDF2 (M13); the (n,p) Galerkin discretisation has a
+  known atol-driven divergence (issue #34), tracked by M13.1
+- Small-signal AC sweep (M14) on two-terminal pn devices, plus the
+  M14.1 `mos_cap_ac` runner for analytic differential C(V_gate)
 
-**Out of scope today (planned for M13–M17, see [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md)):**
+**Out of scope today (planned for M15 through M17, see [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md)):**
 
+- GPU linear solver path; CPU-LU only above ~200k DOFs is a hard wall (M15)
 - Caughey-Thomas / Lombardi field-dependent mobility (M16)
 - Auger and radiative recombination (M16)
 - Fermi-Dirac statistics (M16; Boltzmann throughout today, valid below ~10¹⁹ cm⁻³)
 - Impact ionization and avalanche generation (future)
-- AC small-signal analysis (M14)
-- Transient (time-dependent) solver (M13)
 - Band-to-band or trap-assisted tunneling (M16)
 - Heterojunctions and position-dependent band structure (M17)
 - Schottky contacts and contact resistance models (M16)
 - Thermal coupling / self-heating (future)
 - Optical generation (future)
-- Full MOSFET, FinFET, or 3D transistor geometries (depends on M12 + M16)
+- Full FinFET or 3D transistor geometries (depends on M16 + meshing work)
 
 ## Design notes
 
@@ -363,20 +385,20 @@ junction.
 
 ```bash
 python tests/check_day1_math.py    # runs offline, no dolfinx required
-pytest tests/                       # 238 tests under Docker
-python scripts/run_verification.py  # V&V suite, 62 studies
+pytest tests/                       # 256 tests + 1 xfail under Docker
+python scripts/run_verification.py  # V&V suite
 ```
 
 ## Planning documents (read order for contributors)
 
 1. [PLAN.md](PLAN.md) — current state, next task, invariants. **Single source of truth** for what to work on.
-2. [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md) — M11+ roadmap, acceptance tests, anti-goals.
+2. [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md) — M15+ roadmap, acceptance tests, anti-goals.
 3. [docs/PHYSICS_INTRO.md](docs/PHYSICS_INTRO.md) — physics tutorial for programmers.
 4. [docs/PHYSICS.md](docs/PHYSICS.md) — governing equations, scaling, BCs (reference).
 5. [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) — end-to-end code trace with file:line anchors.
 6. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — five-layer component design and import rules.
 7. [docs/adr/](docs/adr/) — locked decisions. Open a new ADR before changing any invariant.
-8. [docs/ROADMAP.md](docs/ROADMAP.md) — per-milestone delivery history (M1–M10).
+8. [docs/ROADMAP.md](docs/ROADMAP.md) — per-milestone delivery history (M1 through M14.1).
 
 ## License
 
