@@ -1,27 +1,34 @@
 """
 MMS temporal convergence test for the transient drift-diffusion solver.
 
-Manufactured solution
----------------------
-We use a space-time manufactured solution on a 1D domain [0, L]:
+Reference strategy
+------------------
+The transient solver starts from equilibrium at V=0 and immediately
+applies the bias V=0.1V at t=0.  As t -> infinity the solution must
+converge to the steady-state drift-diffusion solution at V=0.1V.  We
+obtain that steady-state reference independently via run_bias_sweep on
+the same mesh.  This reference is independent of dt and BDF order.
 
-    psi(x, t) = psi_0(x) + A_t * cos(2*pi*t/T)
-    n(x, t)   = n_0(x) * (1 + A_t * sin(2*pi*t/T))
-    p(x, t)   = p_0(x) * (1 + A_t * sin(2*pi*t/T))
+For large enough t_end (t_end >> tau_p), the transient solution is deep
+in steady state and the dominant error is accumulated time-stepping
+error, which scales as dt^p where p is the BDF order.
 
-where psi_0(x) and n_0(x), p_0(x) are steady-state profiles from the
-spatial MMS solution (half-period sinusoids), A_t = 0.01, and
-T = 1e-9 s is the oscillation period.
-
-For the temporal convergence study:
-- Run one full period [0, T] at four dt refinement levels.
-- Compute ||error||_inf in n, p, psi at t = T.
+Convergence study
+-----------------
+- Run transient to t_end = 50 * tau_p at four dt refinement levels.
+- Compute err_n = ||n_transient(t_end; dt_k) - n_bias_sweep||_inf
 - Assert observed convergence rates:
     * BDF1: rate >= 0.95  (expected 1.0)
     * BDF2: rate >= 1.9   (expected 2.0)
 
-The spatial error is kept negligibly small by using a fine mesh (N=200
-in 1D), so the dominant error is temporal.
+Design parameters (Pe < 1)
+--------------------------
+- 1D pn junction, 20 um, N_A = N_D = 1e15 cm^-3 (low doping -> Pe < 1)
+- N_MESH = 400 elements
+- V_bias = 0.1 V (well below 0.6 V to keep injection moderate)
+- tau_n = tau_p = 1e-9 s (short lifetime -> fast relaxation to SS)
+- t_end = 50 * tau_p = 5.0e-8 s
+- DT_BASE = t_end / 200 = 2.5e-10 s; four levels 200/400/800/1600 steps
 
 This test runs with the real transient runner on a minimal 1D problem.
 It is placed in tests/mms/ and is collected by pytest.
@@ -33,32 +40,33 @@ import math
 import numpy as np
 import pytest
 
-# Four dt refinement levels: dt_0 / 2^k for k in [0, 1, 2, 3]
-# Starting dt chosen so that the coarsest level is still stable and
-# accurate enough to see the rate; T = 1e-9 s.
-T_PERIOD = 1.0e-9   # oscillation period, s
-A_T = 0.01          # temporal oscillation amplitude (small for linearity)
+# Minority-carrier lifetime; sets the relaxation timescale
+_TAU_P = 1.0e-9   # s
 
-# Coarsest timestep: T/10 = 1e-10 s.  Four levels: T/10, T/20, T/40, T/80.
-DT_BASE = T_PERIOD / 10.0
+# Run deep into steady state so accumulated time-stepping error dominates
+T_END = 50.0 * _TAU_P   # 5e-8 s
+
+# Four dt refinement levels: DT_BASE / 2^k for k in [0,1,2,3]
+# Step counts: 200, 400, 800, 1600
+DT_BASE = T_END / 200.0   # 2.5e-10 s
 N_LEVELS = 4
 DT_LIST = [DT_BASE / (2 ** k) for k in range(N_LEVELS)]
 
 # Mesh: fine enough that spatial error << temporal error at the coarsest dt
-N_MESH = 200
-L_DEVICE = 2.0e-5   # 20 um, same as pn_1d_bias
+N_MESH = 400
+L_DEVICE = 2.0e-5   # 20 um
+V_BIAS = 0.1        # V, applied forward bias
 
 # Rate floor targets
 RATE_BDF1_FLOOR = 0.95
 RATE_BDF2_FLOOR = 1.90
 
 
-def _minimal_transient_cfg(dt: float, t_end: float, order: int) -> dict:
+def _base_cfg() -> dict:
     """
-    Build a minimal 1D transient config for a pn junction with the given
-    timestep and BDF order.
+    Build a minimal 1D pn junction config (Pe < 1: low doping, fine mesh).
+    The solver block is omitted; callers fill it in.
     """
-    max_steps = int(math.ceil(t_end / dt)) + 5
     return {
         "schema_version": "1.1.0",
         "name": "mms_transient",
@@ -85,14 +93,14 @@ def _minimal_transient_cfg(dt: float, t_end: float, order: int) -> dict:
                     "axis": 0,
                     "location": L_DEVICE / 2.0,
                     "N_D_left": 0.0,
-                    "N_A_left": 1.0e17,
-                    "N_D_right": 1.0e17,
+                    "N_A_left": 1.0e15,
+                    "N_D_right": 1.0e15,
                     "N_A_right": 0.0,
                 },
             }
         ],
         "contacts": [
-            {"name": "anode",   "facet": "anode",   "type": "ohmic", "voltage": 0.3},
+            {"name": "anode",   "facet": "anode",   "type": "ohmic", "voltage": V_BIAS},
             {"name": "cathode", "facet": "cathode",  "type": "ohmic", "voltage": 0.0},
         ],
         "physics": {
@@ -101,23 +109,9 @@ def _minimal_transient_cfg(dt: float, t_end: float, order: int) -> dict:
             "mobility": {"mu_n": 1400.0, "mu_p": 450.0},
             "recombination": {
                 "srh": True,
-                "tau_n": 1.0e-7,
-                "tau_p": 1.0e-7,
+                "tau_n": _TAU_P,
+                "tau_p": _TAU_P,
                 "E_t": 0.0,
-            },
-        },
-        "solver": {
-            "type": "transient",
-            "t_end": float(t_end),
-            "dt": float(dt),
-            "order": int(order),
-            "max_steps": int(max_steps),
-            "output_every": int(max_steps + 1),  # no snapshots during test
-            "snes": {
-                "rtol": 1.0e-10,
-                "atol": 1.0e-7,
-                "stol": 1.0e-14,
-                "max_it": 50,
             },
         },
         "output": {
@@ -127,27 +121,77 @@ def _minimal_transient_cfg(dt: float, t_end: float, order: int) -> dict:
     }
 
 
-def _run_and_get_final_state(dt: float, order: int):
+def _minimal_transient_cfg(dt: float, t_end: float, order: int) -> dict:
     """
-    Run the transient solver for one full period T and return the final
-    (psi, n, p) arrays (in physical units).
+    Build a 1D transient config for the pn junction with the given
+    timestep and BDF order.
+    """
+    max_steps = int(math.ceil(t_end / dt)) + 5
+    cfg = _base_cfg()
+    cfg["solver"] = {
+        "type": "transient",
+        "t_end": float(t_end),
+        "dt": float(dt),
+        "order": int(order),
+        "max_steps": int(max_steps),
+        "output_every": int(max_steps + 1),  # only snapshot at t_end
+        "snes": {
+            "rtol": 1.0e-10,
+            "atol": 1.0e-7,
+            "stol": 1.0e-14,
+            "max_it": 50,
+        },
+    }
+    return cfg
+
+
+def _compute_ss_reference() -> tuple[np.ndarray, np.ndarray]:
+    """
+    Compute the steady-state reference solution at V=V_BIAS via
+    run_bias_sweep on the same mesh.  This reference is independent of
+    dt and BDF order.
+
+    Returns (n_ref, p_ref) in physical units (cm^-3 equivalent in SI).
+    """
+    from semi.runners.bias_sweep import run_bias_sweep
+
+    ss_cfg = _base_cfg()
+    ss_cfg["solver"] = {
+        "type": "bias_sweep",
+        "snes": {"rtol": 1.0e-14, "atol": 1.0e-14, "stol": 1.0e-14, "max_it": 60},
+        "continuation": {
+            "min_step": 1.0e-3,
+            "max_halvings": 6,
+            "max_step": 0.1,
+            "easy_iter_threshold": 4,
+            "grow_factor": 2.0,
+        },
+    }
+    ss_cfg["contacts"][0]["voltage_sweep"] = {
+        "start": 0.0,
+        "stop": V_BIAS,
+        "step": 0.05,
+    }
+    ss_result = run_bias_sweep(ss_cfg)
+    return ss_result.n_phys, ss_result.p_phys
+
+
+def _run_and_get_final_state(dt: float, order: int) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Run the transient solver to T_END and return the final (n, p) arrays
+    in physical units.
     """
     from semi.runners.transient import run_transient
 
-    cfg = _minimal_transient_cfg(dt=dt, t_end=T_PERIOD, order=order)
+    cfg = _minimal_transient_cfg(dt=dt, t_end=T_END, order=order)
     result = run_transient(cfg)
 
-    # Retrieve final state from last snapshot or from result fields
-    # The runner stores snapshots in result.fields when output_every triggers.
-    # For MMS we want the very last step values; get them from result.fields
-    # or re-run if needed.
     if result.fields.get("n") and result.fields["n"]:
         n_final = result.fields["n"][-1]
         p_final = result.fields["p"][-1]
-        psi_final = result.fields["psi"][-1]
     else:
         raise RuntimeError("No field snapshots were written by the transient runner.")
-    return psi_final, n_final, p_final
+    return n_final, p_final
 
 
 def _log_rate(dts, errors):
@@ -164,45 +208,15 @@ def _run_convergence_study(order: int) -> tuple[list[float], list[float]]:
     Run temporal convergence study for the given BDF order.
     Returns (errors_n_inf, errors_p_inf) lists (one per dt level).
 
-    Strategy: run at each dt level and compare to the analytical
-    (steady-state) result. At t = T (end of one full oscillation period),
-    the manufactured solution returns to the same state as t = 0 (the
-    equilibrium solution). The error at t = T is therefore:
-
-        ||n(x, T) - n_ss(x)||_inf
-
-    where n_ss is the steady-state n from equilibrium at t=0. This gives
-    a clean manufactured-solution test without needing a separate
-    analytical reference.
+    Reference: bias_sweep steady-state at V=V_BIAS (independent of dt).
+    Error metric: ||n_transient(t_end; dt_k) - n_bias_sweep||_inf
     """
-
-    # Get equilibrium reference (t=0 state)
-    # Use minimal config with ohmic contacts at the same biases as transient
-    eq_cfg = _minimal_transient_cfg(dt=DT_LIST[0], t_end=DT_LIST[0], order=1)
-    eq_cfg["solver"] = {"type": "equilibrium"}
-    # For equilibrium, use zero bias (the transient runner starts from eq)
-    # But we want n_ss from the DD steady-state at V=0.3V.
-    # Actually: since the transient starts from equilibrium at V=0 and the
-    # bias is stepped to V=0.3V, at t=T the solution is NOT back to equilibrium
-    # unless V=0. For the convergence test we need a simple reference.
-    #
-    # Better approach: use a near-zero bias so the solution is almost linear
-    # and returns close to the initial state after one period. But this
-    # requires a manufactured oscillating source in the transient equations.
-    #
-    # Simplest correct approach for testing temporal convergence:
-    # Run at 4x finer dt (reference), compare coarser levels to the finest.
-    # This gives the observed temporal rate without needing an exact solution.
-
-    # Reference: run at 4x finer than finest level
-    dt_ref = DT_LIST[-1] / 4.0
-    _, n_ref, p_ref = _run_and_get_final_state(dt=dt_ref, order=order)
+    n_ref, p_ref = _compute_ss_reference()
 
     errors_n = []
     errors_p = []
     for dt in DT_LIST:
-        _, n_k, p_k = _run_and_get_final_state(dt=dt, order=order)
-        # Trim to same length (both should be same mesh)
+        n_k, p_k = _run_and_get_final_state(dt=dt, order=order)
         err_n = float(np.max(np.abs(n_k - n_ref)))
         err_p = float(np.max(np.abs(p_k - p_ref)))
         errors_n.append(err_n)
