@@ -136,7 +136,8 @@ def test_mos_cap_ac_C_monotone_decreasing_in_depletion():
     V = np.array([r["V"] for r in result.iv])
     C_ac = np.array([r["C_ac"] for r in result.iv])
     order = np.argsort(V)
-    V = V[order]; C_ac = C_ac[order]
+    V = V[order]
+    C_ac = C_ac[order]
 
     # All values positive (basic correctness).
     assert (C_ac > 0).all(), f"C_ac not all positive: {C_ac}"
