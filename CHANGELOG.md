@@ -1,5 +1,64 @@
 # Changelog
 
+## [Unreleased] - M13.1: Scharfetter-Gummel transient (in flight)
+
+### Added (on `dev/m13.1-scharfetter-gummel`, not yet on main)
+- `docs/adr/0012-scharfetter-gummel.md`: ADR superseding the (n, p)
+  Galerkin convection-diffusion choice in ADR 0009 with Scharfetter-Gummel
+  edge-flux assembly. Sign convention: Sandia / Farrell-et-al. Open
+  sources cited and read end-to-end: arXiv 1911.00377 Eq (30), Sandia
+  OSTI 2011-3865 Eq (18), Spevak TU Wien thesis Section 3.2.6. Cites
+  Scharfetter-Gummel 1969, Bank-Rose 1987, Brezzi-Marini-Pietra 1989,
+  Selberherr 1984 ch. 4.4 with explanations of why open reproductions
+  cover what each paywalled source contains.
+- `semi/fem/scharfetter_gummel.py`: Bernoulli function `B(x) = x/(exp(x)-1)`
+  with four-regime stable evaluation (Taylor for `|x| < 1e-3`,
+  `x*exp(-x)/(1-exp(-x))` for `x > 30`, closed form elsewhere).
+  1D SG edge fluxes for electrons and holes in Sandia / Farrell convention.
+  UFL Bernoulli (tanh-blended, no conditionals) for the modified-diffusion
+  form. Midpoint-Galerkin reference for the small-Peclet sign / scaling
+  guard (different derivation than SG, so it catches sign errors that the
+  Slotboom 2-node closed form would miss).
+- `semi/fem/sg_assembly.py`: per-edge SG residual assembler for 1D
+  meshes. Computes the per-cell flux from the DOF arrays, scatters into
+  per-vertex residuals with the correct divergence sign convention.
+  Plus the `solve_sg_block_1d` SNES wrapper scaffold (marked
+  `# pragma: no cover`, in flight pending dolfinx-0.10 block API debug).
+- `tests/test_scharfetter_gummel.py` (64 tests): mpmath cross-check at
+  1000 log-uniform points to 1e-12 relative; the corrected identity
+  `B(x) - B(-x) = -x` (the prompt's first-draft `B(x) + B(-x) = -x`
+  was wrong, the sum is `x*coth(x/2)`); two-direction sign tests for
+  electrons and holes; hole-flux device-equation symmetry guard 2b
+  to 1e-10 relative; midpoint-Galerkin agreement at small Peclet to
+  5 % relative; UFL Bernoulli matches NumPy reference at sample points.
+- `tests/fem/test_sg_assembly.py` (5 tests): per-cell vertex ordering
+  by x-coordinate, zero residual at zero state, zero at uniform-n
+  zero-field equilibrium, per-vertex scatter matches scalar fluxes,
+  divergence-of-constant-flux is zero at interior vertices to 1e-12
+  relative.
+
+### Status (not yet ready for merge)
+- The transient runner does NOT yet incorporate the SG flux. The
+  steady-state agreement test at V=0.5 V across N={100,200,400,1000}
+  on `pn_1d_bias` (the 1e-4 hard merge gate per the M13.1 prompt) is
+  NOT yet exercised. The xfail in `tests/fem/test_transient_steady_state.py`
+  documents this status.
+- 2D simplicial assembly: explicitly raises `NotImplementedError` per
+  the "1D before 2D, hard" guard.
+
+### Decisions surfaced and resolved during this work
+- **Bernoulli identity correction**: the prompt's `B(x) + B(-x) = -x`
+  is wrong; the correct identity is `B(x) - B(-x) = -x` (the sum is
+  `x*coth(x/2)`). Verified algebraically and numerically; the corrected
+  identity is in the unit tests.
+- **SG sign convention**: the prompt's first-draft formula
+  `F = (mu V_t/h)[B(-dpsi) n_j - B(+dpsi) n_i]` had B-arguments swapped
+  relative to the standard convention; caught by the midpoint-Galerkin
+  cross-check guard (27 % disagreement at small Peclet) before any
+  residual code was wired. Corrected to `(mu V_t/h)[n_j B(+dpsi) - n_i B(-dpsi)]`
+  matching arXiv 1911.00377 Eq (30) and Sandia OSTI 2011-3865 Eq (18);
+  agreement vs MG drops to 0.35 %.
+
 ## [0.14.0] - M14: Small-signal AC sweep
 
 ### Added

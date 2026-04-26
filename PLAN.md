@@ -35,17 +35,29 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M14 are merged into `main`. M9 delivered the on-disk artifact
+M1 through M14.1 are merged into `main`. M9 delivered the on-disk artifact
 contract; M10 exposed the engine over HTTP; M11 versions the input
 schema and ships the UI-facing schema companion; M12 closes out the
 MOSFET benchmark with n+ Gaussian source/drain implants and amends the
 SNES tolerances for high-injection multi-region problems; M13 delivers
-the transient solver with BDF1/BDF2 time integration in (ψ, n, p)
+the transient solver with BDF1/BDF2 time integration in (psi, n, p)
 primary-density form; M14 ships the small-signal AC sweep runner with
-a real 2x2 block reformulation of the (J + jωM) δu = -dF/dV δV system,
-displacement current at the contact, and an RC depletion-capacitance
-benchmark validated to 0.4 % of the analytical model.
-`CHANGELOG.md` records the `[0.14.0] - M14` entry.
+a real 2x2 block reformulation of the (J + j*omega*M) delta_u = -dF/dV delta_V
+system, displacement current at the contact, and an RC depletion-capacitance
+benchmark validated to 0.4 % of the analytical model. M14.1 rewires the
+mos_2d C-V benchmark to an analytic-AC differential-capacitance runner
+(`mos_cap_ac`); worst error 6.79 % vs theory in the depletion window.
+`CHANGELOG.md` records the `[0.14.0] - M14` entry; M14.1 ships under
+the same minor version (PR #38).
+
+**M13.1 is in flight on `dev/m13.1-scharfetter-gummel`** (Scharfetter-Gummel
+edge-flux discretisation for the transient continuity, ADR 0012). The
+SG residual primitives (Bernoulli, 1D edge fluxes, per-edge assembler)
+are implemented and unit-tested at 64 + 5 tests. The custom SNES wrapper
+that injects the SG residual into the dolfinx block solve is scaffolded
+but needs follow-up to land cleanly against the dolfinx-0.10 block API;
+the steady-state agreement gate at 1e-4 across N={100,200,400,1000} is
+not yet exercised. Issue #34 stays open until the integration lands.
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
