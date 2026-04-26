@@ -1392,20 +1392,37 @@ def main(argv: list[str] | None = None) -> int:
         return 3
     dt = time.perf_counter() - t0
 
-    info = result.solver_info or {}
-    n_dofs = int(result.V.dofmap.index_map.size_global) if result.V is not None else -1
+    # TransientResult exposes `meta`/`t`/`iv` instead of `solver_info`/`V`.
+    is_transient = hasattr(result, "meta") and not hasattr(result, "solver_info")
+    if is_transient:
+        meta = result.meta or {}
+        n_steps = int(meta.get("n_steps_taken", 0))
+        n_failed = int(meta.get("n_failed_steps", 0))
+        print("[run_benchmark] transient diagnostics:")
+        print(f"    order           = {meta.get('order')}")
+        print(f"    dt              = {meta.get('dt')}")
+        print(f"    n_steps_taken   = {n_steps}")
+        print(f"    n_failed_steps  = {n_failed}")
+        print(f"    solve_time      = {dt:.3f} s")
+        print(f"    iv_records      = {len(result.iv)}")
+        if n_steps == 0:
+            print("[run_benchmark] FAIL: transient took no steps", file=sys.stderr)
+            return 4
+    else:
+        info = result.solver_info or {}
+        n_dofs = int(result.V.dofmap.index_map.size_global) if result.V is not None else -1
 
-    print("[run_benchmark] SNES diagnostics:")
-    print(f"    converged       = {info.get('converged')}")
-    print(f"    iterations      = {info.get('iterations')}")
-    print(f"    reason          = {info.get('reason')}")
-    print(f"    solve_time      = {dt:.3f} s")
-    print(f"    dof_count       = {n_dofs}")
-    print(f"    scaling         = {result.scaling}")
+        print("[run_benchmark] SNES diagnostics:")
+        print(f"    converged       = {info.get('converged')}")
+        print(f"    iterations      = {info.get('iterations')}")
+        print(f"    reason          = {info.get('reason')}")
+        print(f"    solve_time      = {dt:.3f} s")
+        print(f"    dof_count       = {n_dofs}")
+        print(f"    scaling         = {result.scaling}")
 
-    if not info.get("converged", False):
-        print("[run_benchmark] FAIL: SNES did not converge", file=sys.stderr)
-        return 4
+        if not info.get("converged", False):
+            print("[run_benchmark] FAIL: SNES did not converge", file=sys.stderr)
+            return 4
 
     # Output directory
     out_dir = RESULTS_DIR / name

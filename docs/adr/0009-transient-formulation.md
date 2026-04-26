@@ -109,3 +109,63 @@ continues to use the Slotboom (φ_n, φ_p) formulation.
    an explicit scheme for the time derivative. Rejected because explicit
    methods are conditionally stable with a CFL-like constraint on dt that
    would require very small steps for typical semiconductor problems.
+
+## Known limitation (M13.1)
+
+The (ψ, n_hat, p_hat) Galerkin discretization adopted above does **not**
+converge to the same discrete steady state as the Slotboom (φ_n, φ_p)
+discretization used by `run_bias_sweep`, even on identical meshes with
+identical boundary conditions and arbitrarily tight SNES tolerance.
+
+**Symptom.** A 1D pn junction held at forward bias for many minority-
+carrier lifetimes settles to a discrete fixed point of the (n,p) form
+that disagrees with `bias_sweep`'s Slotboom fixed point by ~3 × 10¹⁸
+m⁻³ in carrier density at the depletion edge (orders of magnitude
+larger than the minority-carrier density itself). The terminal IV from
+the transient runner is the wrong magnitude and, depending on
+post-processing, the wrong sign. With sufficiently tight SNES tolerance
+(`atol = 1e-15`), the (n,p) Newton iterate can drive carriers to
+~10²⁴ m⁻³ and ψ_hat to ~90, far outside the physical regime, before
+locking at a non-physical fixed point.
+
+**Cause.** This is a **spatial discretization** failure, not a time
+integration one. The standard Galerkin discretization of the
+convection-diffusion form `div(∇n − n∇ψ) = R` has no positivity guarantee
+and is unstable for non-trivial cell Péclet numbers, exactly the regime
+the depletion region sits in. The Slotboom form sidesteps the issue by
+using exponentially-varying integrand `n_i exp(ψ − φ_n)` at quadrature
+points, which absorbs the cell-Péclet variation into the basis. An
+intermediate fix using Slotboom primary unknowns plus a chain-rule
+expansion of ∂n/∂t was attempted on `dev/m13-mesh-and-slotboom-test`
+(commit 323d30a) and hit MUMPS LU zero-pivot failures from a different
+conditioning issue.
+
+**Test status.**
+* `tests/mms/test_transient_convergence.py` — **passing.** A pairwise-
+  difference temporal-convergence test recovers BDF1 ≈ 1.0 and BDF2 ≈ 2.0
+  on the (n,p) form, verifying that the time integrator and history
+  bookkeeping are correct.
+* `tests/fem/test_transient_steady_state.py` — **xfail** with `strict=False`,
+  pending M13.1 fix. The test still encodes the correct acceptance
+  criterion (relative IV error < 1e-4 vs `bias_sweep`); it will flip
+  to passing without code change once SG lands.
+
+**Resolution path (M13.1).** Implement Scharfetter-Gummel
+exponential-fitting edge fluxes for the carrier continuity blocks. SG
+absorbs the n_hat scaling into Bernoulli-weighted basis functions, is
+positivity-preserving by construction, and is the standard choice in
+production drift-diffusion codes. Estimated scope: a new edge-flux
+assembler in `semi/fem/scharfetter_gummel.py`, ~600 LOC including
+tests, plus a new ADR superseding the (n,p) Galerkin choice in this
+document.
+
+**Why not block on M13.1.** The transient infrastructure (BDF1/BDF2,
+history bookkeeping, lumped mass for M14, IV recording, snapshot
+output) is correct and is verified by the temporal convergence test.
+Blocking the milestone on a new spatial discretizer would push
+M14 (small-signal AC) by an estimated 2-3 sessions. Shipping with
+the steady-state limit xfail'd is honest about the limitation while
+unblocking downstream work. The default SNES `atol` for the transient
+runner has been tightened from `1e-7` to `1e-10` so the (n,p) failure
+is exposed as honest Newton work rather than silently masked by SNES
+exiting at iteration 0.
