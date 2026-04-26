@@ -35,7 +35,7 @@ Electron continuity (n-form):
 Hole continuity (p-form):
     alpha_0/dt * p * v_p
     + L0^2 * mu_p * (inner(grad(p), grad(v_p)) + p * inner(grad(psi), grad(v_p)))
-    - R * v_p
+    + R * v_p
     + f_hist_p * v_p  =  0
 
 where f_hist_n and f_hist_p are known source terms from the BDF history
@@ -609,10 +609,10 @@ def _build_transient_residual(
 
     # ------------------------------------------------------------------
     # Hole continuity (p-form):
-    #   d(p)/dt + div(-mu_p*(grad(p) + p*grad(psi))) = R
+    #   d(p)/dt + div(-mu_p*(grad(p) + p*grad(psi))) = -R
     # Weak form:
     #   alpha0/dt * int(p*v) + int(L0^2*mu_p*(grad(p) + p*grad(psi)).grad(v))
-    #   - int(R*v) + int(f_hist_p*v) = 0
+    #   + int(R*v) + int(f_hist_p*v) = 0
     # ------------------------------------------------------------------
     F_p = (
         alpha0_const / dt_const * p_hat * v_p * ufl.dx
@@ -620,7 +620,7 @@ def _build_transient_residual(
             ufl.inner(ufl.grad(p_hat), ufl.grad(v_p))
             + p_hat * ufl.inner(ufl.grad(psi), ufl.grad(v_p))
         ) * ufl.dx
-        - R * v_p * ufl.dx
+        + R * v_p * ufl.dx
         + f_hist_p * v_p * ufl.dx
     )
 
