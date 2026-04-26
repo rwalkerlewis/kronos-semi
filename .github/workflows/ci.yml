@@ -91,6 +91,8 @@ jobs:
         # dolfinx-dependent tests under tests/fem/) with coverage and
         # enforces the 95% gate. We used to run pytest twice (plain
         # then with coverage) which doubled wall time for no signal.
+        # Writes coverage.xml at the workspace root for the upload step
+        # below.
         run: |
           docker run --rm \
             -v "${{ github.workspace }}:/workspaces/kronos-semi" \
@@ -99,6 +101,18 @@ jobs:
             pytest tests/ -v --tb=short \
               --cov=semi --cov-report=term-missing --cov-report=xml \
               --cov-fail-under=95
+
+      - name: Upload coverage XML
+        # Local-artifact only (no Codecov yet); CI consumers can grab the
+        # file from the run page. Always: ensures the artifact lands even
+        # if a downstream benchmark step fails so reviewers can still see
+        # what coverage looked like.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          retention-days: 14
 
       - name: Run pn_1d benchmark
         run: |
@@ -127,7 +141,7 @@ jobs:
             kronos-semi:ci \
             python scripts/run_benchmark.py pn_1d_bias_reverse
 
-      - name: Run mos_2d benchmark (2D MOS capacitor C-V)
+      - name: Run mos_2d benchmark (2D MOS capacitor C-V via analytic AC, M14.1)
         run: |
           docker run --rm \
             -v "${{ github.workspace }}:/workspaces/kronos-semi" \
@@ -135,6 +149,42 @@ jobs:
             -e MPLBACKEND=Agg \
             kronos-semi:ci \
             python scripts/run_benchmark.py mos_2d
+
+      - name: Run mosfet_2d benchmark (2D MOSFET, M12)
+        # No registered verifier today; smoke-test that the multi-region
+        # SNES bias sweep with Gaussian n+ implants converges across all
+        # bias points. run_benchmark.py exits non-zero on SNES failure.
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
+            -w /workspaces/kronos-semi \
+            -e MPLBACKEND=Agg \
+            kronos-semi:ci \
+            python scripts/run_benchmark.py mosfet_2d
+
+      - name: Run pn_1d_turnon benchmark (transient BDF, M13)
+        # No registered verifier in run_benchmark.py today; smoke-test
+        # that the transient runner takes steps end-to-end. The lifetime
+        # extraction in benchmarks/pn_1d_turnon/verify.py runs separately
+        # and is wired in by M13.1 (issue #34) once the SG rewrite lands.
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
+            -w /workspaces/kronos-semi \
+            -e MPLBACKEND=Agg \
+            kronos-semi:ci \
+            python scripts/run_benchmark.py pn_1d_turnon
+
+      - name: Run rc_ac_sweep benchmark (small-signal AC, M14)
+        # Has a registered verifier: asserts |C(f) - C_dep(V_DC)| within
+        # 5% over [1 Hz, 1 MHz] and plateau flat to 2%.
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
+            -w /workspaces/kronos-semi \
+            -e MPLBACKEND=Agg \
+            kronos-semi:ci \
+            python scripts/run_benchmark.py rc_ac_sweep
 
       - name: Run resistor_3d benchmark (3D Ohmic V-I, builtin box)
         run: |
