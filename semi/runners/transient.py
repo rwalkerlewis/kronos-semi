@@ -35,7 +35,7 @@ Electron continuity (n-form):
 Hole continuity (p-form):
     alpha_0/dt * p * v_p
     + L0^2 * mu_p * (inner(grad(p), grad(v_p)) + p * inner(grad(psi), grad(v_p)))
-    - R * v_p
+    + R * v_p
     + f_hist_p * v_p  =  0
 
 where f_hist_n and f_hist_p are known source terms from the BDF history
@@ -337,9 +337,31 @@ def run_transient(
     # IV recording helper
     # ------------------------------------------------------------------
     def _record_all_iv(t_val: float, iv_rows: list):
-        """Record IV for all ohmic contacts at the current solution."""
-        from ..physics.slotboom import phi_n_from_np, phi_p_from_np
-        from ..postprocess import evaluate_partial_currents
+        """Record IV for all ohmic contacts at the current solution.
+
+        Computes J_n and J_p via UFL boundary assembly.  Reconstructing
+        phi_n/phi_p as P1 nodal arrays via log() is ill-conditioned in the
+        minority-carrier regions where n_hat (or p_hat) approaches zero or
+        dips slightly negative during Newton iteration -- a single bad node
+        becomes a P1 spike that pollutes grad(phi_n) at the contact and
+        produces O(1e6) spurious terminal currents.
+
+        Instead, evaluate grad(phi_n)/grad(phi_p) symbolically from the
+        primary unknowns using the chain rule:
+            n_hat = ni_hat * exp(psi - phi_n)
+                -> grad(phi_n) = grad(psi) - grad(n_hat) / n_hat
+            p_hat = ni_hat * exp(phi_p - psi)
+                -> grad(phi_p) = grad(psi) + grad(p_hat) / p_hat
+
+        Mirrors the boundary-integration pattern in
+        semi.postprocess.evaluate_partial_currents.
+        """
+        from dolfinx.mesh import meshtags
+        from mpi4py import MPI
+
+        from ..constants import Q
+
+        fdim = msh.topology.dim - 1
 
         for c in cfg["contacts"]:
             if c["type"] != "ohmic":
@@ -349,39 +371,56 @@ def run_transient(
             finfo = contact_facet_infos.get(cname)
             if finfo is None:
                 continue
-            # Reconstruct phi_n, phi_p from n_hat, p_hat for current evaluation
-            phi_n_arr = phi_n_from_np(psi.x.array, n_hat.x.array, ni_hat_val)
-            phi_p_arr = phi_p_from_np(psi.x.array, p_hat.x.array, ni_hat_val)
-            phi_n_fn = fem.Function(V_n, name="phi_n_tmp")
-            phi_p_fn = fem.Function(V_p, name="phi_p_tmp")
-            phi_n_fn.x.array[:] = phi_n_arr
-            phi_p_fn.x.array[:] = phi_p_arr
-            phi_n_fn.x.scatter_forward()
-            phi_p_fn.x.scatter_forward()
 
-            # Build a spaces-like object for evaluate_partial_currents
-            class _Spaces:
-                pass
-            sp = _Spaces()
-            sp.V_psi = V_psi
-            sp.psi = psi
-            sp.V_phi_n = V_n
-            sp.V_phi_p = V_p
-            sp.phi_n = phi_n_fn
-            sp.phi_p = phi_p_fn
+            tag = int(finfo["tag"])
+            facets = finfo["facets"]
+            if len(facets) == 0:
+                iv_rows.append({
+                    "t": float(t_val),
+                    "contact": cname,
+                    "V": float(V_applied),
+                    "J": 0.0,
+                    "J_n": 0.0,
+                    "J_p": 0.0,
+                })
+                continue
 
-            J_n, J_p = evaluate_partial_currents(
-                sp, sc, ref_mat, finfo, mu_n_SI, mu_p_SI,
-            )
-            J_total = J_n + J_p
+            values = np.full(len(facets), tag, dtype=np.int32)
+            indices = np.asarray(facets, dtype=np.int32)
+            sort = np.argsort(indices)
+            facet_mt = meshtags(msh, fdim, indices[sort], values[sort])
+            ds = ufl.Measure("ds", domain=msh, subdomain_data=facet_mt,
+                             subdomain_id=tag)
+            n_vec = ufl.FacetNormal(msh)
+
+            grad_phi_n = ufl.grad(psi) - ufl.grad(n_hat) / n_hat
+            grad_phi_p = ufl.grad(psi) + ufl.grad(p_hat) / p_hat
+
+            Jn = Q * mu_n_SI * n_hat * sc.C0 * ufl.dot(sc.V0 * grad_phi_n, n_vec)
+            Jp = Q * mu_p_SI * p_hat * sc.C0 * ufl.dot(sc.V0 * grad_phi_p, n_vec)
+
+            jn_form = fem.form(Jn * ds)
+            jp_form = fem.form(Jp * ds)
+            area_form = fem.form(1.0 * ds)
+
+            Jn_local = fem.assemble_scalar(jn_form)
+            Jp_local = fem.assemble_scalar(jp_form)
+            A_local = fem.assemble_scalar(area_form)
+            Jn_val = msh.comm.allreduce(Jn_local, op=MPI.SUM)
+            Jp_val = msh.comm.allreduce(Jp_local, op=MPI.SUM)
+            A = msh.comm.allreduce(A_local, op=MPI.SUM)
+            if A == 0.0:
+                A = 1.0
+            J_n = float(Jn_val / A)
+            J_p = float(Jp_val / A)
 
             iv_rows.append({
                 "t": float(t_val),
                 "contact": cname,
                 "V": float(V_applied),
-                "J": float(J_total),
-                "J_n": float(J_n),
-                "J_p": float(J_p),
+                "J": float(J_n + J_p),
+                "J_n": J_n,
+                "J_p": J_p,
             })
 
     # ------------------------------------------------------------------
@@ -609,10 +648,14 @@ def _build_transient_residual(
 
     # ------------------------------------------------------------------
     # Hole continuity (p-form):
-    #   d(p)/dt + div(-mu_p*(grad(p) + p*grad(psi))) = R
+    #   d(p)/dt + div(-mu_p*(grad(p) + p*grad(psi))) = -R
+    # SRH recombination removes both n and p at rate R, so both
+    # residuals carry +R*v.  An earlier version had -R*v_p here, which
+    # turned recombination into generation and produced ~30x too little
+    # minority injection in steady-state limit tests.
     # Weak form:
     #   alpha0/dt * int(p*v) + int(L0^2*mu_p*(grad(p) + p*grad(psi)).grad(v))
-    #   - int(R*v) + int(f_hist_p*v) = 0
+    #   + int(R*v) + int(f_hist_p*v) = 0
     # ------------------------------------------------------------------
     F_p = (
         alpha0_const / dt_const * p_hat * v_p * ufl.dx
@@ -620,7 +663,7 @@ def _build_transient_residual(
             ufl.inner(ufl.grad(p_hat), ufl.grad(v_p))
             + p_hat * ufl.inner(ufl.grad(psi), ufl.grad(v_p))
         ) * ufl.dx
-        - R * v_p * ufl.dx
+        + R * v_p * ufl.dx
         + f_hist_p * v_p * ufl.dx
     )
 
