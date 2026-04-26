@@ -127,11 +127,17 @@ def run_transient(
     bdf = BDFCoefficients(order)
     alpha_0 = bdf.coeffs[0]
 
-    # SNES tolerances (same as bias_sweep defaults from ADR 0008)
+    # SNES tolerances. The (n,p) Galerkin spatial residual carries an
+    # L_0^2 prefactor (typically 1e-10 to 1e-12 in scaled units), so the
+    # bias_sweep default atol=1e-7 (ADR 0008) leaves SNES exiting at
+    # iteration 0 every step and the time loop sits frozen at the initial
+    # guess. atol=1e-10 forces honest Newton iteration. See ADR 0009
+    # "Known limitation (M13.1)" for the deeper structural issue this
+    # tighter tolerance now exposes (tracked separately).
     snes_opts = solver_cfg.get("snes", {}) or {}
     snes_petsc_options = {
         "snes_rtol": float(snes_opts.get("rtol", 1.0e-10)),
-        "snes_atol": float(snes_opts.get("atol", 1.0e-7)),
+        "snes_atol": float(snes_opts.get("atol", 1.0e-10)),
         "snes_stol": float(snes_opts.get("stol", 1.0e-14)),
         "snes_max_it": int(snes_opts.get("max_it", 100)),
     }

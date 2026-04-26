@@ -61,7 +61,7 @@
     "output_every": 50,
     "snes": {
       "rtol": 1.0e-10,
-      "atol": 1.0e-7,
+      "atol": 1.0e-10,
       "stol": 1.0e-14,
       "max_it": 100
     }
