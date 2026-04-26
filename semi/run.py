@@ -8,6 +8,8 @@ Supports:
                                       voltage_sweep and solve coupled.
     solver.type == "transient"        BDF1/BDF2 time integration in
                                       (psi, n, p) primary-density form.
+    solver.type == "ac_sweep"         small-signal AC analysis around a
+                                      DC operating point (M14).
 
 Implementation note: this module is a thin dispatcher. The actual
 runners live in `semi.runners.equilibrium`, `semi.runners.bias_sweep`,
@@ -48,7 +50,13 @@ class SimulationResult:
 
 def run(cfg: dict[str, Any]):
     """Dispatch on solver.type."""
-    from .runners import run_bias_sweep, run_equilibrium, run_mos_cv, run_transient
+    from .runners import (
+        run_ac_sweep,
+        run_bias_sweep,
+        run_equilibrium,
+        run_mos_cv,
+        run_transient,
+    )
 
     stype = cfg.get("solver", {}).get("type", "equilibrium")
     if stype == "equilibrium":
@@ -59,6 +67,8 @@ def run(cfg: dict[str, Any]):
         return run_mos_cv(cfg)
     if stype == "transient":
         return run_transient(cfg)
+    if stype == "ac_sweep":
+        return run_ac_sweep(cfg)
     raise ValueError(f"Unknown solver.type {stype!r}")
 
 
@@ -83,4 +93,7 @@ def __getattr__(name: str):
     if name == "run_transient":
         from .runners.transient import run_transient
         return run_transient
+    if name == "run_ac_sweep":
+        from .runners.ac_sweep import run_ac_sweep
+        return run_ac_sweep
     raise AttributeError(f"module 'semi.run' has no attribute {name!r}")

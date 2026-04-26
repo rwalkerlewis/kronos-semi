@@ -11,9 +11,9 @@ production engine suitable for web UI integration.
 If you're a contributor or a coding agent, start at the [Orientation](#orientation)
 section.
 
-## Status (v0.13.0, end of M13)
+## Status (v0.14.0, end of M14)
 
-Milestones M1 through M12 are merged on `main`. The capability matrix is
+Milestones M1 through M14 are merged on `main`. The capability matrix is
 what the engine actually does today, verified in CI:
 
 | Capability                         | Dimensions    | Status  | Verifier                                                     |
@@ -27,7 +27,7 @@ what the engine actually does today, verified in CI:
 | File-sourced gmsh .msh meshes      | 3D            | shipped | builtin vs gmsh R-match within 1%                            |
 | Adaptive bias continuation         | uni + bipolar | shipped | pn junction forward + reverse, 3D resistor                   |
 | 3D ohmic V-I linearity             | 3D            | shipped | V-I linearity within 1%                                      |
-| Benchmarks                         | 6             | shipped | pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d, mosfet_2d |
+| Benchmarks                         | 8             | shipped | pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d, mosfet_2d, pn_1d_turnon, rc_ac_sweep |
 | Conservation / mesh convergence    | 1D            | shipped | charge neutrality, Cauchy rates >= 1.8/doubling              |
 | V&V                                | 10 studies    | shipped | 62/62 PASS                                                   |
 | On-disk result artifact (M9)       | all           | shipped | round-trip tests on all 5 benchmarks, manifest Draft-07 validated |
@@ -35,6 +35,8 @@ what the engine actually does today, verified in CI:
 | HTTP server (M10)                  | all           | shipped | 15 server tests, end-to-end POST /solve + WebSocket progress |
 | Schema versioning + UI form-builder annotations (M11) | all | shipped | every object node has description; schema extracted to JSON file |
 | 2D MOSFET with n+ implants (M12)   | 2D            | shipped | Gaussian source/drain doping; SNES tolerance ADR 0008        |
+| Transient (BDF1/BDF2) solver (M13) | 1D / 2D       | shipped | pn_1d_turnon; lumped mass infrastructure; ADRs 0009 / 0010   |
+| Small-signal AC sweep (M14)        | 1D / 2D       | shipped | rc_ac_sweep within 0.4 % of analytical depletion C; ADR 0011 |
 | Test suite                         | pure + FEM    | shipped | 239+ tests, >=95% coverage                                    |
 | CI                                 | lint+test+FEM | shipped | green on dev and main                                        |
 

@@ -1,5 +1,90 @@
 # Changelog
 
+## [0.14.0] - M14: Small-signal AC sweep
+
+### Added
+- `semi/runners/ac_sweep.py`: `run_ac_sweep(cfg, progress_callback=None)`
+  runner. Solves the linearised system `(J + jωM) δu = -dF/dV δV`
+  around a converged DC operating point at each frequency in a
+  user-specified sweep. Reports admittance Y, impedance Z, capacitance
+  C(ω) = -Im(Y) / (2π f), and conductance G(ω) = Re(Y) at the swept
+  contact. Internally:
+  * obtains the DC operating point by calling `run_bias_sweep` at the
+    requested `dc_bias.voltage` (and at V_DC + ε for the finite-
+    difference DC sensitivity);
+  * converts the Slotboom (ψ, φ_n, φ_p) DC solution to (ψ, n_hat, p_hat)
+    primary-density form via Boltzmann statistics;
+  * assembles the steady-state DD Jacobian J in primary-density form
+    and the lumped mass matrix M (carrier rows only; ψ has no time
+    derivative because the engine is quasi-electrostatic);
+  * builds and solves the **real 2×2 block reformulation** of the
+    complex linear system at each frequency, since the dolfinx-real
+    PETSc build (the one used in CI) does not support complex scalars;
+  * evaluates terminal current including the **displacement** term
+    `j ω ε grad(δψ)·n` at the contact, in addition to the linearised
+    conduction current.
+- `semi/results.py`: `AcSweepResult` dataclass with `frequencies`,
+  `Y`, `Z`, `C`, `G`, `dc_bias`, and `meta` fields. Follows the JSON-
+  as-contract invariant; complex numbers serialise as
+  `{"re": ..., "im": ...}` in the artifact writer.
+- `schemas/input.v1.json`: `solver.type` enum extended with
+  `"ac_sweep"`. New solver sub-objects: `solver.dc_bias`
+  (`{contact, voltage}`) and `solver.ac` (`{contact, amplitude,
+  frequencies}`). `frequencies` accepts an explicit `list`, a
+  `logspace` spec, or a `linspace` spec.
+- `semi/schema.py`: `SCHEMA_SUPPORTED_MINOR` bumped 1 → 2.
+- `benchmarks/rc_ac_sweep/`: M14 acceptance benchmark. 1D pn diode at
+  V_DC = -1.0 V swept 1 Hz to 1 GHz logspace 41 points. `scripts/
+  run_benchmark.py` adds a registered verifier that asserts C(f) is
+  within 5 % of the analytical depletion capacitance over [1 Hz,
+  1 MHz] and that the plateau is flat to 2 %; current measurement
+  matches to **0.41 %** worst-case.
+- `tests/mms/test_ac_consistency.py`: MMS-style AC consistency test.
+  Three checks: Y(ω = 0) is purely real; Re(Y) is stable from ω = 0
+  to ω = 2π·1e-3 Hz; C(f) is ω-independent at low frequency in the
+  depletion regime.
+- `tests/fem/test_ac_dc_limit.py`: M14 acceptance test #2. Asserts
+  C(1 Hz) matches analytical depletion C within 5 % at three reverse
+  biases (V_DC ∈ {-2.0, -1.0, -0.5} V).
+- `docs/adr/0011-ac-small-signal.md`: ADR documenting the
+  formulation, the (ψ, n, p) primary-variable choice, the real 2×2
+  block reformulation forced by the PETSc-real build, the engineering
+  sign convention for terminal Y, and the validation strategy.
+
+### Changed
+- `semi/run.py`: dispatches `solver.type == "ac_sweep"` to
+  `run_ac_sweep`.
+- `semi/runners/__init__.py`: exports `run_ac_sweep`.
+- `scripts/run_benchmark.py`: AC results (`AcSweepResult`) now print
+  ac-specific diagnostics; the `cfg` is attached to AC results so
+  verifier and plotter can recompute the analytical reference.
+  Plotter `rc_ac_sweep` writes a Bode plot of |Y|, C, and |G| with
+  the analytical C overlaid.
+- `pyproject.toml` version bumped `0.13.0 → 0.14.0`.
+- `semi/__init__.py` `__version__` bumped `0.13.0 → 0.14.0`.
+
+### Design notes
+- ADR 0011: the (ψ, n, p) primary-density form is reused from M13 to
+  share the lumped mass matrix and avoid a chain-rule mass on the
+  Slotboom variables. The real 2×2 block reformulation is the
+  PETSc-build-driven choice (no complex scalars in the CI image); a
+  complex backend is left as an M16+ upgrade.
+- The sign convention `Y = -j ω C` for an ideal capacitor is the
+  consequence of reporting "current OUT of device" (matching
+  `postprocess.evaluate_current_at_contact`); a circuit-side
+  "current INTO device" report would give `Y = +j ω C`. The runner
+  documents this in code comments and in `AcSweepResult.C`'s
+  docstring.
+
+### Out of scope (deferred)
+- Direct `dF/dV` assembly via UFL action on a BC-perturbation function
+  (cleaner than finite difference; M16).
+- Complex PETSc backend (`PETSC_USE_COMPLEX=1` Docker image).
+- Upgrading the `mos_2d` C-V benchmark to use AC admittance instead of
+  `mos_cv`'s numerical dQ/dV (listed as M14 deliverable in the
+  IMPROVEMENT_GUIDE, but `mos_cv` is left untouched in this PR;
+  tracked as M14.1).
+
 ## [0.13.0] - M13: Transient solver (BDF1/BDF2)
 
 ### Added

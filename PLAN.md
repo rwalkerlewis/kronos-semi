@@ -35,51 +35,71 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M13 are merged into `main`. M9 delivered the on-disk artifact
+M1 through M14 are merged into `main`. M9 delivered the on-disk artifact
 contract; M10 exposed the engine over HTTP; M11 versions the input
 schema and ships the UI-facing schema companion; M12 closes out the
 MOSFET benchmark with n+ Gaussian source/drain implants and amends the
 SNES tolerances for high-injection multi-region problems; M13 delivers
 the transient solver with BDF1/BDF2 time integration in (ψ, n, p)
-primary-density form. `CHANGELOG.md` records the `[0.13.0] - M13` entry.
+primary-density form; M14 ships the small-signal AC sweep runner with
+a real 2x2 block reformulation of the (J + jωM) δu = -dF/dV δV system,
+displacement current at the contact, and an RC depletion-capacitance
+benchmark validated to 0.4 % of the analytical model.
+`CHANGELOG.md` records the `[0.14.0] - M14` entry.
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
 
 ### What works (verified in Docker on current `main`)
 
-- Everything from M1–M12 (see CHANGELOG.md for details).
-- **M13 deliverables (new in v0.13.0):**
-  - `semi/timestepping.py` — `BDFCoefficients` class (BDF1 and BDF2).
-  - `semi/fem/mass.py` — `assemble_lumped_mass` for n and p spaces.
-  - `semi/results.py` — `TransientResult` dataclass.
-  - `semi/runners/transient.py` — `run_transient(cfg)` in (ψ, n, p) form.
-  - `semi/postprocess.py` — `evaluate_partial_currents` helper.
-  - `schemas/input.v1.json` — `solver.type` extended with `"transient"`.
-  - `semi/schema.py` — `SCHEMA_SUPPORTED_MINOR = 1`.
-  - `benchmarks/pn_1d_turnon/` — 1D pn diode transient turn-on benchmark.
-  - `tests/fem/test_transient_steady_state.py` — steady-state limit test.
-  - `tests/mms/test_transient_convergence.py` — temporal MMS convergence.
-  - `docs/adr/0009-transient-formulation.md` and `0010-bdf-time-integration.md`.
-  - ADR 0009: (n, p) primary form for transient continuity.
-  - ADR 0010: BDF1/BDF2 selection; consistent mass in UFL forms.
+- Everything from M1–M13 (see CHANGELOG.md for details).
+- **M14 deliverables (new in v0.14.0):**
+  - `semi/runners/ac_sweep.py` — `run_ac_sweep(cfg)` in (ψ, n, p) primary
+    density form. Real 2x2 block reformulation of the complex linear
+    system, MUMPS direct LU per frequency. Includes both linearised
+    conduction and displacement current at the swept contact.
+  - `semi/results.py` — `AcSweepResult` dataclass with frequencies, Y,
+    Z, C, G, dc_bias, and meta.
+  - `schemas/input.v1.json` — `solver.type` extended with `"ac_sweep"`,
+    plus `solver.dc_bias` and `solver.ac` (frequency sweep spec).
+  - `semi/schema.py` — `SCHEMA_SUPPORTED_MINOR = 2`; schema_version 1.2.0.
+  - `benchmarks/rc_ac_sweep/` — 1D pn diode at V_DC = -1 V, AC sweep
+    1 Hz to 1 GHz, 41 logspace; verifier matches analytical depletion C
+    within 0.4 % over [1 Hz, 1 MHz].
+  - `tests/mms/test_ac_consistency.py` — three MMS-style AC consistency
+    invariants (Y(0) real, Re(Y) stable at low ω, C(f) ω-independent).
+  - `tests/fem/test_ac_dc_limit.py` — depletion-C agreement within 5 %
+    at three reverse biases.
+  - `docs/adr/0011-ac-small-signal.md` — formulation, primary-variable
+    choice, real 2x2 block reformulation rationale, sign convention.
 
 ### What does not work / not yet built
 
 The gaps between the current state and a production UI-backed engine
 are enumerated and sequenced in
 [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md), milestones
-M14 through M18. Summary:
+M15 through M18. Summary:
 
-- **No AC small-signal.** M14.
 - **Linear solver is CPU-LU only.** Unusable above ~200k DOFs. M15.
 - **Physics gaps:** no field-dependent mobility, Auger, Fermi-Dirac,
   Schottky contacts, tunneling, heterojunctions. M16, M17.
+- **Heterojunctions:** position-dependent χ and Eg not yet supported.
+  M17.
+- **Open M14.1:** the `mos_2d` C-V benchmark still uses `mos_cv`
+  numerical dQ/dV; switching it to AC admittance is listed as M14
+  deliverable in IMPROVEMENT_GUIDE but is left to M14.1.
 
 ## Next task
 
-**M14: AC small-signal analysis** (see
-[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §M14).
+**M13.1 / M14.1 cleanup** (small follow-ups before M15) —
+- M13.1: re-enable the xfailed `test_transient_steady_state.py` once
+  the SRH-coupled steady-state limit is investigated (see ADR 0009
+  "Known limitation").
+- M14.1: rewire `benchmarks/mos_2d` to use the AC admittance for true
+  C(V) rather than the `mos_cv` runner's numerical dQ/dV.
+
+After both, **M15: GPU linear solver path** (see
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §M15).
 
 ## Roadmap
 
@@ -98,7 +118,7 @@ M14 through M18. Summary:
 | M11: Schema versioning | UI-facing schema companion, form-builder annotations | Done |
 | M12: MOSFET n+ + SNES amendment | Gaussian implants, relaxed SNES tols, ADR 0008 | Done |
 | M13: Transient solver | Backward-Euler + BDF2, diode turn-on benchmark | Done |
-| M14: AC small-signal | Complex-frequency admittance, true C-V | Planned |
+| M14: AC small-signal | Linearised (J + jωM) δu = -dF/dV δV; rc_ac_sweep verifier within 0.4% of analytical C_dep; ADR 0011 | Done |
 | M15: GPU linear solver | PETSc CUDA/HIP, AMGX preconditioner, 500k-DOF 3D benchmark | Planned |
 | M16: Physics completeness | Caughey-Thomas, Lombardi, Auger, FD, Schottky, tunneling | Planned |
 | M17: Heterojunctions | Position-dependent chi, Eg; HEMT or HBT benchmark | Planned |
@@ -195,6 +215,28 @@ items.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M14 (2026-04-26):** Small-signal AC sweep runner. Added
+  `semi/runners/ac_sweep.py` solving the linearised system
+  (J + jωM) δu = -dF/dV δV around a converged DC operating point. The
+  Jacobian J is the steady-state DD operator at u_0 in (ψ, n_hat,
+  p_hat) primary-density form; M is the lumped diagonal carrier-density
+  mass shipped with M13 (`semi/fem/mass.py`); -dF/dV is obtained via
+  finite-difference DC sensitivity (eps_V = 1e-3 V) under the hood.
+  PETSc-real build forces a real 2x2 block reformulation
+  ([[J, -ωM], [ωM, J]] [[Re δu], [Im δu]] = [[Re b], [Im b]]); ADR
+  0011 documents the decision and lists complex PETSc as deferred
+  M16+ work. Terminal admittance includes the displacement current
+  jω·ε·grad(δψ)·n at the contact in addition to the linearised
+  conduction current. Added `AcSweepResult` to `semi/results.py`,
+  bumped `schemas/input.v1.json` to 1.2.0 and `SCHEMA_SUPPORTED_MINOR`
+  to 2 (new `solver.dc_bias` and `solver.ac` sub-objects). Acceptance
+  benchmark `benchmarks/rc_ac_sweep/` matches analytical pn depletion
+  C within 0.41 % worst-case at V_DC = -1 V across [1 Hz, 1 MHz];
+  `tests/fem/test_ac_dc_limit.py` matches within 5 % at V_DC ∈
+  {-2.0, -1.0, -0.5} V; `tests/mms/test_ac_consistency.py` checks
+  three internal AC-formulation invariants. Version bumped to
+  0.14.0.
 
 - **M12 (2026-04-25):** MOSFET n+ doping + SNES tolerance amendment.
   Added `benchmarks/mosfet_2d/mosfet_2d.json` with three doping entries:

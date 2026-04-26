@@ -1,10 +1,13 @@
 """
-Result types for transient simulation runs.
+Result types for transient and AC small-signal simulation runs.
 
-TransientResult is the public output type for :func:`run_transient`. It
-follows the JSON-as-contract invariant: no PETSc or UFL types appear in
-the public API fields; only plain Python scalars, lists, dicts, and numpy
-arrays are exposed.
+TransientResult is the public output type for :func:`run_transient`.
+AcSweepResult is the public output type for :func:`run_ac_sweep` (M14).
+Both follow the JSON-as-contract invariant: no PETSc or UFL types appear
+in the public API fields; only plain Python scalars, lists, dicts, and
+numpy arrays are exposed. Complex numbers in AcSweepResult are
+serialized to JSON as ``{"re": <float>, "im": <float>}`` by the
+artifact writer (see :mod:`semi.io.artifact`).
 """
 from __future__ import annotations
 
@@ -48,3 +51,61 @@ class TransientResult:
     fields: dict[str, list[np.ndarray]] = field(default_factory=dict)
     meta: dict[str, Any] = field(default_factory=dict)
     x_dof: np.ndarray | None = None
+
+
+@dataclass
+class AcSweepResult:
+    """
+    Output of :func:`semi.runners.ac_sweep.run_ac_sweep` (M14).
+
+    Small-signal AC analysis. The system is linearised around a DC
+    operating point u_0 = (psi_0, n_0, p_0); the perturbation
+    delta_u(omega) satisfies (J + j*omega*M) * delta_u = -dF/dV * delta_V.
+    Terminal current and admittance are evaluated per unit perturbation
+    voltage at the swept contact.
+
+    Attributes
+    ----------
+    frequencies : list of float
+        Frequency points (Hz).
+    Y : list of complex
+        Small-signal admittance per unit voltage perturbation at the
+        swept contact, in S/m^2 (1D), S/m (2D), or S (3D), matching the
+        per-unit-area convention of the conduction current evaluator.
+    Z : list of complex
+        Small-signal impedance, 1/Y, with the same per-unit-area
+        convention. Entries with |Y| < 1e-300 are reported as 0.0 (no
+        terminal response).
+    C : list of float
+        Effective capacitance C(omega) = -Im(Y) / (2*pi*f). The runner
+        reports Y with the "positive = current OUT of the device"
+        convention used by ``postprocess.evaluate_current_at_contact``.
+        In that convention a pure capacitor has Y = -j*omega*C, so a
+        positive physical capacitance maps to negative Im(Y) and the
+        leading minus in the formula recovers a positive C. Same
+        per-unit convention as Y. Entries at f=0 are reported as 0.0.
+    G : list of float
+        Effective conductance G(omega) = Re(Y). Same per-unit convention.
+    dc_bias : dict
+        DC operating point used. Keys: ``contact`` (str), ``voltage``
+        (float). Mirrors the relevant slice of ``cfg["solver"]``.
+    meta : dict
+        Run metadata. Keys include:
+        - ``n_freqs`` (int): number of frequency points.
+        - ``perturbation_voltage`` (float): finite-difference epsilon
+          used for the DC sensitivity (V).
+        - ``ac_amplitude`` (float): AC amplitude (V) reported back from
+          the cfg; admittance is per unit volt regardless.
+        - ``dc_solver_iterations`` (int): SNES iterations of the DC
+          solve (max over the V_DC and V_DC+eps solves).
+        - ``backend`` (str): ``"real-2x2-block"`` (always, until M16
+          enables a complex PETSc build).
+        - ``displacement_current_included`` (bool): always True for M14.
+    """
+    frequencies: list[float] = field(default_factory=list)
+    Y: list[complex] = field(default_factory=list)
+    Z: list[complex] = field(default_factory=list)
+    C: list[float] = field(default_factory=list)
+    G: list[float] = field(default_factory=list)
+    dc_bias: dict[str, Any] = field(default_factory=dict)
+    meta: dict[str, Any] = field(default_factory=dict)

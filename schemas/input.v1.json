@@ -8,8 +8,8 @@
     "schema_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.1.0.",
-      "examples": ["1.0.0", "1.1.0"]
+      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.2.0.",
+      "examples": ["1.0.0", "1.1.0", "1.2.0"]
     },
     "name": {
       "type": "string",
@@ -441,10 +441,91 @@
             "drift_diffusion",
             "bias_sweep",
             "mos_cv",
-            "transient"
+            "transient",
+            "ac_sweep"
           ],
-          "description": "Which runner to dispatch. `equilibrium` solves Poisson at zero bias; `drift_diffusion` solves the coupled system at a single bias point; `bias_sweep` ramps a contact voltage; `mos_cv` walks a gate sweep and integrates gate charge; `transient` runs BDF1/BDF2 time integration; `newton_block` is a legacy alias.",
+          "description": "Which runner to dispatch. `equilibrium` solves Poisson at zero bias; `drift_diffusion` solves the coupled system at a single bias point; `bias_sweep` ramps a contact voltage; `mos_cv` walks a gate sweep and integrates gate charge; `transient` runs BDF1/BDF2 time integration; `ac_sweep` (M14) runs small-signal AC analysis around a DC operating point; `newton_block` is a legacy alias.",
           "default": "equilibrium"
+        },
+        "dc_bias": {
+          "type": "object",
+          "title": "DC operating point for AC sweep",
+          "description": "DC operating point around which the small-signal AC linearisation is performed. Required when solver.type is `ac_sweep`. The named contact is also the contact whose terminal admittance is reported.",
+          "required": ["contact", "voltage"],
+          "properties": {
+            "contact": {
+              "type": "string",
+              "description": "Name of the contact at which the DC bias is applied and around which the AC perturbation is computed. Must match a contact in the `contacts` list."
+            },
+            "voltage": {
+              "type": "number",
+              "description": "DC bias voltage at `contact`, in volts. The AC sweep linearises around this point."
+            }
+          }
+        },
+        "ac": {
+          "type": "object",
+          "title": "AC small-signal sweep specification",
+          "description": "AC perturbation amplitude and frequency sweep. Required when solver.type is `ac_sweep`. Admittance is reported per unit perturbation voltage; the amplitude is informational only because the response is linearised.",
+          "required": ["contact", "frequencies"],
+          "properties": {
+            "contact": {
+              "type": "string",
+              "description": "Contact at which the AC perturbation is applied. Typically equal to `dc_bias.contact`."
+            },
+            "amplitude": {
+              "type": "number",
+              "exclusiveMinimum": 0.0,
+              "default": 1.0,
+              "description": "AC perturbation amplitude, V. Reported back in the result meta; the small-signal response itself is linear and is normalised to a per-unit-volt sensitivity inside the runner."
+            },
+            "frequencies": {
+              "type": "object",
+              "title": "AC frequency sweep specification",
+              "description": "Frequency points at which to evaluate Y(omega). Two forms: explicit `list`, or generative `logspace`/`linspace`.",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "title": "Explicit frequency list",
+                  "description": "Use a fully specified array of frequencies (Hz). The runner evaluates Y(omega) at each entry verbatim; useful for benchmarks and for replicating a measurement instrument's preset frequency list.",
+                  "required": ["type", "values"],
+                  "properties": {
+                    "type": {"const": "list"},
+                    "values": {
+                      "type": "array",
+                      "items": {"type": "number", "minimum": 0.0},
+                      "minItems": 1,
+                      "description": "Frequencies in Hz. f=0 is permitted (DC limit; capacitance reported as 0)."
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "title": "Logarithmic frequency sweep",
+                  "description": "Generate `n_points` log-spaced frequencies between `start` and `stop` (both Hz, both strictly positive). Standard for AC characterisation since admittance varies over many decades of frequency.",
+                  "required": ["type", "start", "stop", "n_points"],
+                  "properties": {
+                    "type": {"const": "logspace"},
+                    "start": {"type": "number", "exclusiveMinimum": 0.0, "description": "Smallest frequency, Hz."},
+                    "stop": {"type": "number", "exclusiveMinimum": 0.0, "description": "Largest frequency, Hz."},
+                    "n_points": {"type": "integer", "minimum": 2, "description": "Number of log-spaced frequency points."}
+                  }
+                },
+                {
+                  "type": "object",
+                  "title": "Linear frequency sweep",
+                  "description": "Generate `n_points` linearly spaced frequencies between `start` (Hz, may be 0) and `stop` (Hz, strictly positive). Useful for narrow-band sweeps where the response shape is known to be smooth.",
+                  "required": ["type", "start", "stop", "n_points"],
+                  "properties": {
+                    "type": {"const": "linspace"},
+                    "start": {"type": "number", "minimum": 0.0, "description": "Smallest frequency, Hz."},
+                    "stop": {"type": "number", "exclusiveMinimum": 0.0, "description": "Largest frequency, Hz."},
+                    "n_points": {"type": "integer", "minimum": 2, "description": "Number of linearly spaced frequency points."}
+                  }
+                }
+              ]
+            }
+          }
         },
         "t_end": {
           "type": "number",

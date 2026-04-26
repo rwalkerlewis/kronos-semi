@@ -45,8 +45,11 @@ _SCHEMA_PATH = Path(__file__).parent.parent / "schemas" / "input.v1.json"
 ENGINE_SUPPORTED_SCHEMA_MAJOR = 1
 
 # Minor version tracking. Bumped when a backward-compatible schema addition
-# is made (M13: added transient solver type and schema_version 1.1.0).
-SCHEMA_SUPPORTED_MINOR = 1
+# is made.
+#   M13 (1.1.0): added the `transient` solver type.
+#   M14 (1.2.0): added the `ac_sweep` solver type plus solver.dc_bias and
+#                solver.ac sub-objects (frequency sweep specification).
+SCHEMA_SUPPORTED_MINOR = 2
 
 
 @lru_cache(maxsize=1)

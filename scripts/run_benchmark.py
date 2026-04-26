@@ -644,7 +644,7 @@ def _mos_device_params(cfg, sc, mat):
       - phi_ms from the gate contact's workfunction (or 0 for ideal gate)
       - V_t from the scaling at the config temperature
     """
-    from semi.constants import EPS0, cm3_to_m3
+    from semi.constants import cm3_to_m3
     from semi.materials import get_material
 
     N_A = cm3_to_m3(cfg["doping"][0]["profile"]["N_A"])
@@ -859,7 +859,6 @@ def plot_mos_2d(result, out_dir: Path) -> list[Path]:
     The 2D contour uses matplotlib's triangulation so it works on any
     dolfinx-produced unstructured mesh (triangles).
     """
-    from matplotlib import colors as mcolors
     from matplotlib.tri import Triangulation
 
     cfg = result.cfg
@@ -1335,6 +1334,148 @@ _PLOTTERS["resistor_3d"] = plot_resistor_3d
 
 
 # --------------------------------------------------------------------------- #
+# rc_ac_sweep verifier and plotter (M14)                                      #
+# --------------------------------------------------------------------------- #
+
+def _rc_ac_analytical_C(cfg) -> float:
+    """Analytical depletion capacitance per unit area for the rc_ac_sweep
+    fixture: a 1D step pn junction at the cfg's DC bias.
+
+    C_dep(V) = sqrt(q * eps_Si * N_eff / (2 * (V_bi - V)))
+    N_eff    = N_A * N_D / (N_A + N_D)
+    V_bi     = V_t * ln(N_A * N_D / n_i^2)
+    """
+    from semi.constants import EPS0, KB, Q, cm3_to_m3
+    from semi.materials import get_material
+
+    mat_name = cfg["regions"]["silicon"]["material"]
+    mat = get_material(mat_name)
+    eps = EPS0 * mat.epsilon_r
+    n_i = mat.n_i
+
+    prof = cfg["doping"][0]["profile"]
+    if prof.get("type") != "step":
+        raise ValueError("rc_ac_sweep verifier expects a step doping profile")
+    N_A = cm3_to_m3(float(prof["N_A_left"]))
+    N_D = cm3_to_m3(float(prof["N_D_right"]))
+    N_eff = N_A * N_D / (N_A + N_D)
+
+    T = float(cfg.get("physics", {}).get("temperature", 300.0))
+    V_t = KB * T / Q
+    V_bi = V_t * np.log(N_A * N_D / (n_i * n_i))
+
+    V_DC = float(cfg["solver"]["dc_bias"]["voltage"])
+    return float(np.sqrt(Q * eps * N_eff / (2.0 * (V_bi - V_DC))))
+
+
+@register("rc_ac_sweep")
+def verify_rc_ac_sweep(result) -> list[tuple[str, bool, str]]:
+    """RC AC-sweep verifier (M14).
+
+    Checks:
+      1. Capacitance plateau matches analytical depletion C within 5% at
+         every frequency in [1 Hz, 1 MHz].
+      2. Plateau flatness: max(C) / min(C) over [1 Hz, 1 MHz] within 2%.
+    """
+    cfg = result.cfg if hasattr(result, "cfg") else None
+    # AcSweepResult does not stash the cfg; we get it via the closure
+    # below since the runner's main() loaded it. For now the verifier
+    # accepts a result that exposes `dc_bias` and recomputes the
+    # analytical from the JSON sitting next to the result. The runner
+    # main() patches `result.cfg = cfg` for ac sweeps just below this
+    # function (see Driver section).
+    if cfg is None:
+        return [(
+            "rc_ac_sweep: result.cfg present", False,
+            "verifier needs cfg; benchmark driver did not attach it",
+        )]
+
+    freqs = np.asarray(result.frequencies, dtype=float)
+    C = np.asarray(result.C, dtype=float)
+
+    C_an = _rc_ac_analytical_C(cfg)
+
+    band_mask = (freqs >= 1.0) & (freqs <= 1.0e6)
+    if not band_mask.any():
+        return [(
+            "rc_ac_sweep: plateau band has samples", False,
+            f"no frequencies in [1 Hz, 1 MHz] of {len(freqs)} swept",
+        )]
+
+    C_band = C[band_mask]
+
+    # Check 1: every plateau-band C must be within 5% of analytical.
+    rel_err = np.abs(C_band - C_an) / abs(C_an)
+    worst_idx = int(np.argmax(rel_err))
+    worst_err = float(rel_err[worst_idx])
+    worst_f = float(freqs[band_mask][worst_idx])
+    worst_C = float(C_band[worst_idx])
+
+    # Check 2: flatness across the band.
+    flatness = float(C_band.max() / C_band.min()) if C_band.min() > 0 else float("inf")
+
+    checks = [
+        (
+            "rc_ac_sweep: C(f) within 5% of analytical depletion C in [1 Hz, 1 MHz]",
+            worst_err < 0.05,
+            (
+                f"C_an={C_an:.4e} F/m^2; worst rel err {100*worst_err:.2f}% "
+                f"at f={worst_f:.2e} Hz (C_sim={worst_C:.4e})"
+            ),
+        ),
+        (
+            "rc_ac_sweep: C(f) plateau flatness max/min within 2% in [1 Hz, 1 MHz]",
+            (flatness - 1.0) < 0.02,
+            f"max(C)/min(C) = {flatness:.4f} over {int(band_mask.sum())} samples",
+        ),
+    ]
+    return checks
+
+
+def plot_rc_ac_sweep(result, out_dir: Path) -> list[Path]:
+    """Bode-style plots: |Y|, C, G across frequency."""
+    paths: list[Path] = []
+    freqs = np.asarray(result.frequencies, dtype=float)
+    Y = np.asarray(result.Y, dtype=complex)
+    C = np.asarray(result.C, dtype=float)
+    G = np.asarray(result.G, dtype=float)
+
+    cfg = getattr(result, "cfg", None)
+    C_an = _rc_ac_analytical_C(cfg) if cfg is not None else None
+
+    # |Y|, C, G vs f
+    fig, axes = plt.subplots(3, 1, figsize=(7, 9), sharex=True)
+    axes[0].loglog(freqs[freqs > 0], np.abs(Y[freqs > 0]), "o-", color="C0")
+    axes[0].set_ylabel("|Y| (S/m^2)")
+    axes[0].grid(True, which="both", alpha=0.3)
+
+    pos = freqs > 0
+    axes[1].semilogx(freqs[pos], C[pos], "o-", color="C1", label="simulated")
+    if C_an is not None:
+        axes[1].axhline(C_an, color="k", linestyle="--", label="analytical C_dep")
+    axes[1].set_ylabel("C (F/m^2)")
+    axes[1].grid(True, which="both", alpha=0.3)
+    axes[1].legend()
+
+    axes[2].semilogx(freqs[pos], np.abs(G[pos]) + 1.0e-30, "o-", color="C2")
+    axes[2].set_ylabel("|G| (S/m^2)")
+    axes[2].set_xlabel("f (Hz)")
+    axes[2].grid(True, which="both", alpha=0.3)
+    axes[2].set_yscale("log")
+
+    fig.suptitle("rc_ac_sweep: Bode plot of admittance / capacitance / conductance")
+    fig.tight_layout()
+    p = out_dir / "ac_bode.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    paths.append(p)
+    return paths
+
+
+_PLOTTERS["rc_ac_sweep"] = plot_rc_ac_sweep
+
+
+# --------------------------------------------------------------------------- #
 # Driver                                                                      #
 # --------------------------------------------------------------------------- #
 
@@ -1392,9 +1533,39 @@ def main(argv: list[str] | None = None) -> int:
         return 3
     dt = time.perf_counter() - t0
 
-    # TransientResult exposes `meta`/`t`/`iv` instead of `solver_info`/`V`.
-    is_transient = hasattr(result, "meta") and not hasattr(result, "solver_info")
-    if is_transient:
+    # AcSweepResult exposes `frequencies`/`Y`/`Z`/`C`/`G` and `meta` but
+    # no `solver_info`. Branch first so the transient block does not
+    # mistake an AC result for a transient one.
+    is_ac = hasattr(result, "frequencies") and hasattr(result, "Y") and hasattr(result, "C")
+    is_transient = (
+        not is_ac
+        and hasattr(result, "meta")
+        and not hasattr(result, "solver_info")
+    )
+    if is_ac:
+        # AcSweepResult does not stash cfg; attach for the verifier and
+        # plotter. SimulationResult already carries cfg on the field;
+        # the AC dataclass intentionally stays minimal so we patch here.
+        try:
+            result.cfg = cfg
+        except Exception:  # noqa: BLE001
+            pass
+        meta = result.meta or {}
+        n_freqs = int(meta.get("n_freqs", len(result.frequencies)))
+        print("[run_benchmark] ac_sweep diagnostics:")
+        print(f"    backend            = {meta.get('backend')}")
+        print(f"    n_freqs            = {n_freqs}")
+        print(f"    f_min              = {min(result.frequencies):.3e} Hz")
+        print(f"    f_max              = {max(result.frequencies):.3e} Hz")
+        print(f"    dc_bias            = {result.dc_bias}")
+        print(f"    perturbation       = {meta.get('perturbation_voltage')} V")
+        print(f"    dc_solver_iter     = {meta.get('dc_solver_iterations')}")
+        print(f"    solve_time         = {dt:.3f} s")
+        if n_freqs == 0:
+            print("[run_benchmark] FAIL: ac_sweep produced no frequency points",
+                  file=sys.stderr)
+            return 4
+    elif is_transient:
         meta = result.meta or {}
         n_steps = int(meta.get("n_steps_taken", 0))
         n_failed = int(meta.get("n_failed_steps", 0))
