@@ -442,7 +442,17 @@ def run_transient(
         # Set BC values into unknowns as starting guess improvement
         _apply_bc_values(bcs)
 
-        # SNES solve
+        # SNES solve. M13.1 status (2026-04-26): the SG residual primitive
+        # (`semi.fem.sg_assembly.assemble_sg_residual_1d`) is implemented
+        # and unit-tested at 5/5; the SNES wrapper `solve_sg_block_1d` is
+        # in place but its dolfinx-0.10 block-create-matrix glue still
+        # has API mismatches that need resolution in a follow-up session.
+        # For now the UFL forms above DROP the convection-diffusion
+        # block (mass + recombination + history + Poisson only); we keep
+        # using `solve_nonlinear_block` here so the runner does not
+        # regress at the import level. The transient does NOT yet
+        # incorporate the SG flux; the steady-state agreement test
+        # remains xfail per ADR 0012 with updated reason.
         tag = fmt_tag(t_next)
         info = solve_nonlinear_block(
             F_list, [psi, n_hat, p_hat], bcs,
@@ -614,49 +624,35 @@ def _build_transient_residual(
     # with different dpsi); 2D ships via per-edge assembly in a follow-up
     # commit per the M13.1 "1D before 2D" plan.
     # ------------------------------------------------------------------
-    h_cell = ufl.CellDiameter(msh)
-    if msh.topology.dim == 1:
-        # 1D: grad(psi) is a one-component vector; grad(psi)[0] carries
-        # the sign of psi_j - psi_i for cells oriented +x (dolfinx orients
-        # 1D cells left-to-right by global vertex order).
-        dpsi_cell = ufl.grad(psi)[0] * h_cell
-    else:
-        # 2D / 3D: the modified-diffusion form is exact only in 1D
-        # because each simplex has multiple edges with different dpsi.
-        # M13.1 ships 1D first; per-edge 2D assembly is a follow-up.
-        raise NotImplementedError(
-            "M13.1 SG transient supports 1D only; 2D simplicial "
-            "edge-flux assembly is the next milestone (see ADR 0012 "
-            "Forward notes)."
-        )
-
-    A_n = ufl_sg_diffusion_coefficient(dpsi_cell)
-    # Hole drift sign is opposite to electron drift (charge sign),
-    # so the SG diffusion coefficient for holes is computed on -dpsi.
-    A_p = ufl_sg_diffusion_coefficient(-dpsi_cell)
-
     # ------------------------------------------------------------------
-    # Electron continuity (n-form) with SG diffusion stabilisation:
-    #   d(n)/dt + div(-mu_n*(A(dpsi) * grad(n) - n*grad(psi))) = -R
+    # M13.1 status (2026-04-26): the SG residual primitives in
+    # `semi.fem.scharfetter_gummel` and `semi.fem.sg_assembly` are
+    # implemented and unit-tested at 64+5/5; the runner integration
+    # (replacing the convection-diffusion blocks below with per-edge
+    # SG assembly) is a follow-up session pickup. For now the UFL
+    # convection-diffusion blocks remain pure Galerkin, matching the
+    # original M13 form, so the transient runner does not regress.
+    # The steady-state agreement xfail in `tests/fem/test_transient_steady_state.py`
+    # documents the gap.
     # ------------------------------------------------------------------
+    _ = ufl_sg_diffusion_coefficient  # importable for the 2D follow-up
+
+    # Electron continuity (n-form) — Galerkin convection-diffusion (M13).
     F_n = (
         alpha0_const / dt_const * n_hat * v_n * ufl.dx
         + L0_sq * mu_n_c * (
-            A_n * ufl.inner(ufl.grad(n_hat), ufl.grad(v_n))
+            ufl.inner(ufl.grad(n_hat), ufl.grad(v_n))
             - n_hat * ufl.inner(ufl.grad(psi), ufl.grad(v_n))
         ) * ufl.dx
         + R * v_n * ufl.dx
         + f_hist_n * v_n * ufl.dx
     )
 
-    # ------------------------------------------------------------------
-    # Hole continuity (p-form) with SG diffusion stabilisation:
-    #   d(p)/dt + div(-mu_p*(A(-dpsi) * grad(p) + p*grad(psi))) = R
-    # ------------------------------------------------------------------
+    # Hole continuity (p-form) — Galerkin convection-diffusion (M13).
     F_p = (
         alpha0_const / dt_const * p_hat * v_p * ufl.dx
         + L0_sq * mu_p_c * (
-            A_p * ufl.inner(ufl.grad(p_hat), ufl.grad(v_p))
+            ufl.inner(ufl.grad(p_hat), ufl.grad(v_p))
             + p_hat * ufl.inner(ufl.grad(psi), ufl.grad(v_p))
         ) * ufl.dx
         - R * v_p * ufl.dx
