@@ -1,7 +1,7 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.2.0",
   "name": "mos_cap_2d",
-  "description": "2D MOS capacitor. P-type Si substrate (500 nm, N_A=1e17 cm^-3) with SiO2 gate oxide (5 nm). Uniform vertical mesh (1 nm per cell, 505 cells) lands the Si/SiO2 interface on a grid line. Gate sweeps -0.9 to 1.2 V; C-V compared against depletion-approximation MOS theory in the verifier window [V_FB+0.1, V_T-0.1] (approx [-0.3, 0.56] V for ideal phi_ms=0, psi=0 at intrinsic level) within 10%.",
+  "description": "2D MOS capacitor. P-type Si substrate (500 nm, N_A=1e17 cm^-3) with SiO2 gate oxide (5 nm). Uniform vertical mesh (1 nm per cell, 505 cells) lands the Si/SiO2 interface on a grid line. Gate sweeps -0.9 to 1.2 V; differential capacitance C(V_gate) is extracted analytically per bias point via PDE sensitivity (M14.1, `mos_cap_ac` runner) and compared against depletion-approximation MOS theory in the verifier window [V_FB+0.2, V_T-0.1] within 10%.",
   "dimension": 2,
   "mesh": {
     "source": "builtin",
@@ -44,7 +44,7 @@
     "recombination": {"srh": false, "tau_n": 1.0e-7, "tau_p": 1.0e-7, "E_t": 0.0}
   },
   "solver": {
-    "type": "mos_cv"
+    "type": "mos_cap_ac"
   },
   "output": {
     "directory": "./results/mos_2d",

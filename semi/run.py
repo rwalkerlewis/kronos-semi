@@ -10,6 +10,8 @@ Supports:
                                       (psi, n, p) primary-density form.
     solver.type == "ac_sweep"         small-signal AC analysis around a
                                       DC operating point (M14).
+    solver.type == "mos_cap_ac"       MOS C(V_gate) via analytic PDE
+                                      sensitivity (M14.1).
 
 Implementation note: this module is a thin dispatcher. The actual
 runners live in `semi.runners.equilibrium`, `semi.runners.bias_sweep`,
@@ -54,6 +56,7 @@ def run(cfg: dict[str, Any]):
         run_ac_sweep,
         run_bias_sweep,
         run_equilibrium,
+        run_mos_cap_ac,
         run_mos_cv,
         run_transient,
     )
@@ -65,6 +68,8 @@ def run(cfg: dict[str, Any]):
         return run_bias_sweep(cfg)
     if stype == "mos_cv":
         return run_mos_cv(cfg)
+    if stype == "mos_cap_ac":
+        return run_mos_cap_ac(cfg)
     if stype == "transient":
         return run_transient(cfg)
     if stype == "ac_sweep":
@@ -90,6 +95,9 @@ def __getattr__(name: str):
     if name == "run_mos_cv":
         from .runners.mos_cv import run_mos_cv
         return run_mos_cv
+    if name == "run_mos_cap_ac":
+        from .runners.mos_cap_ac import run_mos_cap_ac
+        return run_mos_cap_ac
     if name == "run_transient":
         from .runners.transient import run_transient
         return run_transient

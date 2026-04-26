@@ -1,6 +1,15 @@
 """
 MOS capacitor C-V runner (M6).
 
+.. deprecated:: M14.1
+    Prefer :mod:`semi.runners.mos_cap_ac` (``solver.type == "mos_cap_ac"``)
+    for new MOS C-V workloads. That runner solves the same multi-region
+    equilibrium Poisson system but reports the differential capacitance
+    C(V_gate) via analytic PDE sensitivity, which is exact to discretisation
+    rather than approximated through `numpy.gradient` of Q_gate(V_gate).
+    `mos_cv` is kept for backwards compatibility with consumers that already
+    rely on the Q-then-finite-difference path; removal is a future cleanup.
+
 Solves multi-region equilibrium Poisson at each gate bias in a sweep,
 integrates the semiconductor space charge to recover Q_gate(V_gate),
 and returns a `SimulationResult` whose `iv` rows carry `(V, Q_gate)`

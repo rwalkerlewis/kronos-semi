@@ -744,13 +744,16 @@ def verify_mos_2d(result) -> list[tuple[str, bool, str]]:
     """
     MOS C-V verifier.
 
-    Extracts C_sim(V_gate) from Q_gate(V_gate) by centered finite
-    difference and compares against the depletion-approximation MOS
-    curve in the window (V_FB + 0.1, V_T - 0.1) V. Tolerance 10%,
-    fixed in docs/mos_derivation.md section 6.9. On failure, the
-    debugging action is to shrink the window or examine dQ/dV noise,
-    not to loosen the tolerance (see module docstring above for the
-    excluded accumulation and strong-inversion regimes).
+    When the runner reports analytic differential capacitance per bias
+    point (M14.1 `mos_cap_ac`, `iv[i]["C_ac"]` populated), we use that
+    directly. When only `Q_gate` is recorded (legacy `mos_cv` path), we
+    fall back to centred finite-difference dQ/dV. Both paths compare
+    against the depletion-approximation MOS curve in the window
+    (V_FB + 0.2, V_T - 0.1) V. Tolerance 10%, fixed in
+    docs/mos_derivation.md section 6.9. On failure, the debugging
+    action is to shrink the window, not to loosen the tolerance (see
+    module docstring above for the excluded accumulation and
+    strong-inversion regimes).
     """
     from semi.materials import get_material
 
@@ -766,13 +769,27 @@ def verify_mos_2d(result) -> list[tuple[str, bool, str]]:
 
     V = np.array([r["V"] for r in iv])
     Q = np.array([r.get("Q_gate", 0.0) for r in iv])
+    has_C_ac = all(("C_ac" in r) for r in iv)
+    if has_C_ac:
+        C_ac_arr = np.array([float(r["C_ac"]) for r in iv])
+    else:
+        C_ac_arr = None
 
     # Sort by V_gate so gradient is well-defined on non-monotone sweeps.
     order = np.argsort(V)
     V = V[order]
     Q = Q[order]
+    if C_ac_arr is not None:
+        C_ac_arr = C_ac_arr[order]
 
-    C_sim = np.gradient(Q, V)  # F / m^2
+    if C_ac_arr is not None:
+        # Analytic per-bias differential capacitance (preferred).
+        C_sim = C_ac_arr
+        cv_method = "ac"
+    else:
+        # Legacy numerical dQ/dV path.
+        C_sim = np.gradient(Q, V)
+        cv_method = "fd"
     C_th = _mos_C_theory(V, dp)
 
     # Verifier window: strictly inside the depletion regime. The low edge
@@ -786,8 +803,10 @@ def verify_mos_2d(result) -> list[tuple[str, bool, str]]:
     window_hi = dp["V_T"] - 0.1
 
     mask = (V >= window_lo) & (V <= window_hi) & np.isfinite(C_th)
-    # Drop the two endpoints of the array where centered FD is one-sided.
-    if len(V) >= 3:
+    # The centered-FD path produces one-sided derivatives at the endpoints,
+    # which are unreliable. The analytic-AC path has no such endpoint
+    # degeneracy, so the mask is left intact for it.
+    if cv_method == "fd" and len(V) >= 3:
         endpoint_mask = np.ones_like(V, dtype=bool)
         endpoint_mask[0] = False
         endpoint_mask[-1] = False
@@ -822,7 +841,7 @@ def verify_mos_2d(result) -> list[tuple[str, bool, str]]:
         f"mos_2d: |C_sim - C_theory|/C_theory < 10% in [{window_lo:.3f}, {window_hi:.3f}] V",
         bool(rel_err.max() < 0.10),
         f"worst {rel_err.max()*100:.2f}% at V_gate={V_worst:+.3f} V "
-        f"(C_sim={C_sim_worst*1e2:.4f} uF/cm^2, C_th={C_th_worst*1e2:.4f} uF/cm^2)",
+        f"(C_sim={C_sim_worst*1e2:.4f} uF/cm^2, C_th={C_th_worst*1e2:.4f} uF/cm^2, method={cv_method})",
     ))
 
     # Monotone non-increasing check: depletion C starts at C_ox in
@@ -840,7 +859,8 @@ def verify_mos_2d(result) -> list[tuple[str, bool, str]]:
     # Stash device params and curves so the plotter can render them.
     result._mos_params = dp
     result._mos_curves = dict(V=V, Q=Q, C_sim=C_sim, C_th=C_th,
-                               window_lo=window_lo, window_hi=window_hi)
+                               window_lo=window_lo, window_hi=window_hi,
+                               cv_method=cv_method)
     return checks
 
 
@@ -950,15 +970,26 @@ def plot_mos_2d(result, out_dir: Path) -> list[Path]:
             return paths
         V_arr = np.array([r["V"] for r in iv])
         Q_arr = np.array([r.get("Q_gate", 0.0) for r in iv])
+        has_C_ac = all(("C_ac" in r) for r in iv)
+        if has_C_ac:
+            C_ac_arr = np.array([float(r["C_ac"]) for r in iv])
+        else:
+            C_ac_arr = None
         order = np.argsort(V_arr)
         V_arr = V_arr[order]
         Q_arr = Q_arr[order]
-        C_sim_arr = np.gradient(Q_arr, V_arr)
+        if C_ac_arr is not None:
+            C_sim_arr = C_ac_arr[order]
+            cv_method = "ac"
+        else:
+            C_sim_arr = np.gradient(Q_arr, V_arr)
+            cv_method = "fd"
         C_th_arr = _mos_C_theory(V_arr, dp_local)
         curves = dict(
             V=V_arr, Q=Q_arr, C_sim=C_sim_arr, C_th=C_th_arr,
             window_lo=dp_local["V_FB"] + 0.2,
             window_hi=dp_local["V_T"] - 0.1,
+            cv_method=cv_method,
         )
         result._mos_curves = curves
         result._mos_params = dp_local
@@ -971,8 +1002,14 @@ def plot_mos_2d(result, out_dir: Path) -> list[Path]:
     hi = curves["window_hi"]
     dp = result._mos_params
 
+    cv_method = curves.get("cv_method", "fd")
+    sim_label = (
+        "simulation (analytic AC, M14.1)" if cv_method == "ac"
+        else "simulation (numerical dQ/dV)"
+    )
+
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.plot(V, C_sim * 1e2, "o-", label="simulation", markersize=3)
+    ax.plot(V, C_sim * 1e2, "o-", label=sim_label, markersize=3)
     finite = np.isfinite(C_th)
     ax.plot(V[finite], C_th[finite] * 1e2, "r--", label="depletion-approx theory")
     ax.axhline(dp["C_ox"] * 1e2, color="k", linestyle=":", label=r"$C_{ox}$")
