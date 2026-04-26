@@ -441,10 +441,11 @@
             "drift_diffusion",
             "bias_sweep",
             "mos_cv",
+            "mos_cap_ac",
             "transient",
             "ac_sweep"
           ],
-          "description": "Which runner to dispatch. `equilibrium` solves Poisson at zero bias; `drift_diffusion` solves the coupled system at a single bias point; `bias_sweep` ramps a contact voltage; `mos_cv` walks a gate sweep and integrates gate charge; `transient` runs BDF1/BDF2 time integration; `ac_sweep` (M14) runs small-signal AC analysis around a DC operating point; `newton_block` is a legacy alias.",
+          "description": "Which runner to dispatch. `equilibrium` solves Poisson at zero bias; `drift_diffusion` solves the coupled system at a single bias point; `bias_sweep` ramps a contact voltage; `mos_cv` walks a gate sweep and integrates gate charge by numerical dQ/dV (legacy); `mos_cap_ac` (M14.1) walks a gate sweep and reports analytic differential capacitance from PDE sensitivity (preferred over `mos_cv`); `transient` runs BDF1/BDF2 time integration; `ac_sweep` (M14) runs small-signal AC analysis around a DC operating point; `newton_block` is a legacy alias.",
           "default": "equilibrium"
         },
         "dc_bias": {
