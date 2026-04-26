@@ -141,7 +141,7 @@ def test_transient_steady_state_limit():
         "order": 2,
         "max_steps": max_steps,
         "output_every": max_steps + 1,  # snapshot only at end
-        "snes": {"rtol": 1.0e-10, "atol": 1.0e-7, "stol": 1.0e-14, "max_it": 100},
+        "snes": {"rtol": 1.0e-10, "atol": 1.0e-12, "stol": 1.0e-14, "max_it": 100},
     })
     tr_result = run_transient(tr_cfg)
 

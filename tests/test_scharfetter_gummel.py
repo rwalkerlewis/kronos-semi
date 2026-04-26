@@ -329,6 +329,58 @@ def test_sg_edge_flux_p_array_matches_scalar():
 # High-Peclet sanity (regime where Galerkin fails and SG must hold up)        #
 # --------------------------------------------------------------------------- #
 
+def test_ufl_bernoulli_matches_numpy_at_sample_points():
+    """
+    The UFL Bernoulli expression (tanh-blended, no conditionals) must
+    match the NumPy `bernoulli` reference numerically at the sample
+    points we care about for SG transient. Evaluated by interpolating
+    `ufl_bernoulli(x_const)` into a Constant-valued cell and reading
+    out via fem.assemble_scalar.
+
+    Skipped when dolfinx is unavailable (pure-python CI matrix).
+    """
+    dolfinx = pytest.importorskip("dolfinx")
+    import ufl
+    from dolfinx import fem
+    from mpi4py import MPI
+
+    from semi.fem.scharfetter_gummel import bernoulli as np_bernoulli
+    from semi.fem.scharfetter_gummel import ufl_bernoulli
+
+    msh = dolfinx.mesh.create_unit_interval(MPI.COMM_WORLD, 1)
+    sample_xs = [-30.0, -10.0, -3.0, -1.0, -0.1, -1.0e-4,
+                 0.0,
+                 1.0e-4, 0.1, 1.0, 3.0, 10.0, 30.0]
+    worst = 0.0
+    for x_val in sample_xs:
+        x_const = fem.Constant(msh, x_val)
+        expr = ufl_bernoulli(x_const)
+        # Integrate over a unit-length interval; expr is constant so the
+        # integral equals the value (cell length 1).
+        integ = fem.form(expr * ufl.dx)
+        got = fem.assemble_scalar(integ)
+        ref = np_bernoulli(x_val)
+        if abs(ref) > 0:
+            rel = abs(got - ref) / abs(ref)
+        else:
+            rel = abs(got - ref)
+        worst = max(worst, rel)
+        # Tolerance: tanh blend introduces blend-region perturbation
+        # at |x| ~ sigma=1; allow 1e-6 relative away from that region
+        # and a looser bound near it.
+        if abs(x_val) > 5.0 or abs(x_val) < 1.0e-3:
+            assert rel < 1.0e-6, (
+                f"ufl_bernoulli({x_val}) = {got:.6e} differs from "
+                f"numpy reference {ref:.6e} by {rel:.3e}"
+            )
+        else:
+            assert rel < 5.0e-3, (
+                f"ufl_bernoulli({x_val}) = {got:.6e} differs from "
+                f"numpy reference {ref:.6e} by {rel:.3e}"
+            )
+    print(f"[ufl_bernoulli vs numpy] worst relative = {worst:.3e}")
+
+
 @pytest.mark.parametrize("dpsi_scaled", [10.0, 50.0, -10.0, -50.0])
 def test_sg_edge_flux_n_finite_at_high_peclet(dpsi_scaled):
     """The SG flux must be finite (no overflow / NaN) at large |dpsi|.

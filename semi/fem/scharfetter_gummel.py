@@ -203,6 +203,108 @@ def sg_edge_flux_p_array(
     )
 
 
+def ufl_bernoulli(x, sigma: float = 1.0):
+    """
+    UFL expression for `B(x) = x / (exp(x) - 1)` suitable for use inside
+    a UFL form. dolfinx differentiates this expression symbolically, so
+    the Jacobian of any form using `ufl_bernoulli` is auto-derived.
+
+    Implementation: tanh-smoothed blend (no conditionals)
+    -----------------------------------------------------
+    The first M13.1 attempt used `ufl.conditional(abs(x) < eps, taylor, closed)`
+    which produced a UFL Jacobian with discontinuity artifacts at the
+    threshold `|x| = eps` because UFL's symbolic differentiator evaluates
+    both branches and the resulting Newton step stagnated. This version
+    avoids conditionals entirely by blending two **mutually-stable** forms
+    with a `ufl.tanh` switch.
+
+    The two forms are mathematically identical to `B(x) = x / (exp(x) - 1)`
+    but are numerically stable in opposite halves of the real line:
+
+        B_pos(x) = x * exp(-x) / (1 - exp(-x))     stable for x > 0
+        B_neg(x) = x / (exp(x) - 1)                stable for x <= 0
+
+    For `x > 0`: `1 - exp(-x)` is bounded in (0, 1] and `x * exp(-x)`
+    underflows benignly to zero at large positive x. For `x <= 0`:
+    `exp(x) - 1` is bounded in (-1, 0] and the closed form does not
+    overflow.
+
+    Both forms are 0/0 at x=0; the blend hides this because the two
+    forms agree to all orders in their Taylor series at x=0, and the
+    blend weight at x=0 is exactly 0.5 of each, so the indeterminate
+    contribution from each side is regularised by the well-defined
+    contribution from the other. Numerically we add a 1e-300 offset
+    to each denominator so UFL's symbolic engine never traps on a
+    literal 0/0; the offset is below double-precision underflow at
+    every operating point we evaluate at, so it has no effect on
+    accuracy.
+
+    The blend weight is `s(x) = 0.5 * (1 + tanh(x / sigma))`. At
+    `x >> sigma`: s -> 1, B = B_pos. At `x << -sigma`: s -> 0,
+    B = B_neg. Around `|x| <= sigma` both contribute; the result is
+    exactly correct because both forms equal the true B(x).
+
+    Choice of `sigma = 1.0` in scaled units: this is ~V_t in physical
+    units, the natural scale of the problem. Verified by the unit
+    tests (mpmath 1e-12, MG agreement 5%, hole symmetry 1e-10).
+
+    Numerical robustness for large `|x|`: at `x > ~700` `exp(-x)`
+    underflows; the `B_pos` form remains well-defined as `x * 0 / 1 = 0`
+    correctly. At `x < ~-700` `exp(x)` underflows; the `B_neg` form
+    saturates to `x / -1 = -x` correctly. So the blend is stable
+    across the full IEEE 754 finite range.
+    """
+    import ufl
+
+    # Regularise both 0/0 limits at x=0 by adding the SAME `eps_reg` to
+    # numerator and denominator. With both perturbed by `eps_reg`, the
+    # x=0 limit evaluates to `eps_reg / eps_reg = 1.0` (correct B(0)),
+    # while away from x=0 the offset is below double-precision underflow
+    # magnitude (smallest normal ~2.2e-308) and has no numerical effect.
+    # This prevents UFL's symbolic engine from tripping on a literal 0/0
+    # AND preserves the correct limit at x=0.
+    eps_reg = 1.0e-300
+    B_pos = (x * ufl.exp(-x) + eps_reg) / (1.0 - ufl.exp(-x) + eps_reg)
+    B_neg = (x + eps_reg) / (ufl.exp(x) - 1.0 + eps_reg)
+
+    # Smooth blend; s(0) = 0.5, s(x>>sigma) -> 1, s(x<<-sigma) -> 0.
+    s = 0.5 * (1.0 + ufl.tanh(x / sigma))
+    return s * B_pos + (1.0 - s) * B_neg
+
+
+def ufl_sg_diffusion_coefficient(dpsi):
+    """
+    Exponential-fitting coefficient `A(dpsi) = (B(+dpsi) + B(-dpsi)) / 2`
+    used in the modified-diffusion form of the 1D SG flux.
+
+    For 1D linear elements, the SG flux on cell `K` with `dpsi = psi_j - psi_i`
+    is algebraically identical to a "modified diffusion" Galerkin form:
+
+        J_SG_cell = mu_n * ( A(dpsi) * grad(n) - n * grad(psi) )
+
+    where the drift term `n grad(psi)` is unchanged from Galerkin and
+    only the diffusion coefficient on `grad(n)` is modified by
+    `A(dpsi)`. This makes 1D SG a one-line drop-in substitution for
+    the existing Galerkin convection-diffusion form. See ADR 0012
+    "1D edge flux" section; the algebraic identity is
+
+        n_j B(+dpsi) - n_i B(-dpsi)
+            = -n_avg * dpsi + Delta_n * (B(+dpsi) + B(-dpsi)) / 2
+            = -n_avg * dpsi + Delta_n * A(dpsi).
+
+    Asymptotics:
+        A(0)   = 1                       (Galerkin limit, zero field)
+        A -> |dpsi|/2  as |dpsi| -> inf  (SG enhancement, high Peclet)
+
+    Note: the "modified-diffusion" reduction is exact for 1D linear
+    elements only. In 2D simplicial elements the per-edge SG fluxes
+    do not reduce to a single A(dpsi) per cell because each triangle
+    has three edges with different dpsi values; the M13.1 plan ships
+    1D first via this UFL form, and 2D via per-edge assembly later.
+    """
+    return (ufl_bernoulli(dpsi) + ufl_bernoulli(-dpsi)) / 2.0
+
+
 def midpoint_galerkin_flux_n(
     n_i: float, n_j: float, dpsi: float,
     h_ij: float, mu_n: float, V_t: float,

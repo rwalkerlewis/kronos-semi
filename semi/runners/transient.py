@@ -557,6 +557,8 @@ def _build_transient_residual(
     from dolfinx import fem
     from petsc4py import PETSc
 
+    from ..fem.scharfetter_gummel import ufl_sg_diffusion_coefficient
+
     V_psi = spaces.V_psi
     V_n = spaces.V_phi_n
     V_p = spaces.V_phi_p
@@ -597,16 +599,50 @@ def _build_transient_residual(
     )
 
     # ------------------------------------------------------------------
-    # Electron continuity (n-form):
-    #   d(n)/dt + div(-mu_n*(grad(n) - n*grad(psi))) = -R
-    # Weak form after integration by parts:
-    #   alpha0/dt * int(n*v) + int(L0^2*mu_n*(grad(n) - n*grad(psi)).grad(v))
-    #   + int(R*v) + int(f_hist_n*v) = 0
+    # Convection-diffusion blocks: Scharfetter-Gummel (M13.1, ADR 0012).
+    #
+    # On 1D linear elements the per-edge SG flux is algebraically
+    # identical to a "modified diffusion" Galerkin form with
+    # A(dpsi) * grad(n) replacing grad(n), where dpsi = grad(psi) . h_K.
+    # In dolfinx, h_K (cell length in 1D) maps to ufl.CellVolume in 1D
+    # (and ufl.CellDiameter for higher dims); we use CellDiameter to
+    # cover the 1D case. The "dpsi_cell" expression below is
+    # grad(psi) . tangent * h_cell which on a 1D mesh oriented in +x
+    # equals psi_j - psi_i.
+    #
+    # In 2D this UFL form is not exact (each triangle has three edges
+    # with different dpsi); 2D ships via per-edge assembly in a follow-up
+    # commit per the M13.1 "1D before 2D" plan.
+    # ------------------------------------------------------------------
+    h_cell = ufl.CellDiameter(msh)
+    if msh.topology.dim == 1:
+        # 1D: grad(psi) is a one-component vector; grad(psi)[0] carries
+        # the sign of psi_j - psi_i for cells oriented +x (dolfinx orients
+        # 1D cells left-to-right by global vertex order).
+        dpsi_cell = ufl.grad(psi)[0] * h_cell
+    else:
+        # 2D / 3D: the modified-diffusion form is exact only in 1D
+        # because each simplex has multiple edges with different dpsi.
+        # M13.1 ships 1D first; per-edge 2D assembly is a follow-up.
+        raise NotImplementedError(
+            "M13.1 SG transient supports 1D only; 2D simplicial "
+            "edge-flux assembly is the next milestone (see ADR 0012 "
+            "Forward notes)."
+        )
+
+    A_n = ufl_sg_diffusion_coefficient(dpsi_cell)
+    # Hole drift sign is opposite to electron drift (charge sign),
+    # so the SG diffusion coefficient for holes is computed on -dpsi.
+    A_p = ufl_sg_diffusion_coefficient(-dpsi_cell)
+
+    # ------------------------------------------------------------------
+    # Electron continuity (n-form) with SG diffusion stabilisation:
+    #   d(n)/dt + div(-mu_n*(A(dpsi) * grad(n) - n*grad(psi))) = -R
     # ------------------------------------------------------------------
     F_n = (
         alpha0_const / dt_const * n_hat * v_n * ufl.dx
         + L0_sq * mu_n_c * (
-            ufl.inner(ufl.grad(n_hat), ufl.grad(v_n))
+            A_n * ufl.inner(ufl.grad(n_hat), ufl.grad(v_n))
             - n_hat * ufl.inner(ufl.grad(psi), ufl.grad(v_n))
         ) * ufl.dx
         + R * v_n * ufl.dx
@@ -614,16 +650,13 @@ def _build_transient_residual(
     )
 
     # ------------------------------------------------------------------
-    # Hole continuity (p-form):
-    #   d(p)/dt + div(-mu_p*(grad(p) + p*grad(psi))) = R
-    # Weak form:
-    #   alpha0/dt * int(p*v) + int(L0^2*mu_p*(grad(p) + p*grad(psi)).grad(v))
-    #   - int(R*v) + int(f_hist_p*v) = 0
+    # Hole continuity (p-form) with SG diffusion stabilisation:
+    #   d(p)/dt + div(-mu_p*(A(-dpsi) * grad(p) + p*grad(psi))) = R
     # ------------------------------------------------------------------
     F_p = (
         alpha0_const / dt_const * p_hat * v_p * ufl.dx
         + L0_sq * mu_p_c * (
-            ufl.inner(ufl.grad(p_hat), ufl.grad(v_p))
+            A_p * ufl.inner(ufl.grad(p_hat), ufl.grad(v_p))
             + p_hat * ufl.inner(ufl.grad(psi), ufl.grad(v_p))
         ) * ufl.dx
         - R * v_p * ufl.dx
