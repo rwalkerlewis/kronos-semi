@@ -27,6 +27,7 @@ from mpi4py import MPI  # noqa: E402
 
 from semi.fem.scharfetter_gummel import sg_edge_flux_n, sg_edge_flux_p  # noqa: E402
 from semi.fem.sg_assembly import (  # noqa: E402
+    assemble_sg_jacobian_correction_1d,
     assemble_sg_residual_1d,
     compute_edge_topology_1d,
     vertex_to_dof_map,
@@ -205,3 +206,174 @@ def test_assemble_sg_residual_interior_vertex_is_div_of_flux():
         assert abs(R_p[dof]) < abs_tol, (
             f"interior vertex {v}: R_p = {R_p[dof]} (tol {abs_tol:.3e})"
         )
+
+
+def _galerkin_convdiff_residual_1d(
+    psi_arr, n_arr, p_arr,
+    cell_vertices, h_cells, v2d_psi, v2d_n, v2d_p,
+    mu_n_hat, mu_p_hat, L0_sq,
+):
+    """
+    Reference Galerkin convection-diffusion residual matching the M13 form
+    `inner(grad(*), grad(v)) -+ *grad(psi).grad(v)` integrated cell by cell.
+
+    Used inside the FD-verification regression test. Independent of UFL
+    so the regression test does not need to assemble a dolfinx form.
+    """
+    R_gal_n = np.zeros_like(n_arr)
+    R_gal_p = np.zeros_like(p_arr)
+    for k in range(len(h_cells)):
+        i, j = int(cell_vertices[k, 0]), int(cell_vertices[k, 1])
+        h = float(h_cells[k])
+        psi_i = psi_arr[v2d_psi[i]]
+        psi_j = psi_arr[v2d_psi[j]]
+        n_i = n_arr[v2d_n[i]]
+        n_j = n_arr[v2d_n[j]]
+        p_i = p_arr[v2d_p[i]]
+        p_j = p_arr[v2d_p[j]]
+        dpsi = psi_j - psi_i
+        n_avg = 0.5 * (n_i + n_j)
+        p_avg = 0.5 * (p_i + p_j)
+        gal_n_i = -L0_sq * mu_n_hat * ((n_j - n_i) / h - n_avg * dpsi / h)
+        gal_p_i = -L0_sq * mu_p_hat * ((p_j - p_i) / h + p_avg * dpsi / h)
+        R_gal_n[v2d_n[i]] += gal_n_i
+        R_gal_n[v2d_n[j]] -= gal_n_i
+        R_gal_p[v2d_p[i]] += gal_p_i
+        R_gal_p[v2d_p[j]] -= gal_p_i
+    return R_gal_n, R_gal_p
+
+
+def _correction_residual_1d(
+    psi_arr, n_arr, p_arr,
+    cell_vertices, h_cells, v2d_psi, v2d_n, v2d_p,
+    mu_n_hat, mu_p_hat, L0_sq,
+):
+    """`-sg_n - g_n` (and same for p) — the quantity the SG callback adds to b_M13."""
+    sg_n, sg_p = assemble_sg_residual_1d(
+        psi_arr, n_arr, p_arr,
+        cell_vertices, h_cells, v2d_psi, v2d_n, v2d_p,
+        mu_n_hat, mu_p_hat, L0_sq,
+    )
+    g_n, g_p = _galerkin_convdiff_residual_1d(
+        psi_arr, n_arr, p_arr,
+        cell_vertices, h_cells, v2d_psi, v2d_n, v2d_p,
+        mu_n_hat, mu_p_hat, L0_sq,
+    )
+    return -sg_n - g_n, -sg_p - g_p
+
+
+def test_assemble_sg_jacobian_correction_fd_verified():
+    """
+    Finite-difference verification of `assemble_sg_jacobian_correction_1d`
+    against the corresponding correction residual `-sg_n - g_n` on a
+    3-node 1D mesh at a non-equilibrium state.
+
+    Why this test exists
+    --------------------
+    The 1D SG transient runner overrides the SNES residual so that
+
+        b_corrected = b_M13_galerkin - g_n - sg_n   (n block; mirror for p)
+
+    The Jacobian "correction" added to the auto-derived UFL Jacobian is
+    `-d(g_n)/dx - d(sg_n)/dx`. A sign or factor-of-2 error in any of the
+    16 entries per edge is invisible at zero field (where SG = Galerkin)
+    but blows up Newton convergence once a depletion region with a
+    non-trivial dpsi develops. This test is the regression guard that
+    locks in the formulae in `assemble_sg_jacobian_correction_1d`.
+
+    The script `scripts/verify_sg_jacobian_fd.py` is the same
+    verification with prettier output for diagnostic use.
+    """
+    n_verts = 3
+    cell_vertices = np.array([[0, 1], [1, 2]], dtype=np.int64)
+    h_cells = np.array([5.0e-6, 5.0e-6], dtype=np.float64)
+    v2d = np.arange(n_verts, dtype=np.int64)
+
+    dof_offsets = (0, n_verts, 2 * n_verts)
+    bc_dofs_n: set[int] = set()
+    bc_dofs_p: set[int] = set()
+
+    mu_n_hat = 1.0
+    mu_p_hat = 0.32
+    L0_sq = 1.0e-12  # ~ (1 um)^2
+
+    # Non-equilibrium state with non-trivial dpsi (~ depletion-region scale).
+    psi_arr = np.array([0.0, 1.5, 4.0], dtype=np.float64)
+    n_arr = np.array([1.0e18, 5.0e16, 1.0e16], dtype=np.float64)
+    p_arr = np.array([1.0e15, 5.0e16, 1.0e18], dtype=np.float64)
+
+    # Analytic.
+    rows, cols, vals = assemble_sg_jacobian_correction_1d(
+        psi_arr, n_arr, p_arr,
+        cell_vertices, h_cells, v2d, v2d, v2d,
+        mu_n_hat, mu_p_hat, L0_sq,
+        dof_offsets, bc_dofs_n, bc_dofs_p,
+    )
+    n_total = 3 * n_verts
+    J_analytic = np.zeros((n_total, n_total), dtype=np.float64)
+    for r, c, v in zip(rows, cols, vals):
+        J_analytic[int(r), int(c)] += float(v)
+
+    # Finite-difference reference.
+    eps_rel = 1.0e-7
+    J_fd = np.zeros((n_total, n_total), dtype=np.float64)
+    for col in range(n_total):
+        psi_p = psi_arr.copy(); psi_m = psi_arr.copy()
+        n_p = n_arr.copy(); n_m = n_arr.copy()
+        p_p = p_arr.copy(); p_m = p_arr.copy()
+
+        if col < n_verts:
+            v = col
+            scale = max(abs(psi_arr[v]), 1.0)
+            h = eps_rel * scale
+            psi_p[v] += h; psi_m[v] -= h
+        elif col < 2 * n_verts:
+            v = col - n_verts
+            scale = max(abs(n_arr[v]), 1.0)
+            h = eps_rel * scale
+            n_p[v] += h; n_m[v] -= h
+        else:
+            v = col - 2 * n_verts
+            scale = max(abs(p_arr[v]), 1.0)
+            h = eps_rel * scale
+            p_p[v] += h; p_m[v] -= h
+
+        Rp_n, Rp_p = _correction_residual_1d(
+            psi_p, n_p, p_p,
+            cell_vertices, h_cells, v2d, v2d, v2d,
+            mu_n_hat, mu_p_hat, L0_sq,
+        )
+        Rm_n, Rm_p = _correction_residual_1d(
+            psi_m, n_m, p_m,
+            cell_vertices, h_cells, v2d, v2d, v2d,
+            mu_n_hat, mu_p_hat, L0_sq,
+        )
+        Rp = np.zeros(n_total)
+        Rp[n_verts:2 * n_verts] = Rp_n
+        Rp[2 * n_verts:] = Rp_p
+        Rm = np.zeros(n_total)
+        Rm[n_verts:2 * n_verts] = Rm_n
+        Rm[2 * n_verts:] = Rm_p
+        J_fd[:, col] = (Rp - Rm) / (2.0 * h)
+
+    # Compare entry-by-entry over the n,p row block (psi rows are zero).
+    rel_thresh = 1.0e-5
+    abs_floor = 1.0e-12  # treat anything smaller as zero
+    mismatches = []
+    for r in range(n_verts, 3 * n_verts):
+        for c in range(3 * n_verts):
+            j_a = J_analytic[r, c]
+            j_f = J_fd[r, c]
+            denom = max(abs(j_a), abs(j_f), abs_floor)
+            rel = abs(j_a - j_f) / denom
+            if rel > rel_thresh and max(abs(j_a), abs(j_f)) > abs_floor:
+                mismatches.append((r, c, j_a, j_f, rel))
+
+    assert not mismatches, (
+        f"{len(mismatches)} Jacobian-correction entries failed FD verification "
+        f"at rel tol {rel_thresh}:\n"
+        + "\n".join(
+            f"  J[{r},{c}] = {j_a:+.6e}  vs FD {j_f:+.6e}  (rel {rel:.3e})"
+            for r, c, j_a, j_f, rel in mismatches
+        )
+    )

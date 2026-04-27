@@ -37,14 +37,101 @@
   divergence-of-constant-flux is zero at interior vertices to 1e-12
   relative.
 
-### Status (not yet ready for merge)
-- The transient runner does NOT yet incorporate the SG flux. The
-  steady-state agreement test at V=0.5 V across N={100,200,400,1000}
-  on `pn_1d_bias` (the 1e-4 hard merge gate per the M13.1 prompt) is
-  NOT yet exercised. The xfail in `tests/fem/test_transient_steady_state.py`
-  documents this status.
+### Added (M13.1 follow-up #1, 2026-04-26)
+- `semi/fem/sg_assembly.py::solve_sg_block_1d`: rewritten to wrap
+  `dolfinx.fem.petsc.NonlinearProblem` and override the SNES function
+  + Jacobian callbacks. The function callback runs the standard UFL
+  M13 Galerkin block-residual assembly, then subtracts the Galerkin
+  convection-diffusion contribution and adds the per-edge SG flux from
+  `assemble_sg_residual_1d` (in M13 sign convention — the SG primitive
+  uses the opposite sign convention from the M13 weak form, verified
+  at zero field on a 3-node mesh).
+- `semi/fem/sg_assembly.py::_bernoulli_prime_array`: numerically stable
+  derivative `B'(x)` in four regimes (Taylor for `|x| < 1e-3`, closed
+  form mid-range, asymptotic for `|x| > 30`).
+- `semi/fem/sg_assembly.py::assemble_sg_jacobian_correction_1d`:
+  analytic per-edge Jacobian correction `J_sg_M13 - J_galerkin_convdiff`
+  for the SG-corrected block residual. FD-verified against the residual
+  on a 3-node test mesh to 1e-7 relative on all 16 entries per edge
+  across the (n, p) row blocks and (psi, n, p) column blocks.
+
+### Status (M13.1 follow-up #1, NOT yet ready for merge)
+- The SG residual + analytic-Jacobian-correction primitives are wired
+  up and FD-verified, but `solve_sg_block_1d` is not yet routed from
+  the transient runner. When routed, SNES converges (4-8 Newton iters
+  per step) but the iterate develops a small numerical seed of
+  negative `p` in the depletion region at the first time step that
+  amplifies across subsequent steps; SG primary-variable continuity
+  is not strictly positivity-preserving. The transient diverges
+  (line search failure) around `t ~ tau_p / 30`. Closing this needs
+  either a positivity-preserving change of variables (Slotboom
+  transform with chain-rule time term, abandoned in ADR 0009 for
+  ill-conditioning) or a continuation strategy for the first time
+  step where `V` is ramped from 0 to `V_F`.
+- The transient runner stays on the M13 Galerkin path so M13 + M14
+  transient/AC tests continue to pass; the steady-state agreement
+  xfail in `tests/fem/test_transient_steady_state.py` is updated with
+  this status. See `/tmp/m13.1-integration-blocker.md` for details on
+  the FD-verification of the Jacobian and the iteration-cap reasoning.
 - 2D simplicial assembly: explicitly raises `NotImplementedError` per
   the "1D before 2D, hard" guard.
+
+### Added (M13.1 follow-up #3, 2026-04-26 — BC-ramp continuation)
+- `semi/runners/transient.py::_run_bc_continuation`: BC-ramp
+  continuation helper that walks the bias from V=0 to V_target through
+  N steady-state sub-steps via `run_bias_sweep` BEFORE the time loop
+  begins. Converts the Slotboom `(psi, phi_n, phi_p)` triple to
+  `(psi, n_hat, p_hat)` via Boltzmann and uses the result as the
+  time-loop IC. Configurable via `solver.bc_ramp_steps` (default 10);
+  set to 0 to disable continuation entirely.
+- `schemas/input.v1.json`: new `solver.bc_ramp_steps` field, integer
+  >= 0, default 10. Documented as "set to 0 to disable continuation
+  and start the time loop from the V=0 equilibrium IC (the right
+  choice for transient turn-on benchmarks where the step bias at
+  t=0+ is the physical scenario being measured)."
+- `benchmarks/pn_1d_turnon/config.json`: `solver.bc_ramp_steps = 0`,
+  preserving the equilibrium-then-step-bias scenario the verify.py
+  lifetime extraction relies on.
+- `scripts/debug_bc_ramp.py`: diagnostic script that reproduces the
+  IC-vs-time-loop comparison in the SS-limit test. Used to verify the
+  BC-ramp IC matches `run_bias_sweep` to 5.7e-7 relative at t=0, and
+  shows the (n, p) Galerkin time loop drift to its OWN discrete
+  fixed point within ~12 BDF2 steps. Kept in repo for the M13.1
+  follow-up #4 agent.
+- `semi/fem/sg_assembly.py::solve_sg_block_1d`: re-applied the
+  `# pragma: no cover - reserved for M13.1 follow-up #4` comment.
+  Follow-up #1 (commit 2a7bf45) removed the pragma anticipating that
+  the function would be wired into the runner; that wiring regresses
+  the M13 transient MMS test (see status block) and is deferred to
+  follow-up #4. Until the SG path is routed in, the function is
+  uncovered by tests and would otherwise drag the project below the
+  95% coverage gate. The pragma is appropriate: this is dead code on
+  main today, kept in tree for the follow-up.
+
+### Status (M13.1 follow-up #3, NOT yet ready for merge)
+- BC-ramp continuation is correct infrastructure but does NOT close
+  the steady-state agreement gate. The IC produced by the ramp
+  matches `run_bias_sweep` at V_target to 5.7e-7 relative, but the
+  (n, p) Galerkin time loop drifts to its own discrete fixed point
+  within ~12 BDF steps (J_final = -6.273e+05 vs J_ss = +2.884). The
+  drift target is determined by the spatial discretisation, not by
+  where the time loop starts; no IC choice can prevent it. Closing
+  the test requires switching the time-loop convection-diffusion
+  discretisation from Galerkin to SG (deferred to follow-up #4).
+- `tests/fem/test_transient_steady_state.py`: still xfail with
+  `strict=False`. Reason updated to reflect the corrected diagnosis
+  (the previous-session "MMS source terms calibrated against
+  Galerkin" claim is incorrect — the MMS test is a pairwise-
+  difference temporal-convergence test, not source-driven; the SG
+  regression's actual root cause was not nailed down before the
+  iteration cap was hit).
+- M13.1 close-out: still blocked. v0.14.1 NOT ready to tag.
+- Full test suite: 262 passed, 1 skipped, 1 xfailed (the SS-limit
+  test). MMS pairwise-difference test passes with BC-ramp default
+  10 (continuation does not affect temporal-convergence rates).
+- All M11-M14 benchmarks (pn_1d, pn_1d_bias, pn_1d_bias_reverse,
+  mos_2d, mosfet_2d, resistor_3d, rc_ac_sweep, pn_1d_turnon)
+  pass with existing tolerances.
 
 ### Decisions surfaced and resolved during this work
 - **Bernoulli identity correction**: the prompt's `B(x) + B(-x) = -x`

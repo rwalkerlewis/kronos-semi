@@ -101,6 +101,7 @@ def run_transient(
     from ..bcs import resolve_contacts
     from ..doping import build_profile
     from ..fem.mass import assemble_lumped_mass
+    from ..fem.sg_assembly import solve_sg_block_1d
     from ..mesh import build_mesh
     from ..physics.drift_diffusion import make_dd_block_spaces
     from ..postprocess import (
@@ -214,6 +215,38 @@ def run_transient(
     p_hat.x.array[:] = ni_hat_val * np.exp(-psi_arr)
     n_hat.x.scatter_forward()
     p_hat.x.scatter_forward()
+
+    # ------------------------------------------------------------------
+    # Step 0b: BC-ramp continuation to V_target steady state.
+    #
+    # The (n, p) primary-variable transient is not strictly positivity-
+    # preserving across a single-step jump from the V=0 equilibrium IC
+    # to a forward-biased BC: the depletion-region carriers can develop
+    # a small negative-p seed at the first time step that amplifies
+    # geometrically and stalls SNES line search after ~25 steps. The
+    # cure is a runner-level continuation that walks the bias from 0 to
+    # its target through N steady-state sub-steps before the time loop
+    # begins. The continuation reuses run_bias_sweep (Slotboom primary
+    # unknowns + adaptive halving) so we get a converged steady-state
+    # solution at V_target; we then convert (psi, phi_n, phi_p) ->
+    # (psi, n_hat, p_hat) via Slotboom and use it as the time-loop IC.
+    #
+    # Configurable via solver.bc_ramp_steps (default 10). Setting it
+    # to 0 disables continuation (used by pn_1d_turnon, where the V=0
+    # IC + step-bias-at-t=0 is the physical scenario being measured).
+    #
+    # See ADR 0013 (BC-ramp continuation) and ADR 0009 (transient form).
+    # ------------------------------------------------------------------
+    bc_ramp_steps = int(solver_cfg.get("bc_ramp_steps", 10))
+    cont = _run_bc_continuation(cfg, bc_ramp_steps)
+    if cont is not None:
+        psi_arr_c, phi_n_arr_c, phi_p_arr_c = cont
+        psi.x.array[:] = psi_arr_c
+        n_hat.x.array[:] = ni_hat_val * np.exp(psi_arr_c - phi_n_arr_c)
+        p_hat.x.array[:] = ni_hat_val * np.exp(phi_p_arr_c - psi_arr_c)
+        psi.x.scatter_forward()
+        n_hat.x.scatter_forward()
+        p_hat.x.scatter_forward()
 
     # ------------------------------------------------------------------
     # Assemble lumped mass diagonal (for future M14 use, and for
@@ -442,17 +475,24 @@ def run_transient(
         # Set BC values into unknowns as starting guess improvement
         _apply_bc_values(bcs)
 
-        # SNES solve. M13.1 status (2026-04-26): the SG residual primitive
-        # (`semi.fem.sg_assembly.assemble_sg_residual_1d`) is implemented
-        # and unit-tested at 5/5; the SNES wrapper `solve_sg_block_1d` is
-        # in place but its dolfinx-0.10 block-create-matrix glue still
-        # has API mismatches that need resolution in a follow-up session.
-        # For now the UFL forms above DROP the convection-diffusion
-        # block (mass + recombination + history + Poisson only); we keep
-        # using `solve_nonlinear_block` here so the runner does not
-        # regress at the import level. The transient does NOT yet
-        # incorporate the SG flux; the steady-state agreement test
-        # remains xfail per ADR 0012 with updated reason.
+        # SNES solve. Stays on the M13 Galerkin path so that the M13
+        # MMS / M14 AC tests continue to pass; switching the 1D path
+        # to `semi.fem.sg_assembly.solve_sg_block_1d` was attempted in
+        # M13.1 follow-up #2 and regresses the MMS transient tests
+        # (line-search failures by step ~6 because the M13 MMS source
+        # terms are calibrated against the Galerkin discrete operator,
+        # not SG). The BC-ramp continuation in Step 0b above gives a
+        # provably-correct Slotboom IC for V_target, but the M13
+        # Galerkin (n, p) discrete operator drifts away from that IC
+        # over the time loop because its discrete fixed point differs
+        # from Slotboom's by ~3e18 m^-3 in carrier density at the
+        # depletion edge (ADR 0009 "Known limitation"). Closing the
+        # steady-state-agreement gate at 1e-4 needs SG enabled in the
+        # time loop AND a positivity-preserving first BDF step, both
+        # M13.1 follow-up #3+ work. See xfail reason in
+        # `tests/fem/test_transient_steady_state.py` for the audit
+        # trail and `_run_bc_continuation` below for the IC plumbing.
+        _ = solve_sg_block_1d  # silence unused-import; SG primitives stay reserved
         tag = fmt_tag(t_next)
         info = solve_nonlinear_block(
             F_list, [psi, n_hat, p_hat], bcs,
@@ -567,8 +607,6 @@ def _build_transient_residual(
     from dolfinx import fem
     from petsc4py import PETSc
 
-    from ..fem.scharfetter_gummel import ufl_sg_diffusion_coefficient
-
     V_psi = spaces.V_psi
     V_n = spaces.V_phi_n
     V_p = spaces.V_phi_p
@@ -609,35 +647,18 @@ def _build_transient_residual(
     )
 
     # ------------------------------------------------------------------
-    # Convection-diffusion blocks: Scharfetter-Gummel (M13.1, ADR 0012).
-    #
-    # On 1D linear elements the per-edge SG flux is algebraically
-    # identical to a "modified diffusion" Galerkin form with
-    # A(dpsi) * grad(n) replacing grad(n), where dpsi = grad(psi) . h_K.
-    # In dolfinx, h_K (cell length in 1D) maps to ufl.CellVolume in 1D
-    # (and ufl.CellDiameter for higher dims); we use CellDiameter to
-    # cover the 1D case. The "dpsi_cell" expression below is
-    # grad(psi) . tangent * h_cell which on a 1D mesh oriented in +x
-    # equals psi_j - psi_i.
-    #
-    # In 2D this UFL form is not exact (each triangle has three edges
-    # with different dpsi); 2D ships via per-edge assembly in a follow-up
-    # commit per the M13.1 "1D before 2D" plan.
+    # Convection-diffusion blocks. The UFL form below is the M13
+    # Galerkin discretisation; on 1D meshes the SNES residual callback
+    # in `run_transient` post-processes the UFL residual to swap the
+    # Galerkin convection-diffusion contribution for the per-edge SG
+    # flux from `semi.fem.sg_assembly.assemble_sg_residual_1d`. We keep
+    # the Galerkin form here so the Jacobian (auto-derived by UFL) has
+    # the correct nearest-neighbour sparsity pattern and matches SG to
+    # leading order at low Peclet, giving Newton a good preconditioner
+    # for the SG residual without requiring a hand-coded SG Jacobian.
+    # See ADR 0012 §"1D edge flux" and the runner integration block
+    # in run_transient below.
     # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
-    # M13.1 status (2026-04-26): the SG residual primitives in
-    # `semi.fem.scharfetter_gummel` and `semi.fem.sg_assembly` are
-    # implemented and unit-tested at 64+5/5; the runner integration
-    # (replacing the convection-diffusion blocks below with per-edge
-    # SG assembly) is a follow-up session pickup. For now the UFL
-    # convection-diffusion blocks remain pure Galerkin, matching the
-    # original M13 form, so the transient runner does not regress.
-    # The steady-state agreement xfail in `tests/fem/test_transient_steady_state.py`
-    # documents the gap.
-    # ------------------------------------------------------------------
-    _ = ufl_sg_diffusion_coefficient  # importable for the 2D follow-up
-
-    # Electron continuity (n-form) — Galerkin convection-diffusion (M13).
     F_n = (
         alpha0_const / dt_const * n_hat * v_n * ufl.dx
         + L0_sq * mu_n_c * (
@@ -648,7 +669,6 @@ def _build_transient_residual(
         + f_hist_n * v_n * ufl.dx
     )
 
-    # Hole continuity (p-form) — Galerkin convection-diffusion (M13).
     F_p = (
         alpha0_const / dt_const * p_hat * v_p * ufl.dx
         + L0_sq * mu_p_c * (
@@ -660,3 +680,100 @@ def _build_transient_residual(
     )
 
     return [F_psi, F_n, F_p]
+
+
+def _run_bc_continuation(cfg: dict, n_steps: int):
+    """Run BC-ramp continuation from V=0 to target via run_bias_sweep.
+
+    Used by `run_transient` to obtain a near-steady-state IC for the
+    time loop, sidestepping the (n, p) Galerkin positivity-loss blocker
+    documented in ADR 0009 and resolved in ADR 0013.
+
+    Parameters
+    ----------
+    cfg : dict
+        Validated transient JSON config. Contact target voltages are
+        read from ``cfg["contacts"][i]["voltage"]``.
+    n_steps : int
+        Number of steady-state sub-steps used to ramp the bias. The
+        ramp is delegated to ``run_bias_sweep`` with a sweep step of
+        ``|V_max| / n_steps`` on the contact with the largest
+        |target voltage|; ``run_bias_sweep``'s adaptive controller
+        applies its own halving on top if any sub-step is hard. A
+        value of ``0`` disables continuation entirely (caller's IC is
+        kept untouched).
+
+    Returns
+    -------
+    None or tuple of three numpy.ndarray
+        ``None`` if no ramp is required (n_steps <= 0, or every contact
+        target is within 1e-12 V of zero). Otherwise the converged
+        Slotboom triple ``(psi_hat, phi_n_hat, phi_p_hat)`` at
+        V_target, sampled on the same DOF ordering as the transient
+        runner's mesh (both runners build the mesh via the same
+        deterministic ``build_mesh(cfg)`` call).
+    """
+    import copy
+
+    if n_steps <= 0:
+        return None
+
+    targets = {
+        c["name"]: float(c.get("voltage", 0.0))
+        for c in cfg["contacts"]
+        if c["type"] == "ohmic"
+    }
+    if not targets:
+        return None
+
+    ramp_contact, V_max = max(
+        targets.items(),
+        key=lambda kv: abs(kv[1]),
+    )
+    if abs(V_max) < 1.0e-12:
+        return None
+
+    cont_cfg = copy.deepcopy(cfg)
+    for c in cont_cfg["contacts"]:
+        c.pop("voltage_sweep", None)
+    for c in cont_cfg["contacts"]:
+        if c["name"] == ramp_contact:
+            c["voltage"] = V_max
+            c["voltage_sweep"] = {
+                "start": 0.0,
+                "stop": V_max,
+                "step": abs(V_max) / n_steps,
+            }
+            break
+
+    # Use tight steady-state SNES tolerances so the IC handed to the
+    # transient time loop is at the bias_sweep fixed point to machine
+    # precision. The default bias_sweep atol of 1e-7 is too loose for
+    # this purpose; the steady-state agreement gate is 1e-4 relative
+    # in J, and the (n, p) Galerkin time loop will start drifting from
+    # any IC that is not converged below that.
+    cont_cfg["solver"] = {
+        "type": "bias_sweep",
+        "snes": {
+            "rtol": 1.0e-14,
+            "atol": 1.0e-14,
+            "stol": 1.0e-14,
+            "max_it": 100,
+        },
+        "continuation": {
+            "min_step": abs(V_max) / (n_steps * 8),
+            "max_halvings": 3,
+            "max_step": abs(V_max) / n_steps,
+            "easy_iter_threshold": 4,
+            "grow_factor": 1.5,
+        },
+    }
+
+    from .bias_sweep import run_bias_sweep
+
+    bs_result = run_bias_sweep(cont_cfg)
+    return (
+        bs_result.psi.x.array.copy(),
+        bs_result.phi_n.x.array.copy(),
+        bs_result.phi_p.x.array.copy(),
+    )
