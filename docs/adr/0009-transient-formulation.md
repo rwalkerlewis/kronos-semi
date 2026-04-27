@@ -1,8 +1,12 @@
 # ADR 0009: Transient Continuity Formulation — Density (n, p) vs Slotboom (φ_n, φ_p)
 
 **Date:** 2026-04-25
-**Status:** Partially superseded by ADR 0012 — the (psi, n, p) primary-unknowns choice stands; the Galerkin discretisation of the convection-diffusion blocks is replaced by Scharfetter-Gummel edge-flux assembly.
+**Status:** Superseded by ADR 0014 — the (psi, n_hat, p_hat) primary-unknown choice and the SG-on-density patch are no longer in the codebase.
 **Milestone:** M13 — Transient solver
+
+---
+
+> ADR 0014 supersedes this entirely; the (n, p) primary-unknown choice and the SG-on-density patch are no longer in the codebase.
 
 ---
 
