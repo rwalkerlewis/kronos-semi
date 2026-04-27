@@ -128,7 +128,7 @@ def vertex_to_dof_map(V) -> np.ndarray:
     return v2d
 
 
-def solve_sg_block_1d(  # pragma: no cover - reserved for M13.1 follow-up #4
+def solve_sg_block_1d(
     F_list,
     u_list,
     bcs,
@@ -146,7 +146,8 @@ def solve_sg_block_1d(  # pragma: no cover - reserved for M13.1 follow-up #4
 
     Build the standard dolfinx ``NonlinearProblem`` from the M13
     Galerkin UFL forms in ``F_list``, then override the SNES function
-    callback so that on every residual assembly:
+    and Jacobian callbacks so that on every residual / Jacobian
+    assembly:
 
     1. ``assemble_residual`` populates the block residual ``b`` from
        the M13 Galerkin form (mass + Galerkin convection-diffusion +
@@ -156,17 +157,15 @@ def solve_sg_block_1d(  # pragma: no cover - reserved for M13.1 follow-up #4
        and subtracting.
     3. The Scharfetter-Gummel convection-diffusion contribution is
        added to ``b`` via :func:`assemble_sg_residual_1d`.
+    4. The UFL-derived Galerkin Jacobian is corrected per edge by
+       ``assemble_sg_jacobian_correction_1d`` so that the assembled
+       Jacobian is the analytic derivative of the SG-corrected residual
+       (FD-verified to 3e-9 across all 32 entries, ADR 0012).
 
-    The Jacobian remains the UFL-derived M13 Galerkin Jacobian. This is
-    an approximation: at zero cell Peclet ``B(0) = 1`` so SG and
-    Galerkin agree exactly and the Jacobian is correct; at large Peclet
-    the diffusion coefficient differs by ``A(dpsi)`` but Newton with
-    backtracking line search still converges (the Galerkin Jacobian
-    has the correct sign and sparsity, only its magnitude on the
-    diffusion entries is off by ``A``). The ADR 0012 1D steady-state
-    agreement gate (1e-4) verifies the spatial discretisation; SNES
-    convergence is observed at 4-8 Newton iterations per timestep on
-    the ``pn_1d`` test mesh, well within ``max_it = 100``.
+    The mass, recombination, history, and Poisson blocks of ``F_list``
+    pass through untouched, so this routine is appropriate both for
+    one-shot steady-state solves (mass term absent) and for the
+    per-BDF-step transient solve (mass term present).
 
     See ADR 0012 § "1D edge flux" for the SG flux derivation.
 
@@ -227,7 +226,6 @@ def solve_sg_block_1d(  # pragma: no cover - reserved for M13.1 follow-up #4
         "snes_type": "newtonls",
         "snes_linesearch_type": "bt",
         "snes_linesearch_alpha": 1.0e-8,  # gentler bt threshold
-        "snes_monitor": None,
         "ksp_type": "preonly",
         "pc_type": "lu",
         "pc_factor_mat_solver_type": "mumps",
@@ -287,13 +285,26 @@ def solve_sg_block_1d(  # pragma: no cover - reserved for M13.1 follow-up #4
     off_n = n_psi_dofs
     off_p = n_psi_dofs + n_n_dofs
 
+    # Identify per-block BC dofs. `bc.function_space` returns the C++
+    # FunctionSpace wrapper (`dolfinx.cpp.fem.FunctionSpace_float64`),
+    # which is a different Python object from the Python-level
+    # `dolfinx.fem.FunctionSpace` we hold in `spaces`. Identity (`is`)
+    # comparison silently fails, leaving the BC dof set empty and
+    # causing the F_callback below to overwrite Dirichlet rows of the
+    # SG-corrected residual; the resulting iterate drifts off the BC
+    # at minority-carrier contacts and J at the contact explodes.
+    # `FunctionSpace_float64.contains(Vcpp)` reports identity at the
+    # C++ level, which is what we need.
     bc_dofs_n: set[int] = set()
     bc_dofs_p: set[int] = set()
+    V_n_cpp = spaces.V_phi_n._cpp_object
+    V_p_cpp = spaces.V_phi_p._cpp_object
     for bc in bcs:
-        if bc.function_space is spaces.V_phi_n:
+        bc_fs = bc.function_space
+        if bc_fs.contains(V_n_cpp):
             for d in bc.dof_indices()[0]:
                 bc_dofs_n.add(int(d))
-        elif bc.function_space is spaces.V_phi_p:
+        elif bc_fs.contains(V_p_cpp):
             for d in bc.dof_indices()[0]:
                 bc_dofs_p.add(int(d))
 
@@ -370,6 +381,34 @@ def solve_sg_block_1d(  # pragma: no cover - reserved for M13.1 follow-up #4
     # PETSc options; we only swap the per-iteration assembly hooks.
     problem.solver.setFunction(F_callback, problem.b)
     problem.solver.setJacobian(J_callback, problem.A, problem.P_mat)
+
+    # Orthant projection on n and p blocks. The (n, p) primary form is
+    # not unconditionally positivity-preserving: a Newton step at large
+    # |dpsi| can drive a minority-carrier dof negative; the SRH and
+    # `log(n)` post-processing then NaN. Mirroring the standard fix in
+    # production semiconductor solvers (Sentaurus, Atlas, Minimos), we
+    # clip n and p dofs to a small positive floor before each Newton
+    # iteration. PETSc's SNESSetUpdate callback fires after the previous
+    # iteration's update has been applied to ``snes.solution`` and
+    # before the next residual evaluation; clipping here keeps the
+    # iterate inside the physical orthant without aborting line search,
+    # and SNES is reported as converged once the SG residual at the
+    # clipped iterate is below tolerance. (BC dofs are skipped because
+    # the BC value -- the equilibrium minority carrier density at an
+    # ohmic contact -- is itself the floor we want.)
+    _ORTHANT_FLOOR = 1.0e-30
+
+    def _orthant_clip(_snes, _iter):
+        x = _snes.getSolution()
+        with x.localForm() as x_local:
+            arr = x_local.getArray(readonly=False)
+            n_view = arr[off_n:off_n + n_n_dofs]
+            p_view = arr[off_p:off_p + n_p_dofs]
+            n_view[n_view < _ORTHANT_FLOOR] = _ORTHANT_FLOOR
+            p_view[p_view < _ORTHANT_FLOOR] = _ORTHANT_FLOOR
+        x.assemble()
+
+    problem.solver.setUpdate(_orthant_clip)
 
     # Drive the solve via NonlinearProblem.solve() which handles the
     # initial-guess copy, scatter, and final assignment.

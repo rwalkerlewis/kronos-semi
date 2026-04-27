@@ -50,28 +50,26 @@ mos_2d C-V benchmark to an analytic-AC differential-capacitance runner
 `CHANGELOG.md` records the `[0.14.0] - M14` entry; M14.1 ships under
 the same minor version (PR #38).
 
-**M13.1 is in flight, follow-up #1 on `dev/m13.1-sg-runner-integration`**
-(Scharfetter-Gummel edge-flux discretisation for the transient continuity,
-ADR 0012). The SG residual primitives (Bernoulli, 1D edge fluxes,
-per-edge assembler) are implemented and unit-tested at 64 + 5 tests on
-main (PR #42 merged at b5daba8). Follow-up #1 (this branch) implements
-the runner integration: `solve_sg_block_1d` wraps dolfinx's
-NonlinearProblem with SNES function and Jacobian callbacks that swap
-the M13 Galerkin convection-diffusion contribution for the per-edge
-SG flux + analytic SG Jacobian correction (FD-verified to 1e-7).
-SNES converges in 4-8 Newton iters per timestep, but the iterate
-develops a small numerical seed of negative `p` in the depletion
-region at the first time step that amplifies across subsequent steps
-(SG primary-variable continuity is not strictly positivity-preserving).
-Closing the steady-state agreement gate needs either a positivity-
-preserving change of variables (Slotboom transform with chain-rule
-time term, abandoned in ADR 0009 for ill-conditioning) or a
-continuation strategy for the first time step. Until then the
-transient runner stays on the M13 Galerkin path so the MMS / AC tests
-continue to pass; the steady-state agreement xfail in
-`tests/fem/test_transient_steady_state.py` is updated with this
-status. See `/tmp/m13.1-integration-blocker.md` and the CHANGELOG
-"M13.1 follow-up #1" entry. Issue #34 stays open.
+**M13.1 follow-up #4 (`dev/m13.1-sg-time-loop`)** continues the
+Scharfetter-Gummel edge-flux integration into the 1D transient time
+loop. Two real bugs were fixed in this branch: (1) `solve_sg_block_1d`
+identified BC dofs via `bc.function_space is V_phi_n`, which silently
+matches zero dofs because dolfinx 0.10's `bc.function_space` returns
+the C++ wrapper, a different Python object — the SG residual callback
+was overwriting Dirichlet rows; the fix uses
+`bc.function_space.contains(V_phi_n._cpp_object)`. (2) An orthant
+projection on n,p dofs (`SNESSetUpdate`-driven, floor 1e-30) is added
+as defense-in-depth against the (n,p) primary form's lack of
+unconditional positivity preservation. The SG dispatch is gated by
+`solver.use_sg_flux` (default False), so the M13 Galerkin path stays
+the default and existing MMS / AC / pn_1d_turnon tests are unaffected.
+With the flag on, the V_F=0.3 V steady-state test progresses through
+~52 BDF2 steps before SNES line-search divergence (reason -5);
+`-snes_test_jacobian` confirms the SG Jacobian agrees with FD to
+4.2e-9 at the working iterate, so the failure is not a Jacobian bug.
+The xfail on `tests/fem/test_transient_steady_state.py` stays in
+place; the reason is updated to point at the close-out audit at
+`/tmp/m13.1-positivity-blocker.md`. Issue #34 stays open.
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
