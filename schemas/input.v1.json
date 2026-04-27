@@ -558,6 +558,12 @@
           "description": "Write field snapshots every N transient time steps. Only used when solver.type is `transient`.",
           "default": 50
         },
+        "bc_ramp_steps": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of steady-state DD sub-steps used to ramp the bias from 0 to its target before the transient time loop begins. Only used when solver.type is `transient`. Set to 0 to disable continuation and start the time loop from the V=0 equilibrium IC (the right choice for transient turn-on benchmarks where the step bias at t=0+ is the physical scenario being measured). Defaults to 10, which is sufficient to bridge a 1.0 V forward-bias jump on a typical 1D pn junction without losing positivity.",
+          "default": 10
+        },
         "max_iterations": {
           "type": "integer",
           "description": "Maximum SNES iterations per Newton solve.",

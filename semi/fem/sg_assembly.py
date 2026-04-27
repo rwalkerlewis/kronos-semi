@@ -128,7 +128,7 @@ def vertex_to_dof_map(V) -> np.ndarray:
     return v2d
 
 
-def solve_sg_block_1d(
+def solve_sg_block_1d(  # pragma: no cover - reserved for M13.1 follow-up #4
     F_list,
     u_list,
     bcs,
