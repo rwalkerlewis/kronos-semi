@@ -143,6 +143,16 @@ def run_transient(
         "snes_max_it": int(snes_opts.get("max_it", 100)),
     }
 
+    # Optional SG flux dispatch in the 1D time loop. Default off to
+    # preserve M13 transient MMS calibration (which is pinned to the
+    # Galerkin discrete operator); opt-in via `solver.use_sg_flux: True`
+    # for users who want the SG operator's spatial-discretisation
+    # consistency with `run_bias_sweep` at deep steady state. See
+    # docs/adr/0012 § "1D Time Loop Integration" and the M13.1 close-out
+    # audit at /tmp/m13.1-positivity-blocker.md for the open positivity
+    # issue that keeps this off-by-default.
+    use_sg_flux = bool(solver_cfg.get("use_sg_flux", False))
+
     # ------------------------------------------------------------------
     # Build mesh, scaling, doping
     # ------------------------------------------------------------------
@@ -475,30 +485,31 @@ def run_transient(
         # Set BC values into unknowns as starting guess improvement
         _apply_bc_values(bcs)
 
-        # SNES solve. Stays on the M13 Galerkin path so that the M13
-        # MMS / M14 AC tests continue to pass; switching the 1D path
-        # to `semi.fem.sg_assembly.solve_sg_block_1d` was attempted in
-        # M13.1 follow-up #2 and regresses the MMS transient tests
-        # (line-search failures by step ~6 because the M13 MMS source
-        # terms are calibrated against the Galerkin discrete operator,
-        # not SG). The BC-ramp continuation in Step 0b above gives a
-        # provably-correct Slotboom IC for V_target, but the M13
-        # Galerkin (n, p) discrete operator drifts away from that IC
-        # over the time loop because its discrete fixed point differs
-        # from Slotboom's by ~3e18 m^-3 in carrier density at the
-        # depletion edge (ADR 0009 "Known limitation"). Closing the
-        # steady-state-agreement gate at 1e-4 needs SG enabled in the
-        # time loop AND a positivity-preserving first BDF step, both
-        # M13.1 follow-up #3+ work. See xfail reason in
-        # `tests/fem/test_transient_steady_state.py` for the audit
-        # trail and `_run_bc_continuation` below for the IC plumbing.
-        _ = solve_sg_block_1d  # silence unused-import; SG primitives stay reserved
+        # SNES solve. On 1D meshes with `solver.use_sg_flux: True` we
+        # route the convection-diffusion block through the FD-verified
+        # Scharfetter-Gummel residual and analytic Jacobian
+        # (`solve_sg_block_1d`); the mass, SRH, history, and Poisson
+        # blocks of `F_list` pass through unchanged. Otherwise we keep
+        # the M13 Galerkin path. 2D SG ships in M13.2.
+        # See ADR 0012 (SG flux), ADR 0013 (BC-ramp IC).
         tag = fmt_tag(t_next)
-        info = solve_nonlinear_block(
-            F_list, [psi, n_hat, p_hat], bcs,
-            prefix=f"{cfg['name']}_tr_{tag}_",
-            petsc_options=snes_petsc_options,
-        )
+        if use_sg_flux and msh.topology.dim == 1:
+            info = solve_sg_block_1d(
+                F_list, [psi, n_hat, p_hat], bcs,
+                prefix=f"{cfg['name']}_tr_{tag}_",
+                msh=msh,
+                spaces=spaces,
+                sc=sc,
+                mu_n_hat=mu_n_hat,
+                mu_p_hat=mu_p_hat,
+                petsc_options=snes_petsc_options,
+            )
+        else:
+            info = solve_nonlinear_block(
+                F_list, [psi, n_hat, p_hat], bcs,
+                prefix=f"{cfg['name']}_tr_{tag}_",
+                petsc_options=snes_petsc_options,
+            )
 
         if not info["converged"]:
             raise RuntimeError(

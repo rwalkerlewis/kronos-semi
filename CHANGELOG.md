@@ -133,6 +133,47 @@
   mos_2d, mosfet_2d, resistor_3d, rc_ac_sweep, pn_1d_turnon)
   pass with existing tolerances.
 
+### Added (M13.1 follow-up #4, 2026-04-27 — partial)
+- `semi/runners/transient.py`: opt-in dispatch of the 1D time-loop
+  convection-diffusion block to `solve_sg_block_1d`. Gated by
+  `solver.use_sg_flux` (default False). When False (default and all
+  existing tests / benchmarks), the M13 Galerkin path runs and the
+  runner is bit-identical to the prior PR #44 behaviour. When True
+  on a 1D mesh, the time loop swaps in the FD-verified SG residual +
+  analytic Jacobian.
+- `semi/fem/sg_assembly.py::solve_sg_block_1d`: BC-dof detection bug
+  fix. The previous `bc.function_space is V_phi_n` identity check
+  silently matched zero dofs because dolfinx 0.10's `bc.function_space`
+  returns the C++ `dolfinx.cpp.fem.FunctionSpace_float64` wrapper, a
+  different Python object from the Python-level `dolfinx.fem.FunctionSpace`
+  in `spaces.V_phi_n`. With the empty BC dof set, the SG residual
+  callback's `b += -sg_n - gn` patched Dirichlet rows, allowing SNES
+  to drive minority-carrier BC dofs off their pinned values by an
+  amount proportional to the SG flux at the contact (e.g.
+  p[cathode_minority]: 1e-14 → 9.92e-15 in one BDF step). The fix
+  uses `bc.function_space.contains(V_phi_n._cpp_object)`, which
+  reports identity at the C++ level. Pragma `# pragma: no cover`
+  removed (the function is now reachable via `use_sg_flux: True`).
+- `semi/fem/sg_assembly.py::solve_sg_block_1d`: orthant projection on
+  n,p dofs via `SNESSetUpdate`. Floors carrier dofs at 1e-30 before
+  each Newton residual evaluation. Defense-in-depth against the
+  (n,p) primary form's lack of unconditional positivity preservation;
+  matches the standard fix in production semiconductor codes.
+
+### Status (M13.1 follow-up #4, NOT yet ready for full close-out)
+- The opt-in SG path closes the BC-overwrite bug and adds positivity
+  defense, but the V_F=0.3 V SS-limit test still does not pass. With
+  `use_sg_flux: True`, the 1D time loop progresses ~52 BDF2 steps
+  (dt=50ps) before SNES line-search divergence. `-snes_test_jacobian`
+  reports `||J - Jfd||/||J||` = 4.24e-9, so the failure is not a
+  Jacobian bug. See `/tmp/m13.1-positivity-blocker.md` for the
+  close-out audit, hypotheses for the next iteration, and reproducer.
+- `tests/fem/test_transient_steady_state.py`: still xfail with
+  `strict=False`; xfail reason updated to point at the new audit.
+- M13 transient MMS, M14 AC, pn_1d_turnon, and all M11-M14 benchmarks
+  pass unchanged (the flag defaults to False and they do not opt in).
+  v0.14.1 NOT ready to tag.
+
 ### Decisions surfaced and resolved during this work
 - **Bernoulli identity correction**: the prompt's `B(x) + B(-x) = -x`
   is wrong; the correct identity is `B(x) - B(-x) = -x` (the sum is
