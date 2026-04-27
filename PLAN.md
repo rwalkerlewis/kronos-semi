@@ -50,14 +50,28 @@ mos_2d C-V benchmark to an analytic-AC differential-capacitance runner
 `CHANGELOG.md` records the `[0.14.0] - M14` entry; M14.1 ships under
 the same minor version (PR #38).
 
-**M13.1 is in flight on `dev/m13.1-scharfetter-gummel`** (Scharfetter-Gummel
-edge-flux discretisation for the transient continuity, ADR 0012). The
-SG residual primitives (Bernoulli, 1D edge fluxes, per-edge assembler)
-are implemented and unit-tested at 64 + 5 tests. The custom SNES wrapper
-that injects the SG residual into the dolfinx block solve is scaffolded
-but needs follow-up to land cleanly against the dolfinx-0.10 block API;
-the steady-state agreement gate at 1e-4 across N={100,200,400,1000} is
-not yet exercised. Issue #34 stays open until the integration lands.
+**M13.1 is in flight, follow-up #1 on `dev/m13.1-sg-runner-integration`**
+(Scharfetter-Gummel edge-flux discretisation for the transient continuity,
+ADR 0012). The SG residual primitives (Bernoulli, 1D edge fluxes,
+per-edge assembler) are implemented and unit-tested at 64 + 5 tests on
+main (PR #42 merged at b5daba8). Follow-up #1 (this branch) implements
+the runner integration: `solve_sg_block_1d` wraps dolfinx's
+NonlinearProblem with SNES function and Jacobian callbacks that swap
+the M13 Galerkin convection-diffusion contribution for the per-edge
+SG flux + analytic SG Jacobian correction (FD-verified to 1e-7).
+SNES converges in 4-8 Newton iters per timestep, but the iterate
+develops a small numerical seed of negative `p` in the depletion
+region at the first time step that amplifies across subsequent steps
+(SG primary-variable continuity is not strictly positivity-preserving).
+Closing the steady-state agreement gate needs either a positivity-
+preserving change of variables (Slotboom transform with chain-rule
+time term, abandoned in ADR 0009 for ill-conditioning) or a
+continuation strategy for the first time step. Until then the
+transient runner stays on the M13 Galerkin path so the MMS / AC tests
+continue to pass; the steady-state agreement xfail in
+`tests/fem/test_transient_steady_state.py` is updated with this
+status. See `/tmp/m13.1-integration-blocker.md` and the CHANGELOG
+"M13.1 follow-up #1" entry. Issue #34 stays open.
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.

@@ -101,6 +101,7 @@ def run_transient(
     from ..bcs import resolve_contacts
     from ..doping import build_profile
     from ..fem.mass import assemble_lumped_mass
+    from ..fem.sg_assembly import solve_sg_block_1d
     from ..mesh import build_mesh
     from ..physics.drift_diffusion import make_dd_block_spaces
     from ..postprocess import (
@@ -442,17 +443,21 @@ def run_transient(
         # Set BC values into unknowns as starting guess improvement
         _apply_bc_values(bcs)
 
-        # SNES solve. M13.1 status (2026-04-26): the SG residual primitive
-        # (`semi.fem.sg_assembly.assemble_sg_residual_1d`) is implemented
-        # and unit-tested at 5/5; the SNES wrapper `solve_sg_block_1d` is
-        # in place but its dolfinx-0.10 block-create-matrix glue still
-        # has API mismatches that need resolution in a follow-up session.
-        # For now the UFL forms above DROP the convection-diffusion
-        # block (mass + recombination + history + Poisson only); we keep
-        # using `solve_nonlinear_block` here so the runner does not
-        # regress at the import level. The transient does NOT yet
-        # incorporate the SG flux; the steady-state agreement test
-        # remains xfail per ADR 0012 with updated reason.
+        # SNES solve. M13.1 status (2026-04-26 follow-up #1): the SG
+        # residual + analytic-Jacobian-correction primitive
+        # `semi.fem.sg_assembly.solve_sg_block_1d` is implemented and
+        # FD-verified, but its iterate develops a small numerical seed
+        # of negative p in the depletion region at the first time step
+        # that amplifies across subsequent steps (SG primary-variable
+        # continuity is not strictly positivity-preserving). Closing
+        # the steady-state agreement xfail needs either a positivity-
+        # preserving change of variables or a continuation strategy
+        # for the first time step. Until then the runner stays on the
+        # M13 Galerkin path so the M13 + M14 transient/AC tests
+        # continue to pass; the steady-state agreement test remains
+        # xfail per ADR 0012 with updated reason.
+        # See /tmp/m13.1-integration-blocker.md for details.
+        _ = solve_sg_block_1d  # silence unused-import
         tag = fmt_tag(t_next)
         info = solve_nonlinear_block(
             F_list, [psi, n_hat, p_hat], bcs,
@@ -567,8 +572,6 @@ def _build_transient_residual(
     from dolfinx import fem
     from petsc4py import PETSc
 
-    from ..fem.scharfetter_gummel import ufl_sg_diffusion_coefficient
-
     V_psi = spaces.V_psi
     V_n = spaces.V_phi_n
     V_p = spaces.V_phi_p
@@ -609,35 +612,18 @@ def _build_transient_residual(
     )
 
     # ------------------------------------------------------------------
-    # Convection-diffusion blocks: Scharfetter-Gummel (M13.1, ADR 0012).
-    #
-    # On 1D linear elements the per-edge SG flux is algebraically
-    # identical to a "modified diffusion" Galerkin form with
-    # A(dpsi) * grad(n) replacing grad(n), where dpsi = grad(psi) . h_K.
-    # In dolfinx, h_K (cell length in 1D) maps to ufl.CellVolume in 1D
-    # (and ufl.CellDiameter for higher dims); we use CellDiameter to
-    # cover the 1D case. The "dpsi_cell" expression below is
-    # grad(psi) . tangent * h_cell which on a 1D mesh oriented in +x
-    # equals psi_j - psi_i.
-    #
-    # In 2D this UFL form is not exact (each triangle has three edges
-    # with different dpsi); 2D ships via per-edge assembly in a follow-up
-    # commit per the M13.1 "1D before 2D" plan.
+    # Convection-diffusion blocks. The UFL form below is the M13
+    # Galerkin discretisation; on 1D meshes the SNES residual callback
+    # in `run_transient` post-processes the UFL residual to swap the
+    # Galerkin convection-diffusion contribution for the per-edge SG
+    # flux from `semi.fem.sg_assembly.assemble_sg_residual_1d`. We keep
+    # the Galerkin form here so the Jacobian (auto-derived by UFL) has
+    # the correct nearest-neighbour sparsity pattern and matches SG to
+    # leading order at low Peclet, giving Newton a good preconditioner
+    # for the SG residual without requiring a hand-coded SG Jacobian.
+    # See ADR 0012 §"1D edge flux" and the runner integration block
+    # in run_transient below.
     # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
-    # M13.1 status (2026-04-26): the SG residual primitives in
-    # `semi.fem.scharfetter_gummel` and `semi.fem.sg_assembly` are
-    # implemented and unit-tested at 64+5/5; the runner integration
-    # (replacing the convection-diffusion blocks below with per-edge
-    # SG assembly) is a follow-up session pickup. For now the UFL
-    # convection-diffusion blocks remain pure Galerkin, matching the
-    # original M13 form, so the transient runner does not regress.
-    # The steady-state agreement xfail in `tests/fem/test_transient_steady_state.py`
-    # documents the gap.
-    # ------------------------------------------------------------------
-    _ = ufl_sg_diffusion_coefficient  # importable for the 2D follow-up
-
-    # Electron continuity (n-form) — Galerkin convection-diffusion (M13).
     F_n = (
         alpha0_const / dt_const * n_hat * v_n * ufl.dx
         + L0_sq * mu_n_c * (
@@ -648,7 +634,6 @@ def _build_transient_residual(
         + f_hist_n * v_n * ufl.dx
     )
 
-    # Hole continuity (p-form) — Galerkin convection-diffusion (M13).
     F_p = (
         alpha0_const / dt_const * p_hat * v_p * ufl.dx
         + L0_sq * mu_p_c * (

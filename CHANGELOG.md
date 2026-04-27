@@ -37,12 +37,42 @@
   divergence-of-constant-flux is zero at interior vertices to 1e-12
   relative.
 
-### Status (not yet ready for merge)
-- The transient runner does NOT yet incorporate the SG flux. The
-  steady-state agreement test at V=0.5 V across N={100,200,400,1000}
-  on `pn_1d_bias` (the 1e-4 hard merge gate per the M13.1 prompt) is
-  NOT yet exercised. The xfail in `tests/fem/test_transient_steady_state.py`
-  documents this status.
+### Added (M13.1 follow-up #1, 2026-04-26)
+- `semi/fem/sg_assembly.py::solve_sg_block_1d`: rewritten to wrap
+  `dolfinx.fem.petsc.NonlinearProblem` and override the SNES function
+  + Jacobian callbacks. The function callback runs the standard UFL
+  M13 Galerkin block-residual assembly, then subtracts the Galerkin
+  convection-diffusion contribution and adds the per-edge SG flux from
+  `assemble_sg_residual_1d` (in M13 sign convention — the SG primitive
+  uses the opposite sign convention from the M13 weak form, verified
+  at zero field on a 3-node mesh).
+- `semi/fem/sg_assembly.py::_bernoulli_prime_array`: numerically stable
+  derivative `B'(x)` in four regimes (Taylor for `|x| < 1e-3`, closed
+  form mid-range, asymptotic for `|x| > 30`).
+- `semi/fem/sg_assembly.py::assemble_sg_jacobian_correction_1d`:
+  analytic per-edge Jacobian correction `J_sg_M13 - J_galerkin_convdiff`
+  for the SG-corrected block residual. FD-verified against the residual
+  on a 3-node test mesh to 1e-7 relative on all 16 entries per edge
+  across the (n, p) row blocks and (psi, n, p) column blocks.
+
+### Status (M13.1 follow-up #1, NOT yet ready for merge)
+- The SG residual + analytic-Jacobian-correction primitives are wired
+  up and FD-verified, but `solve_sg_block_1d` is not yet routed from
+  the transient runner. When routed, SNES converges (4-8 Newton iters
+  per step) but the iterate develops a small numerical seed of
+  negative `p` in the depletion region at the first time step that
+  amplifies across subsequent steps; SG primary-variable continuity
+  is not strictly positivity-preserving. The transient diverges
+  (line search failure) around `t ~ tau_p / 30`. Closing this needs
+  either a positivity-preserving change of variables (Slotboom
+  transform with chain-rule time term, abandoned in ADR 0009 for
+  ill-conditioning) or a continuation strategy for the first time
+  step where `V` is ramped from 0 to `V_F`.
+- The transient runner stays on the M13 Galerkin path so M13 + M14
+  transient/AC tests continue to pass; the steady-state agreement
+  xfail in `tests/fem/test_transient_steady_state.py` is updated with
+  this status. See `/tmp/m13.1-integration-blocker.md` for details on
+  the FD-verification of the Jacobian and the iteration-cap reasoning.
 - 2D simplicial assembly: explicitly raises `NotImplementedError` per
   the "1D before 2D, hard" guard.
 

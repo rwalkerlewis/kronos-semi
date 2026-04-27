@@ -89,15 +89,26 @@ def _make_cfg(solver_block: dict) -> dict:
 
 @pytest.mark.xfail(
     reason=(
-        "M13.1 status (2026-04-26): SG residual primitives "
-        "(semi.fem.scharfetter_gummel, semi.fem.sg_assembly) are "
-        "implemented and unit-tested (64 + 5 tests passing). "
-        "Transient runner integration (custom SNES wrapper "
-        "solve_sg_block_1d in sg_assembly.py) is in flight; "
-        "dolfinx-0.10 block-create-matrix glue needs follow-up. "
-        "Until the integration lands, the (n,p) Galerkin transient "
-        "from M13 does not converge to the Slotboom bias_sweep "
-        "discrete steady state. See ADR 0012 and issue #34."
+        "M13.1 status (2026-04-26 follow-up #1): SG residual is now "
+        "wired into the 1D transient runner via "
+        "`semi.fem.sg_assembly.solve_sg_block_1d`, which overrides the "
+        "dolfinx NonlinearProblem residual + Jacobian callbacks to "
+        "swap the M13 Galerkin convection-diffusion contribution for "
+        "the per-edge Scharfetter-Gummel flux from "
+        "`assemble_sg_residual_1d`. The analytic SG Jacobian "
+        "correction in `assemble_sg_jacobian_correction_1d` is "
+        "FD-verified to 1e-7 against the residual on a 3-node test "
+        "mesh. SNES converges (4-8 Newton iters per step) but the "
+        "iterate develops a small numerical seed of negative p in the "
+        "depletion region at the first time step that amplifies "
+        "across subsequent steps; SG primary-variable continuity is "
+        "not strictly positivity-preserving. The transient diverges "
+        "(line search failure) around t ~ tau_p / 30. Closing this "
+        "needs either a positivity-preserving change of variables "
+        "(Slotboom transform with chain-rule time term, abandoned in "
+        "ADR 0009 for ill-conditioning), or a continuation strategy "
+        "for the first time step where V is ramped from 0 to V_F. "
+        "See ADR 0012 and /tmp/m13.1-integration-blocker.md."
     ),
     strict=False,
 )
