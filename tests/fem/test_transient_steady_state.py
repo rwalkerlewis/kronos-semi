@@ -87,28 +87,10 @@ def _make_cfg(solver_block: dict) -> dict:
     }
 
 
-@pytest.mark.xfail(
-    reason=(
-        "M13.1 status (2026-04-27 follow-up #4): the SG flux path now "
-        "ships in `run_transient` behind `solver.use_sg_flux` (default "
-        "False, opt-in). With the flag on the dispatch routes through "
-        "`solve_sg_block_1d`, which now uses `FunctionSpace.contains` "
-        "for BC-block detection (the previous `is`-based check silently "
-        "matched zero BC dofs, allowing the SG callback to overwrite "
-        "Dirichlet rows of the residual; fixed in this PR) and clips "
-        "the iterate to the positive orthant on every Newton update. "
-        "These two fixes get the time loop to step ~52 (BDF2, dt=50ps, "
-        "V_F=0.3) at which point SNES line search still diverges. The "
-        "M13 transient MMS test continues to pass because the flag "
-        "defaults to False; pn_1d_turnon is unaffected (it sets "
-        "`bc_ramp_steps: 0` and never opts in). The remaining gap to "
-        "closing this test is the line-search divergence that mounts "
-        "as carriers fully redistribute across the depletion region. "
-        "See `/tmp/m13.1-positivity-blocker.md` for the close-out "
-        "audit and reproducer."
-    ),
-    strict=False,
-)
+# M13.1 close-out: Slotboom transient (ADR 0014) matches bias_sweep at
+# deep steady state. The earlier (n, p) primary-form xfail is closed by
+# switching primary unknowns; see `docs/m13.1-followup-5-blocker.md` for
+# the diagnostic chain that motivated the switch.
 def test_transient_steady_state_limit():
     """
     Run the transient solver until steady state and compare IV to
@@ -175,17 +157,16 @@ def test_transient_steady_state_limit():
         )
 
 
-def test_sg_flux_path_runs_without_error():
+def test_transient_steady_state_runs_end_to_end():
     """
-    Smoke test: the use_sg_flux=True path executes 5 BDF2 steps on a 1D
-    pn junction without raising an exception.
+    Smoke test: the standard Slotboom transient runs 5 BDF2 steps on a
+    1D pn junction without raising.
 
-    The close-out audit (see xfail note on test_transient_steady_state_limit)
-    shows the SG path converges cleanly for ~52 BDF2 steps at dt=50 ps before
-    line-search divergence.  Five steps is well within the stable window, so
-    this test should always pass regardless of solver tweaks.
-
-    Purpose: exercise solve_sg_block_1d (coverage, M13.1 case e).
+    With ADR 0014 (Slotboom transient) there is no longer a dispatch
+    flag; the runner always uses the Slotboom path. This test guards
+    against regressions in the time-loop scaffolding (BC-ramp IC, BDF
+    history rotation, IV recording) on a short run that completes well
+    within the stable window.
     """
     from semi.runners.transient import run_transient
 
@@ -199,7 +180,6 @@ def test_sg_flux_path_runs_without_error():
         "order": 2,
         "max_steps": n_steps + 5,
         "output_every": n_steps + 5,
-        "use_sg_flux": True,
         "snes": {"rtol": 1.0e-10, "atol": 1.0e-7, "stol": 1.0e-14, "max_it": 100},
     })
     result = run_transient(cfg)
