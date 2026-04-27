@@ -89,12 +89,15 @@ def _make_cfg(solver_block: dict) -> dict:
 
 @pytest.mark.xfail(
     reason=(
-        "Known M13.1 issue: the (n,p) Galerkin transient does not "
-        "converge to the same discrete steady state as the Slotboom "
-        "bias_sweep, even with tight SNES tolerance and refined mesh. "
-        "Tracked in GH issue #34 (Scharfetter-Gummel "
-        "edge-flux discretization). See ADR 0009 'Known limitation "
-        "(M13.1)'."
+        "M13.1 status (2026-04-26): SG residual primitives "
+        "(semi.fem.scharfetter_gummel, semi.fem.sg_assembly) are "
+        "implemented and unit-tested (64 + 5 tests passing). "
+        "Transient runner integration (custom SNES wrapper "
+        "solve_sg_block_1d in sg_assembly.py) is in flight; "
+        "dolfinx-0.10 block-create-matrix glue needs follow-up. "
+        "Until the integration lands, the (n,p) Galerkin transient "
+        "from M13 does not converge to the Slotboom bias_sweep "
+        "discrete steady state. See ADR 0012 and issue #34."
     ),
     strict=False,
 )

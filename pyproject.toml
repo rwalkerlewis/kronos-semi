@@ -36,12 +36,17 @@ fem = []
 test = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    # mpmath is the independent high-precision reference for the
+    # Bernoulli-function unit tests in tests/fem/test_scharfetter_gummel.py
+    # (M13.1 / ADR 0012). Pure Python, no compiled deps.
+    "mpmath>=1.3",
 ]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "nbformat>=5.0",
     "ruff>=0.1",
+    "mpmath>=1.3",
 ]
 server = [
     "fastapi>=0.115,<0.120",
