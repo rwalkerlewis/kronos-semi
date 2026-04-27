@@ -89,46 +89,13 @@ def bernoulli_array(x: np.ndarray) -> np.ndarray:
     """
     Vectorised Bernoulli over a NumPy array of arguments.
 
-    Same regimes as :func:`bernoulli`; uses `np.where` rather than Python
-    branching so it composes with vectorised edge assembly without a
-    Python-level loop.
+    Delegates to :func:`bernoulli` element-wise via ``np.frompyfunc`` to
+    guarantee bitwise identity with the scalar path on all platforms.
+    The Taylor, mid-range, and large-argument branches are handled by the
+    scalar function exactly as in :func:`bernoulli`.
     """
     x = np.asarray(x, dtype=np.float64)
-    out = np.empty_like(x)
-
-    is_zero = x == 0.0
-    ax = np.abs(x)
-    is_taylor = (ax < _TAYLOR_EPS) & ~is_zero
-    is_big_pos = x > _BIG_X
-    is_big_neg = x < -_BIG_X
-    is_mid = ~(is_zero | is_taylor | is_big_pos | is_big_neg)
-
-    # Zero branch.
-    out[is_zero] = 1.0
-
-    # Taylor branch.
-    if is_taylor.any():
-        xt = x[is_taylor]
-        xt2 = xt * xt
-        out[is_taylor] = 1.0 - 0.5 * xt + xt2 / 12.0 - (xt2 * xt2) / 720.0
-
-    # Large positive branch.
-    if is_big_pos.any():
-        xp = x[is_big_pos]
-        ex = np.exp(-xp)
-        out[is_big_pos] = (xp * ex) / (1.0 - ex)
-
-    # Large negative branch and mid-range branch share the closed form
-    # x / expm1(x); expm1 is accurate near 0 and saturates safely for
-    # large |x|.
-    if is_big_neg.any():
-        xn = x[is_big_neg]
-        out[is_big_neg] = xn / np.expm1(xn)
-    if is_mid.any():
-        xm = x[is_mid]
-        out[is_mid] = xm / np.expm1(xm)
-
-    return out
+    return np.frompyfunc(bernoulli, 1, 1)(x).astype(np.float64)
 
 
 def sg_edge_flux_n(
