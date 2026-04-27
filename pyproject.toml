@@ -98,6 +98,12 @@ omit = [
 # `scripts/run_verification.py all`; they are deliberately excluded
 # from pytest coverage to keep the threshold honest about what unit
 # tests verify versus what CI integration verifies.
+#
+# Coverage gate is 92% (CI: --cov-fail-under=92), not 95%, because
+# semi/fem/sg_assembly.py (269 stmts) has no production caller since the
+# transient runner switched to Slotboom form (ADR 0014). The SG primitives
+# are retained for future 2D high-Peclet work in M13.2.
+# TODO: re-raise to 95% when sg_assembly is wired into the M13.2 runner.
 exclude_also = [
     "pragma: no cover",
     "raise NotImplementedError",

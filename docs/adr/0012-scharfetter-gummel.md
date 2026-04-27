@@ -1,7 +1,7 @@
 # ADR 0012: Scharfetter-Gummel edge-flux discretisation for transient continuity
 
 **Date:** 2026-04-26
-**Status:** Accepted (supersedes the (n, p) Galerkin choice in ADR 0009)
+**Status:** Accepted (supersedes the (n, p) Galerkin choice in ADR 0009); primary-unknown assumption amended by ADR 0014; SG primitives retained for future 2D high-Peclet work.
 **Milestone:** M13.1 — Transient solver close-out
 
 ---

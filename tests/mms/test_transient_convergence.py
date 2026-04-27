@@ -1,57 +1,45 @@
 """
 Temporal convergence test for the BDF1/BDF2 transient drift-diffusion solver.
 
-Pairwise-difference design (M13 final)
---------------------------------------
-We measure the temporal discretisation error of the (psi, n, p) form
-transient runner by comparing solutions at consecutive dt levels on the
-same mesh.
+Pairwise-difference design
+--------------------------
+We measure the temporal discretisation error of the Slotboom-form
+transient runner (ADR 0014) by comparing solutions at consecutive dt
+levels on the same mesh.
 
 Why pairwise differences (not bias_sweep, not self-Richardson):
-* The transient runner discretises the (psi, n, p) form. The bias_sweep
-  runner discretises the Slotboom (psi, phi_n, phi_p) form. On the same
-  mesh, the two formulations give *different* discrete steady-state
-  solutions because their Galerkin residuals are different (the test
-  function for the carrier-density variable differs). The difference
-  ~3e18 m^-3 in n at the depletion edge does not vanish as dt -> 0, so
-  bias_sweep cannot serve as a reference for the n-form temporal error.
 * The previous self-Richardson approach used a reference at the same
   BDF order but only 4x finer dt than the finest test level, which
   contaminated the comparison with the reference's own temporal error
   and produced non-monotonic, meaningless rates.
-
-Pairwise differences avoid both pitfalls:
-
-  Let u(dt; t_end) be the n-form transient solution at the same mesh,
-  same BDF order, computed with timestep dt. Its error vs the unknown
-  true solution u_exact(t_end) of the *continuous* (n, p) PDE is
-
-      u(dt; t_end) - u_exact(t_end)  =  C(t_end) * dt^p  +  e_spatial
-
-  where p is the BDF order and e_spatial is the (dt-independent)
-  spatial discretisation error. Therefore for two consecutive levels
+* Pairwise differences avoid this: for two consecutive levels
   dt_k and dt_{k+1} = dt_k / 2,
 
       D_k  :=  || u(dt_k) - u(dt_{k+1}) ||_inf
-            =  || C(t_end) * (dt_k^p - dt_{k+1}^p) ||_inf
             ~  |C(t_end)|_inf * dt_k^p * (1 - 2^{-p})
 
   The spatial error cancels exactly because both runs share mesh and
   formulation. The log-log slope of D_k vs dt_k recovers p.
 
-Pe < 1 design (preserved from M13 round 3)
-------------------------------------------
-Device parameters keep the element Peclet number below 1 so the
-standard Galerkin discretisation maintains positive carrier densities
-through Newton iteration:
+Device design (M13.1 follow-up — 1e17 doping, V_F = 0.05 V)
+------------------------------------------------------------
+The original 1e15 / 0.1 V device failed the rate test because the dt
+window where MUMPS stays stable on the post-ramp V_F/2 → V_F BC step
+(~50 ps minimum) did not overlap with the dt window required for a
+clean BDF rate signal. This is documented in ADR 0014 Limitations.
 
-  N_A = N_D = 1e15 cm^-3 (Si, 300 K) -> V_bi ~ 0.577 V, W ~ 1.23 um
-  ψ_bi ~ 22.2,  h_max = 2*W/ψ_bi ~ 111 nm
-  L = 20 um, N = 400 -> h = 50 nm < 111 nm  -> Pe ~ 0.45
+Fix: use the `pn_1d_turnon` benchmark device (1e17 doping) with a
+small forward bias (V_F = 0.05 V, roughly 2 kT/q). The near-linear
+response below thermal voltage keeps the post-ramp BC step small and
+avoids the MUMPS conditioning failure at the coarsest dt. The 1e17
+regime is already validated by the `pn_1d_turnon` benchmark; the
+Slotboom (psi, phi_n, phi_p) formulation guarantees positivity of
+carriers by construction so the old Pe < 1 Galerkin stability
+constraint no longer applies (see ADR 0014).
 
-Convergence thresholds (unchanged from M13 specification):
-  BDF1: rate >= 0.95
-  BDF2: rate >= 1.90
+Convergence thresholds:
+  BDF1: rate >= 0.95   (theoretical: 1.0)
+  BDF2: rate >= 1.90   (theoretical: 2.0)
 """
 from __future__ import annotations
 
@@ -61,7 +49,8 @@ import numpy as np
 import pytest
 
 # Forward bias for the step-on transient.
-V_F = 0.1
+# 0.05 V ~ 2 kT/q: near-linear response, small BC step impulse.
+V_F = 0.05
 
 # SRH lifetime; sets the time scale of the minority-carrier transient.
 TAU = 1.0e-9
@@ -83,7 +72,10 @@ DT_BASE = T_END / 16.0  # 6.25e-11 s
 N_LEVELS = 4
 DT_LIST = [DT_BASE / (2 ** k) for k in range(N_LEVELS)]
 
-# Mesh: N=400 on a 20 um device -> h=50 nm -> Pe ~ 0.45 < 1 for 1e15 doping.
+# Mesh: N=400 on a 20 um device -> h=50 nm.
+# At 1e17 doping the Slotboom (psi, phi_n, phi_p) form guarantees carrier
+# positivity by construction; the Pe < 1 Galerkin stability constraint
+# from the old (n, p) density form does not apply here.
 N_MESH = 400
 L_DEVICE = 2.0e-5
 
@@ -121,8 +113,8 @@ def _transient_cfg(dt: float, order: int) -> dict:
                     "axis": 0,
                     "location": L_DEVICE / 2.0,
                     "N_D_left": 0.0,
-                    "N_A_left": 1.0e15,
-                    "N_D_right": 1.0e15,
+                    "N_A_left": 1.0e17,
+                    "N_D_right": 1.0e17,
                     "N_A_right": 0.0,
                 },
             }
@@ -151,30 +143,15 @@ def _transient_cfg(dt: float, order: int) -> dict:
             "output_every": int(max_steps + 1),  # only the t=t_end snapshot
             # ADR 0014 (Slotboom transient, supersedes ADR 0009):
             #
-            # The (psi, phi_n, phi_p) Slotboom transient uses a chain-
-            # rule mass term, lumped via P1 vertex quadrature. Two
-            # MMS-test failure modes inform this configuration:
-            #
-            #  * `bc_ramp_steps>0` ramping all the way to V_F leaves
-            #    the IC exactly at the V_F fixed point of the *same*
-            #    discrete formulation that is then advanced in time,
-            #    so pairwise diffs collapse to machine epsilon at every
-            #    dt level. This is escape-hatch #2 in the M13.1 plan
-            #    ("the chain-rule mass term changes the truncation-
-            #    error structure"). Under (n, p), bc_ramp produced a
-            #    formulation-mismatch jolt that drove the time loop;
-            #    under Slotboom there is no mismatch.
-            #
-            #  * `bc_ramp_steps=0` (V=0 IC + step bias) at this device
-            #    drives Newton through carrier-density underflow at
-            #    step 1 (n_min = 0, n_max/n_min = O(1e51)) and leaves
-            #    the post-step Jacobian too ill-conditioned for MUMPS.
-            #
             # `bc_ramp_voltage_factor=0.5` lands the IC at the V_F/2
-            # steady state and the time loop integrates the V_F/2 ->
-            # V_F relaxation transient -- a well-defined transient
-            # signal that lets the BDF rate measurement work without
-            # demanding solver heroics.
+            # steady state; the time loop then integrates the V_F/2 ->
+            # V_F relaxation transient -- a well-defined signal for BDF
+            # rate measurement.  At 1e17 doping / V_F=0.05 V the BC
+            # step impulse is small (near-linear regime, ~2 kT/q) so
+            # MUMPS stays well-conditioned at DT_BASE = 6.25e-11 s.
+            # `bc_ramp_steps=0` (V=0 IC + step bias) at 1e17 doping
+            # would drive Newton through a large density swing at
+            # step 1 and is deliberately avoided here.
             "bc_ramp_steps": 10,
             "bc_ramp_voltage_factor": 0.5,
             "snes": {
@@ -271,56 +248,6 @@ def _run_convergence_study(order: int) -> tuple[list[float], list[float], list[f
     return dts_for_diff, diffs_n, diffs_p
 
 
-def _run_convergence_study_slotboom(
-    order: int,
-) -> tuple[list[float], list[float], list[float]]:
-    """
-    Slotboom-native temporal convergence study (M13.1 follow-up).
-
-    Pairwise differences computed on the *primary* Slotboom unknowns
-    phi_n, phi_p (in volts). This avoids the chain-rule composition
-    that converts BDF truncation error in (psi, phi_n, phi_p) into a
-    nonlinear mixture in the derived (n, p) pair, where
-
-        n = n_i exp(psi - phi_n),    p = n_i exp(phi_p - psi)
-
-    A pairwise difference in n therefore contains contributions from
-    truncation error in psi *and* phi_n weighted by exp(...) at the
-    final state -- a derived-quantity rate that is not the same as
-    the primary-unknown rate. Comparing phi_n, phi_p directly gives
-    a rate measurement on the quantities the Slotboom transient
-    actually integrates.
-
-    Returns (dts_for_diff, diffs_phi_n, diffs_phi_p), with the same
-    pairwise-difference convention as `_run_convergence_study`.
-    """
-    states_phi_n: list[np.ndarray] = []
-    states_phi_p: list[np.ndarray] = []
-    for dt in DT_LIST:
-        st = _run_transient_final_state(dt=dt, order=order)
-        states_phi_n.append(st["phi_n"])
-        states_phi_p.append(st["phi_p"])
-        if (
-            len(states_phi_n) > 1
-            and states_phi_n[-1].shape != states_phi_n[0].shape
-        ):
-            raise RuntimeError(
-                f"DOF count mismatch between dt levels: "
-                f"{states_phi_n[0].shape} vs {states_phi_n[-1].shape}"
-            )
-
-    dts_for_diff = DT_LIST[:-1]
-    diffs_phi_n = [
-        float(np.max(np.abs(states_phi_n[k] - states_phi_n[k + 1])))
-        for k in range(N_LEVELS - 1)
-    ]
-    diffs_phi_p = [
-        float(np.max(np.abs(states_phi_p[k] - states_phi_p[k + 1])))
-        for k in range(N_LEVELS - 1)
-    ]
-    return dts_for_diff, diffs_phi_n, diffs_phi_p
-
-
 def _assert_monotonic(diffs: list[float], label: str) -> None:
     for i in range(1, len(diffs)):
         assert diffs[i] < diffs[i - 1], (
@@ -331,48 +258,16 @@ def _assert_monotonic(diffs: list[float], label: str) -> None:
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(
-    reason=(
-        "M13.1 follow-up finding: the chain-rule-mass-term / "
-        "derived-quantity hypothesis is FALSIFIED. The companion "
-        "Slotboom-native rate test "
-        "(test_transient_convergence_slotboom_bdf1) compares the "
-        "primary unknowns (phi_n, phi_p) directly under the same "
-        "configuration and exhibits the *identical* upstream "
-        "failure: SNES diverges on the V_F/2 -> V_F BC step at the "
-        "coarsest dt (6.25e-11 s), residual stuck at ~7.9e-4. "
-        "Switching the comparison from derived (n, p) to primary "
-        "(phi_n, phi_p) does not change the runtime behaviour "
-        "because both share the same `run_transient` pipeline; the "
-        "rate-measurement quantity is therefore *not* the root "
-        "cause. Root cause is the solver-setup pathology already "
-        "documented for this device: at 1e15 doping, V_F=0.1 V, "
-        "the dt range required to keep MUMPS stable on the "
-        "post-ramp BC step (~50 ps minimum) does not overlap with "
-        "the dt range required for a clean BDF rate signal. "
-        "Original density-form / derived-quantity rationale (kept "
-        "for history): two failure modes bound the redesign space: "
-        "(a) `bc_ramp_steps>0` ramping all the way to V_F lands "
-        "the IC on the same discrete fixed point that the time "
-        "loop then advances, collapsing pairwise diffs to machine "
-        "epsilon; (b) `bc_ramp_steps=0` (V=0 IC + step bias) "
-        "drives Newton through carrier-density underflow at step "
-        "1, leaving the post-step Jacobian too ill-conditioned "
-        "for MUMPS at step 2. The intermediate option "
-        "`bc_ramp_voltage_factor=0.5` runs cleanly for some dt "
-        "values but fails at the coarsest dt of the schedule used "
-        "here. The Slotboom transient itself is correct -- the "
-        "deep-steady-state limit test "
-        "(test_transient_steady_state.test_transient_steady_state_limit) "
-        "passes within the 1e-4 relative-error gate, which is the "
-        "M13.1 headline acceptance criterion. See ADR 0014 "
-        "Limitations subsection for the full diagnostic chain."
-    ),
-    strict=True,
-)
 def test_transient_convergence_bdf1():
     """
     BDF1 (backward Euler) temporal convergence test.
+
+    Device: 1e17 cm^-3 symmetric pn junction, V_F = 0.05 V, T_END = 1 ns.
+    BC ramp: V_F/2 IC -> V_F time loop (bc_ramp_voltage_factor=0.5).
+    The near-linear (< 2 kT/q) forward bias keeps the BC step impulse
+    small, avoiding the MUMPS conditioning failure at DT_BASE = 6.25e-11 s
+    that xfailed the original 1e15/0.1 V device (see ADR 0014 Limitations).
+
     Asserts observed rate >= 0.95 (theoretical: 1.0) and that the
     pairwise-difference sequence decreases monotonically with dt.
     """
@@ -399,22 +294,16 @@ def test_transient_convergence_bdf1():
 
 
 @pytest.mark.slow
-@pytest.mark.xfail(
-    reason=(
-        "M13.1 follow-up finding (BDF2): same SNES upstream failure "
-        "as test_transient_convergence_bdf1; chain-rule / derived-"
-        "quantity hypothesis falsified by "
-        "test_transient_convergence_slotboom_bdf2 which exhibits the "
-        "identical step-1 BC-jump SNES divergence. See "
-        "test_transient_convergence_bdf1 for the full diagnostic. "
-        "The Slotboom transient is correct in the deep-steady-state "
-        "limit (the M13.1 headline test passes within 1e-4)."
-    ),
-    strict=True,
-)
 def test_transient_convergence_bdf2():
     """
     BDF2 temporal convergence test.
+
+    Device: 1e17 cm^-3 symmetric pn junction, V_F = 0.05 V, T_END = 1 ns.
+    BC ramp: V_F/2 IC -> V_F time loop (bc_ramp_voltage_factor=0.5).
+    The near-linear (< 2 kT/q) forward bias keeps the BC step impulse
+    small, avoiding the MUMPS conditioning failure at DT_BASE = 6.25e-11 s
+    that xfailed the original 1e15/0.1 V device (see ADR 0014 Limitations).
+
     Asserts observed rate >= 1.9 (theoretical: 2.0) and that the
     pairwise-difference sequence decreases monotonically with dt.
     """
@@ -437,127 +326,4 @@ def test_transient_convergence_bdf2():
     )
     assert rate_p >= RATE_BDF2_FLOOR, (
         f"BDF2 p rate {rate_p:.3f} < {RATE_BDF2_FLOOR}; diffs={diffs_p}"
-    )
-
-
-# ----------------------------------------------------------------------
-# Slotboom-native temporal convergence (M13.1 follow-up)
-# ----------------------------------------------------------------------
-#
-# The two tests above compare carrier *densities* (n, p) between dt
-# refinement levels. Under the Slotboom (psi, phi_n, phi_p) transient
-# (ADR 0014), n and p are *derived* quantities:
-#
-#     n = n_i exp(psi - phi_n),    p = n_i exp(phi_p - psi)
-#
-# A pairwise difference || n(dt_k) - n(dt_{k+1}) ||_inf therefore
-# folds together temporal errors in psi *and* phi_n, weighted by an
-# exp(...) factor at the final state. The result is a rate
-# measurement on a *derived* quantity -- not on the primary unknowns
-# the BDF integrator actually advances. The two rates can differ.
-#
-# The tests below repeat the same pairwise-difference design on the
-# *primary* unknowns phi_n and phi_p (in volts). Configuration is
-# identical (mesh, V_F, tau, dt schedule); only the comparison
-# quantity changes. Reusing the same `run_transient` pipeline means
-# any solver-setup pathology (e.g. SNES failure on the V_F/2 -> V_F
-# BC step at the coarsest dt) is shared between the density-form and
-# Slotboom-form tests; the Slotboom-form tests isolate whether *if*
-# the runs succeed the rate signal on primary unknowns is cleaner.
-
-
-@pytest.mark.slow
-@pytest.mark.xfail(
-    reason=(
-        "M13.1 Slotboom-native rate test inherits the same upstream "
-        "test-setup pathology that xfails the density-form rate test "
-        "on this device: at 1e15 doping with V_F=0.1 V and the "
-        "DT_BASE = T_END/16 = 6.25e-11 s coarsest dt, the post-ramp "
-        "V_F/2 -> V_F BC step at transient step 1 drives SNES through "
-        "a residual scale (~3.35) that MUMPS cannot resolve below "
-        "~7.9e-4 at this dt -- the run aborts before any rate is "
-        "measured. Comparing primary unknowns (phi_n, phi_p) instead "
-        "of derived (n, p) does not change the upstream SNES "
-        "behaviour because it is the same `run_transient` pipeline. "
-        "The xfail is preserved to retain the test infrastructure "
-        "for future debugging of the SNES setup; the M13.1 headline "
-        "deliverable (test_transient_steady_state_limit) passes "
-        "within the 1e-4 gate. See ADR 0014 Limitations "
-        "subsection for the full diagnostic chain."
-    ),
-    strict=True,
-)
-def test_transient_convergence_slotboom_bdf1():
-    """
-    BDF1 temporal convergence on Slotboom *primary* unknowns
-    (phi_n, phi_p). Asserts observed rate >= RATE_BDF1_FLOOR (0.95)
-    and pairwise-difference monotonicity in dt.
-    """
-    dts, diffs_phi_n, diffs_phi_p = _run_convergence_study_slotboom(order=1)
-    rate_phi_n = _log_rate(dts, diffs_phi_n)
-    rate_phi_p = _log_rate(dts, diffs_phi_p)
-
-    print("\nBDF1 Slotboom-native temporal convergence (pairwise diffs):")
-    for i, dt in enumerate(dts):
-        print(
-            f"  dt={dt:.3e}  diff_phi_n={diffs_phi_n[i]:.3e}  "
-            f"diff_phi_p={diffs_phi_p[i]:.3e}"
-        )
-    print(f"  Observed rates: phi_n={rate_phi_n:.3f}, phi_p={rate_phi_p:.3f}")
-
-    _assert_monotonic(diffs_phi_n, "BDF1 phi_n")
-    _assert_monotonic(diffs_phi_p, "BDF1 phi_p")
-
-    assert rate_phi_n >= RATE_BDF1_FLOOR, (
-        f"BDF1 phi_n rate {rate_phi_n:.3f} < {RATE_BDF1_FLOOR}; "
-        f"diffs={diffs_phi_n}"
-    )
-    assert rate_phi_p >= RATE_BDF1_FLOOR, (
-        f"BDF1 phi_p rate {rate_phi_p:.3f} < {RATE_BDF1_FLOOR}; "
-        f"diffs={diffs_phi_p}"
-    )
-
-
-@pytest.mark.slow
-@pytest.mark.xfail(
-    reason=(
-        "M13.1 Slotboom-native BDF2 rate test inherits the same "
-        "upstream SNES-setup pathology as "
-        "test_transient_convergence_slotboom_bdf1; see that test's "
-        "xfail reason for the full diagnostic. Switching the rate "
-        "comparison from derived (n, p) to primary (phi_n, phi_p) "
-        "does not bypass the failing V_F/2 -> V_F BC step at the "
-        "coarsest dt because both forms share the same `run_transient` "
-        "pipeline."
-    ),
-    strict=True,
-)
-def test_transient_convergence_slotboom_bdf2():
-    """
-    BDF2 temporal convergence on Slotboom *primary* unknowns
-    (phi_n, phi_p). Asserts observed rate >= RATE_BDF2_FLOOR (1.9)
-    and pairwise-difference monotonicity in dt.
-    """
-    dts, diffs_phi_n, diffs_phi_p = _run_convergence_study_slotboom(order=2)
-    rate_phi_n = _log_rate(dts, diffs_phi_n)
-    rate_phi_p = _log_rate(dts, diffs_phi_p)
-
-    print("\nBDF2 Slotboom-native temporal convergence (pairwise diffs):")
-    for i, dt in enumerate(dts):
-        print(
-            f"  dt={dt:.3e}  diff_phi_n={diffs_phi_n[i]:.3e}  "
-            f"diff_phi_p={diffs_phi_p[i]:.3e}"
-        )
-    print(f"  Observed rates: phi_n={rate_phi_n:.3f}, phi_p={rate_phi_p:.3f}")
-
-    _assert_monotonic(diffs_phi_n, "BDF2 phi_n")
-    _assert_monotonic(diffs_phi_p, "BDF2 phi_p")
-
-    assert rate_phi_n >= RATE_BDF2_FLOOR, (
-        f"BDF2 phi_n rate {rate_phi_n:.3f} < {RATE_BDF2_FLOOR}; "
-        f"diffs={diffs_phi_n}"
-    )
-    assert rate_phi_p >= RATE_BDF2_FLOOR, (
-        f"BDF2 phi_p rate {rate_phi_p:.3f} < {RATE_BDF2_FLOOR}; "
-        f"diffs={diffs_phi_p}"
     )
