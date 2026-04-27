@@ -257,7 +257,6 @@ def _assert_monotonic(diffs: list[float], label: str) -> None:
         )
 
 
-
 @pytest.mark.slow
 def test_transient_convergence_bdf1():
     """
