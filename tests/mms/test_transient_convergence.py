@@ -366,7 +366,7 @@ def _assert_monotonic(diffs: list[float], label: str) -> None:
         "(test_transient_steady_state.test_transient_steady_state_limit) "
         "passes within the 1e-4 relative-error gate, which is the "
         "M13.1 headline acceptance criterion. See ADR 0014 "
-        "Limitations and /tmp/m13.1-slotboom-mms-blocker.md."
+        "Limitations subsection for the full diagnostic chain."
     ),
     strict=True,
 )
@@ -482,8 +482,8 @@ def test_transient_convergence_bdf2():
         "The xfail is preserved to retain the test infrastructure "
         "for future debugging of the SNES setup; the M13.1 headline "
         "deliverable (test_transient_steady_state_limit) passes "
-        "within the 1e-4 gate. See ADR 0014 Limitations and "
-        "/tmp/m13.1-slotboom-mms-blocker.md."
+        "within the 1e-4 gate. See ADR 0014 Limitations "
+        "subsection for the full diagnostic chain."
     ),
     strict=True,
 )
