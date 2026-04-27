@@ -369,7 +369,9 @@ def run_transient(
     # ------------------------------------------------------------------
     iv_rows: list[dict[str, Any]] = []
     t_vals: list[float] = []
-    fields_out: dict[str, list[np.ndarray]] = {"psi": [], "n": [], "p": []}
+    fields_out: dict[str, list[np.ndarray]] = {
+        "psi": [], "n": [], "p": [], "phi_n": [], "phi_p": [],
+    }
     snap_t: list[float] = []
     n_steps_taken = 0
     step_count = 0
@@ -451,6 +453,15 @@ def run_transient(
             fields_out["psi"].append(psi.x.array.copy() * sc.V0)
             fields_out["n"].append(n_phys)
             fields_out["p"].append(p_phys)
+            # ADR 0014 (Limitations subsection): expose Slotboom
+            # primary unknowns so MMS rate tests can compare primary
+            # unknowns directly rather than the derived (n, p) pair.
+            # The internal representation in `phi_n.x.array` is the
+            # dimensionless quasi-Fermi potential in scaled units;
+            # we multiply by sc.V0 here so the stored snapshot is
+            # in volts (matching `psi` above).
+            fields_out["phi_n"].append(phi_n.x.array.copy() * sc.V0)
+            fields_out["phi_p"].append(phi_p.x.array.copy() * sc.V0)
             snap_t.append(t_current)
 
         if progress_callback is not None:
