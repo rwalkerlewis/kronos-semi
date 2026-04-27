@@ -311,32 +311,38 @@ def test_assemble_sg_jacobian_correction_fd_verified():
     )
     n_total = 3 * n_verts
     J_analytic = np.zeros((n_total, n_total), dtype=np.float64)
-    for r, c, v in zip(rows, cols, vals):
+    for r, c, v in zip(rows, cols, vals, strict=True):
         J_analytic[int(r), int(c)] += float(v)
 
     # Finite-difference reference.
     eps_rel = 1.0e-7
     J_fd = np.zeros((n_total, n_total), dtype=np.float64)
     for col in range(n_total):
-        psi_p = psi_arr.copy(); psi_m = psi_arr.copy()
-        n_p = n_arr.copy(); n_m = n_arr.copy()
-        p_p = p_arr.copy(); p_m = p_arr.copy()
+        psi_p = psi_arr.copy()
+        psi_m = psi_arr.copy()
+        n_p = n_arr.copy()
+        n_m = n_arr.copy()
+        p_p = p_arr.copy()
+        p_m = p_arr.copy()
 
         if col < n_verts:
             v = col
             scale = max(abs(psi_arr[v]), 1.0)
             h = eps_rel * scale
-            psi_p[v] += h; psi_m[v] -= h
+            psi_p[v] += h
+            psi_m[v] -= h
         elif col < 2 * n_verts:
             v = col - n_verts
             scale = max(abs(n_arr[v]), 1.0)
             h = eps_rel * scale
-            n_p[v] += h; n_m[v] -= h
+            n_p[v] += h
+            n_m[v] -= h
         else:
             v = col - 2 * n_verts
             scale = max(abs(p_arr[v]), 1.0)
             h = eps_rel * scale
-            p_p[v] += h; p_m[v] -= h
+            p_p[v] += h
+            p_m[v] -= h
 
         Rp_n, Rp_p = _correction_residual_1d(
             psi_p, n_p, p_p,

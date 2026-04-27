@@ -173,3 +173,38 @@ def test_transient_steady_state_limit():
             f"Transient steady-state J={J_tr:.6e} A/m^2 differs from "
             f"bias_sweep J={J_ss:.6e} A/m^2 by {rel_err:.3e} (threshold 1e-4)"
         )
+
+
+def test_sg_flux_path_runs_without_error():
+    """
+    Smoke test: the use_sg_flux=True path executes 5 BDF2 steps on a 1D
+    pn junction without raising an exception.
+
+    The close-out audit (see xfail note on test_transient_steady_state_limit)
+    shows the SG path converges cleanly for ~52 BDF2 steps at dt=50 ps before
+    line-search divergence.  Five steps is well within the stable window, so
+    this test should always pass regardless of solver tweaks.
+
+    Purpose: exercise solve_sg_block_1d (coverage, M13.1 case e).
+    """
+    from semi.runners.transient import run_transient
+
+    dt = 5.0e-11  # 50 ps per step
+    n_steps = 5
+    t_end = n_steps * dt
+    cfg = _make_cfg({
+        "type": "transient",
+        "t_end": t_end,
+        "dt": dt,
+        "order": 2,
+        "max_steps": n_steps + 5,
+        "output_every": n_steps + 5,
+        "use_sg_flux": True,
+        "snes": {"rtol": 1.0e-10, "atol": 1.0e-7, "stol": 1.0e-14, "max_it": 100},
+    })
+    result = run_transient(cfg)
+    iv_anode = [r for r in result.iv if r.get("contact") == "anode"]
+    assert len(iv_anode) >= n_steps, (
+        f"Expected at least {n_steps} anode IV entries from {n_steps} BDF steps, "
+        f"got {len(iv_anode)}"
+    )

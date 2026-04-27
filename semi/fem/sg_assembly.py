@@ -370,7 +370,7 @@ def solve_sg_block_1d(
             dof_offsets, bc_dofs_n, bc_dofs_p,
         )
         if len(rows) > 0:
-            for r, c, v in zip(rows, cols, vals):
+            for r, c, v in zip(rows, cols, vals, strict=True):
                 J_mat.setValue(r, c, v, addv=PETSc.InsertMode.ADD_VALUES)
         J_mat.assemble()
         if P_mat is not None and P_mat is not J_mat:
@@ -670,8 +670,6 @@ def assemble_sg_jacobian_correction_1d(
     rows_list = []
     cols_list = []
     vals_list = []
-
-    n_edges = len(h)
 
     # We accumulate into per-vertex/per-edge dictionaries. To skip BC
     # rows, build the row index then skip if BC.
