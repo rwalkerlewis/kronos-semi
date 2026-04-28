@@ -1,0 +1,126 @@
+"""
+Audit case 1: bias_sweep vs transient at deep steady state.
+
+Formalizes the M13.1 close-out result (PR #52) by sampling more than
+one operating point. The transient runner is allowed to relax to deep
+steady state by stepping until residuals stop changing; the result is
+compared to `run_bias_sweep` at the same V_F.
+
+The expectation set by M13.1 is "<= 1e-4 relative error at deep
+steady state". This test reports the per-bias relative L2 of (psi, n,
+p) and the relative IV-current disagreement.
+"""
+from __future__ import annotations
+
+import copy
+
+import numpy as np
+import pytest
+
+from ._helpers import (
+    load_benchmark,
+    relative_l2,
+    require_dolfinx,
+    write_csv,
+    write_markdown,
+)
+
+CASE = "01_bias_vs_transient_steady_state"
+BIASES = [0.3, 0.5]  # V_F values; deep SS for forward bias diode
+
+
+@pytest.mark.audit
+def test_bias_sweep_vs_transient_steady_state():
+    require_dolfinx()
+
+    from semi.runners.bias_sweep import run_bias_sweep
+    from semi.runners.transient import run_transient
+
+    cfg_base = load_benchmark("pn_1d_turnon/config.json")
+
+    rows: list[list[float]] = []
+    for V_F in BIASES:
+        # Bias sweep solve at V_F.
+        cfg_bs = copy.deepcopy(cfg_base)
+        cfg_bs["contacts"][0]["voltage"] = V_F
+        cfg_bs["solver"] = {
+            "type": "bias_sweep",
+            "bias_ramp": {"start": 0.0, "stop": V_F, "step": 0.05},
+        }
+        bs_result = run_bias_sweep(cfg_bs)
+
+        # Transient with BC ramp + long t_end so the solution settles.
+        cfg_tr = copy.deepcopy(cfg_base)
+        cfg_tr["contacts"][0]["voltage"] = V_F
+        cfg_tr["solver"]["bc_ramp_steps"] = 10
+        cfg_tr["solver"]["t_end"] = 5.0e-6
+        cfg_tr["solver"]["dt"] = 5.0e-9
+        cfg_tr["solver"]["max_steps"] = 2000
+        cfg_tr["solver"]["output_every"] = 10000  # only need final
+        tr_result = run_transient(cfg_tr)
+
+        # Pull last-snapshot fields (transient) and compare with bias_sweep
+        # final fields by L2 relative error. Both runners expose fields
+        # under .fields with keys "psi"/"n"/"p" (or "potential").
+        def last(field_name, fields):
+            keys = [field_name] + ([
+                "potential" if field_name == "psi" else field_name
+            ])
+            for k in keys:
+                if k in fields and len(fields[k]) > 0:
+                    return np.asarray(fields[k][-1])
+            raise KeyError(f"field {field_name} not in {list(fields.keys())}")
+
+        bs_fields = getattr(bs_result, "fields", {}) or {}
+        tr_fields = getattr(tr_result, "fields", {}) or {}
+
+        try:
+            psi_err = relative_l2(last("psi", tr_fields), last("psi", bs_fields))
+            n_err = relative_l2(last("n", tr_fields), last("n", bs_fields))
+            p_err = relative_l2(last("p", tr_fields), last("p", bs_fields))
+        except KeyError as exc:
+            pytest.fail(
+                f"{CASE}: required field missing from runner output: {exc}. "
+                f"bs_fields keys = {list(bs_fields)}; "
+                f"tr_fields keys = {list(tr_fields)}"
+            )
+
+        # IV: take last current at the swept contact.
+        bs_J = bs_result.iv[-1]["J"] if bs_result.iv else float("nan")
+        tr_J = tr_result.iv[-1]["J"] if tr_result.iv else float("nan")
+        if abs(bs_J) > 1e-300:
+            iv_err = abs(tr_J - bs_J) / abs(bs_J)
+        else:
+            iv_err = abs(tr_J - bs_J)
+
+        rows.append([V_F, psi_err, n_err, p_err, iv_err])
+
+    write_csv(
+        CASE,
+        ["V_F", "rel_L2_psi", "rel_L2_n", "rel_L2_p", "rel_J"],
+        rows,
+    )
+
+    summary_lines = ["| V_F (V) | rel_L2 psi | rel_L2 n | rel_L2 p | rel J |", "|---:|---:|---:|---:|---:|"]
+    for V, e_psi, e_n, e_p, e_J in rows:
+        summary_lines.append(
+            f"| {V:.3f} | {e_psi:.3e} | {e_n:.3e} | {e_p:.3e} | {e_J:.3e} |"
+        )
+
+    write_markdown(
+        CASE,
+        "Case 01 - bias_sweep vs transient (deep steady state)",
+        "Compares `run_bias_sweep` and `run_transient` (relaxed to deep "
+        "steady state) on the pn_1d_turnon device at multiple forward "
+        "biases. M13.1's close-out claim: agreement at 1e-4 relative.\n\n"
+        + "\n".join(summary_lines)
+        + "\n\nCSV: `/tmp/audit/" + CASE + ".csv`",
+    )
+
+    # Soft gate: this is a discovery audit, not a regression. Tolerance
+    # is intentionally generous; tighten in a follow-up PR if all six
+    # cases come in clean.
+    for V, e_psi, e_n, e_p, _e_J in rows:
+        assert e_psi < 1e-2, f"psi disagreement {e_psi:.3e} at V_F={V}"
+        assert e_n < 5e-2, f"n disagreement {e_n:.3e} at V_F={V}"
+        assert e_p < 5e-2, f"p disagreement {e_p:.3e} at V_F={V}"
