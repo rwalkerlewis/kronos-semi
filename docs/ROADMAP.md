@@ -4,7 +4,7 @@ kronos-semi is a FEniCSx-based finite-element semiconductor device simulator tha
 
 ## Capability matrix
 
-All eight milestones (M1 through M8) are shipped or in flight. The table below reflects the state at the end of M7 (M8 is the final documentation and notebook polish pass, currently in flight).
+All milestones M1 through M14.1 have shipped as of v0.14.1. The table below is the current state; see the Delivery history section for per-milestone details.
 
 | Capability | Dimensions | Status | Verifier |
 |---|---|---|---|
@@ -17,15 +17,20 @@ All eight milestones (M1 through M8) are shipped or in flight. The table below r
 | File-sourced gmsh .msh meshes | 3D | shipped | builtin vs gmsh R-match within 1% |
 | Adaptive bias continuation | uni + bipolar | shipped | pn junction forward + reverse, 3D resistor |
 | 3D ohmic V-I linearity | 3D | shipped | V-I linearity within 1% |
-| Benchmarks | 5 | shipped | pn_1d, pn_1d_bias, pn_1d_bias_reverse, mos_2d, resistor_3d |
-| Conservation / mesh convergence | 1D | shipped | charge neutrality, Cauchy rates >= 1.8/doubling |
-| Test suite | pure + FEM | shipped | 206 tests, 95.58% coverage |
+| Result artifact writer + manifest (M9) | n/a | shipped | semi-run CLI; manifest.v1.json schema |
+| HTTP server POST /solve, GET /runs/{id} (M10) | n/a | shipped | integration tests; WebSocket progress |
+| Schema versioning + UI-facing companion (M11) | n/a | shipped | schema_version gate; SCHEMA_SUPPORTED_MINOR |
+| Mesh input beyond axis-aligned boxes (M12) | 2D | shipped | MOSFET 2D verifier within ±20% |
+| Transient solver BDF1/BDF2 Slotboom (M13/M13.1) | 1D | shipped | steady-state-limit + BDF rate + pn_1d_turnon (5%) |
+| AC small-signal analysis (M14) | 1D / 2D | shipped | RC benchmark within 0.4% of analytical C_dep |
+| Differential capacitance via AC admittance (M14.1) | 2D | shipped | mos_cap_ac vs mos_cv on Q_gate (byte-identical) |
+| Test suite | pure + FEM | shipped | 328 tests, coverage >= 92% (CI gate) |
 | V&V | 10 studies | shipped | 62/62 PASS |
-| CI | lint+test+FEM | shipped | green on dev and main |
+| CI | pure-python + lint + docker-fem (parallelized) | shipped | green on main |
 
 ## Scope vs. COMSOL Semiconductor Module
 
-kronos-semi covers the quasi-static, steady-state subset of the COMSOL Semiconductor Module:
+kronos-semi covers the quasi-static steady-state and time-dependent subsets of the COMSOL Semiconductor Module, plus AC small-signal analysis:
 
 **In scope (shipped):**
 - Poisson equation with multi-region dielectric (Si/SiO2)
@@ -36,17 +41,18 @@ kronos-semi covers the quasi-static, steady-state subset of the COMSOL Semicondu
 - 3D unstructured tetrahedral meshes via gmsh .msh files
 - Bias sweeps with adaptive step-size continuation
 - Method-of-Manufactured-Solutions and conservation V&V suite
+- Transient (time-dependent) solver with BDF1/BDF2 (M13/M13.1)
+- AC small-signal analysis with frequency sweep (M14)
+- Differential capacitance via AC admittance (M14.1)
 
-**Explicitly out of scope (post-submission stretch goals):**
-- Caughey-Thomas or Lombardi field-dependent mobility
-- Auger and radiative recombination
-- Fermi-Dirac statistics (Boltzmann throughout)
-- AC small-signal analysis
-- Transient (time-dependent) solver
-- Band-to-band or trap-assisted tunneling
-- Heterojunctions and position-dependent band structure
-- Schottky contacts
-- Full MOSFET, FinFET, or 3D transistor geometries
+**Explicitly out of scope (post-submission stretch goals, M15–M17 planned):**
+- Caughey-Thomas / Lombardi field-dependent mobility (M16.1, M16.2)
+- Auger and radiative recombination (M16.3)
+- Fermi-Dirac statistics — Boltzmann throughout (M16.4)
+- Band-to-band / trap-assisted tunneling (M16.6)
+- Heterojunctions (M17)
+- Schottky contacts (M16.5)
+- Full FinFET / 3D transistor geometries (depends on M15 GPU)
 
 ## JSON input contract
 
@@ -58,9 +64,9 @@ Each benchmark notebook opens from a Colab badge. The first cell installs FEniCS
 
 ## Delivery history
 
-The milestone entries below record the per-day goal, deliverables, verification criteria, and dependencies for the eight shipped milestones. This is the historical record of how each capability was built; the capability matrix above is the concise entry point for reviewers.
+The milestone entries below record the per-day goal, deliverables, verification criteria, and dependencies for all shipped milestones (M1–M14.1). This is the historical record of how each capability was built; the capability matrix above is the concise entry point for reviewers.
 
-Read `PLAN.md` for the current in-flight task.
+Read `PLAN.md` for the current in-flight task and `docs/IMPROVEMENT_GUIDE.md` for the full milestone specs for M15, M16, and M17.
 
 ## M1: Equilibrium Poisson, 1D pn junction, Docker env
 
@@ -432,10 +438,8 @@ contributors and reviewers know the intended direction.
 - **Fermi-Dirac statistics:** needed for degeneracy in source/drain
   regions and for wide-gap materials at low temperature.
 - **Incomplete dopant ionization:** freeze-out effects at low T.
-- **AC small-signal:** linearized frequency response around a DC
-  operating point; enables impedance and C-V analysis.
-- **Transient solver:** time-dependent drift-diffusion for
-  switching analysis.
+- **AC small-signal:** Shipped in M14 — no longer a stretch goal.
+- **Transient solver:** Shipped in M13/M13.1 — no longer a stretch goal.
 - **Band-to-band and trap-assisted tunneling:** breakdown and gate
   leakage.
 - **Heterojunctions:** multi-semiconductor stacks (GaAs/AlGaAs,
@@ -446,3 +450,171 @@ contributors and reviewers know the intended direction.
   meshing, plus whatever new physics the above stretch goals bring.
 - **GUI or web frontend:** a JavaScript SPA that builds the JSON
   input interactively and streams results back.
+
+## M9: Result artifact writer
+
+- **Status:** Done (2026-04-23). See PLAN.md completed work log and PR #12.
+- **Goal:** Persist every simulation result to disk in a reproducible
+  manifest-plus-artifact layout so downstream consumers (HTTP server,
+  UI, notebooks) can read results without re-running the solver.
+- **Deliverables:**
+  - `semi/io/artifact.py` — writes field arrays and IV tables as
+    NumPy `.npy` files alongside a `manifest.json` that records
+    solver config, version, and output paths.
+  - `schemas/manifest.v1.json` — JSON Schema for the manifest;
+    major-version gate mirrors the input schema gate.
+  - `semi-run` CLI entry point (`pyproject.toml scripts`) that runs
+    a JSON config and writes the artifact bundle to `--output-dir`.
+- **Verification:**
+  - Pure-Python tests for artifact round-trip (write → load → compare).
+  - 238 tests pass, coverage 95.5%.
+- **Dependencies:** M8.
+
+## M10: HTTP server
+
+- **Status:** Done (2026-04-23). See PLAN.md completed work log and PR #13.
+- **Goal:** Expose the solver over HTTP so the future UI (separate
+  repo) can drive simulations without installing the Python package.
+- **Deliverables:**
+  - `kronos_server/` top-level package with a FastAPI app.
+  - `POST /solve` — accepts a JSON config, queues a solve, returns a
+    run ID.
+  - `GET /runs/{id}` — returns the run status and artifact paths.
+  - WebSocket progress endpoint for live iteration feedback.
+- **Verification:**
+  - Integration tests for the HTTP endpoints.
+  - `docker compose run --rm server` starts without error.
+- **Dependencies:** M9.
+
+## M11: Schema versioning + UI-facing schema companion
+
+- **Status:** Done (2026-04-23). See PLAN.md completed work log and PR #14.
+- **Goal:** Decouple the JSON schema from the Python source so the UI
+  can load it without importing the engine; add semver gating so old
+  configs fail loudly on a breaking schema change.
+- **Deliverables:**
+  - `schemas/input.v1.json` — verbatim Draft-07 schema extracted from
+    `semi/schema.py`.
+  - `semi/schema.py` now loads `schemas/input.v1.json` at import time;
+    `ENGINE_SUPPORTED_SCHEMA_MAJOR = 1`, `SCHEMA_SUPPORTED_MINOR` tracks
+    minor bumps.
+  - `schema_version` (semver) field in every config; major-version gate
+    in `semi.schema.validate`.
+  - `GET /schema` returns `{schema, version, supported_major}`.
+  - `_fill_defaults` migrated into the schema `default`/`examples` fields.
+  - `tests/test_schema_versioning.py` — 8 pure-Python tests.
+- **Verification:**
+  - 238 tests pass, coverage 95.5%, ruff clean.
+- **Dependencies:** M10.
+
+## M12: MOSFET n+ doping + SNES tolerance amendment (ADR 0008)
+
+- **Status:** Done (2026-04-25). See PLAN.md completed work log, PR #18,
+  and `docs/adr/0008-snes-tolerances.md`.
+- **Goal:** Support Gaussian implant profiles for realistic source/drain
+  regions; amend SNES tolerances to handle the high-contrast doping
+  (see ADR 0008).
+- **Deliverables:**
+  - Gaussian doping profile builder in `semi/doping.py`.
+  - Relaxed default SNES tolerances documented in ADR 0008.
+  - `benchmarks/mosfet_2d/` — 2D MOSFET with n+ source/drain implants.
+  - MOSFET 2D verifier (`scripts/run_benchmark.py mosfet_2d`) checking
+    threshold voltage and subthreshold slope within ±20%.
+- **Verification:**
+  - All existing benchmarks still green.
+  - MOSFET 2D verifier exits 0.
+- **Dependencies:** M11.
+
+## M13: Transient solver — BDF1/BDF2 (ADR 0009, ADR 0010)
+
+- **Status:** Done (2026-04-25), superseded by M13.1 for Slotboom form.
+  See PLAN.md completed work log and `docs/adr/0009-transient-formulation.md`
+  (superseded), `docs/adr/0010-bdf-time-integration.md`.
+- **Goal:** Time-dependent drift-diffusion with BDF1/BDF2 time integration
+  for diode turn-on and switching analysis.
+- **Deliverables:**
+  - `semi/runners/transient.py` — BDF1/BDF2 time-stepper with
+    configurable dt, t_end, and step output.
+  - `benchmarks/pn_1d_turnon/` — 1D diode turn-on from 0 to 0.6 V
+    over 500 ns; reference vs analytical exponential approach to SS.
+  - `semi/fem/mass.py` — lumped mass matrix for the capacitive term.
+  - BDF rate tests in `tests/fem/test_bdf_rates.py`.
+- **Verification:**
+  - Steady-state-limit test: transient at t → ∞ matches bias_sweep
+    within tolerance.
+  - BDF1/BDF2 rate tests: temporal convergence 1st / 2nd order.
+- **Dependencies:** M12.
+
+## M13.1: Transient close-out — Slotboom primary unknowns (ADR 0012, 0013, 0014)
+
+- **Status:** Done (2026-04-27). PRs #44, #45, #46, #47, #54; tag v0.14.1.
+  See `docs/adr/0012-sg-primitives.md`, `docs/adr/0013-bc-ramp-continuation.md`,
+  `docs/adr/0014-slotboom-transient.md`.
+- **Goal:** Close the xfailed `test_transient_steady_state_limit` and BDF
+  rate tests by switching the transient runner to Slotboom primary unknowns
+  (psi, phi_n, phi_p) and fixing the MUMPS rank-deficiency failure.
+- **Deliverables:**
+  - `semi/fem/scharfetter_gummel.py`, `semi/fem/sg_assembly.py` — SG flux
+    primitives (ADR 0012).
+  - BC-ramp continuation in `run_transient` (ADR 0013): smooth initial
+    condition ramp from equilibrium to the target voltage.
+  - Slotboom transient formulation in `run_transient` (ADR 0014);
+    supersedes ADR 0009.
+  - `solver.jacobian_shift` config field + direct petsc4py MUMPS workspace
+    bump (`mat_mumps_icntl_14=200`) for the rank-deficient minority-side
+    row in deep p-bulk.
+- **Verification:**
+  - `test_transient_steady_state_limit`: bias_sweep vs transient at deep SS
+    within 1e-4 relative error.
+  - BDF1/BDF2 rate tests: active (no xfail), pass.
+  - `pn_1d_turnon` benchmark within 5%.
+- **Dependencies:** M13.
+
+## M14: AC small-signal analysis (ADR 0011)
+
+- **Status:** Done (2026-04-26). See PLAN.md completed work log and
+  `docs/adr/0011-ac-small-signal.md`.
+- **Goal:** Linearised frequency-domain response (J + jωM) δu = −dF/dV δV
+  solved via real 2×2 block factorisation; enable C-V analysis without
+  running a time-domain simulation.
+- **Deliverables:**
+  - `semi/runners/ac_sweep.py` — AC sweep runner.
+  - `schemas/input.v1.json` updated to schema version 1.2.0
+    (`solver.type = "ac_sweep"`, `solver.dc_bias`, `solver.ac`).
+  - `benchmarks/rc_ac_sweep/` — 1D pn diode at V_DC = -1 V; depletion
+    capacitance vs analytical within 0.4%.
+  - `tests/mms/test_ac_consistency.py` — three AC formulation invariants.
+- **Verification:**
+  - RC benchmark depletion capacitance within 0.4% of analytical.
+  - AC MMS consistency tests pass.
+  - 249 tests (pre-audit), coverage 95.x%, ruff clean.
+- **Dependencies:** M13.1.
+
+## M14.1: Differential capacitance via AC admittance (PR #38)
+
+- **Status:** Done (2026-04-26). PR #38.
+- **Goal:** Add a `mos_cap_ac` runner that computes MOS differential
+  capacitance from Im(Y) / (2πf) so the mos_2d C-V benchmark can be
+  verified by the AC path as well as the numerical dQ/dV path.
+- **Deliverables:**
+  - `semi/runners/mos_cap_ac.py` — `run_mos_cap_ac` runner.
+  - Integration of `mos_cap_ac` into the `mos_2d` benchmark verifier.
+  - `tests/fem/test_mos_cap_ac.py` — byte-identity claim: mos_cv and
+    mos_cap_ac agree on Q_gate to machine precision.
+- **Verification:**
+  - Phase 1 audit case 03 confirms byte-identity (rel_err = 0.000 at all
+    42 gate voltages).
+- **Dependencies:** M14.
+
+## Forward-looking
+
+See `PLAN.md` for the active "Next task" and milestone progression.
+See `docs/IMPROVEMENT_GUIDE.md` for the full milestone specs for M15
+(GPU / solver acceleration), M16 (physics additions: field-dependent
+mobility, Fermi-Dirac, additional recombination), and M17
+(heterojunctions).
+
+This file (`ROADMAP.md`) is the "what does this project do" document
+and is updated when milestones merge. `PLAN.md` tracks active work.
+`IMPROVEMENT_GUIDE.md` defines the acceptance criteria for future
+milestones.

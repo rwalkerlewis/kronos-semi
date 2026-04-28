@@ -88,19 +88,25 @@ M15 through M18. Summary:
 
 ## Next task
 
-**Physics validation suite, Phase 1: cross-runner consistency audit.**
-Six audit cases (under `tests/audit/`, `pytest -m audit`) compare
-runners against each other on shared problems: bias_sweep vs
-transient at deep steady state, AC sweep at omega=0 vs bias_sweep
-DC sensitivity, mos_cv vs mos_cap_ac on Q_gate, equilibrium vs
-bias_sweep at V=0, AC sweep terminal current vs bias_sweep dI/dV,
-and transient with sinusoidal bias (FFT) vs ac_sweep at the same
-frequency. Findings written to `docs/PHYSICS_AUDIT.md`. Bugs found
-that are small (<50 lines) get fixed in the same PR; larger
-findings open tracking issues. Phases 2 (external validation
-against Sze and Nicollian-Brews) and 3 (adversarial robustness)
-follow in subsequent PRs. M15 (GPU backend) is deferred until the
-validation suite has run.
+**Physics validation suite — address Phase 1 findings and begin Phase 2.**
+Phase 1 audit is complete (results in `docs/PHYSICS_AUDIT.md`). The
+three open items from Phase 1 are:
+
+1. **AC sign convention (C-level, Cases 02 and 05):** `_eval_linearised_conduction_current`
+   in `semi/runners/ac_sweep.py` reports Re(Y) with opposite sign to
+   `evaluate_current_at_contact` in `semi/postprocess.py`. Investigate
+   the outward-normal orientation in the linearised current integral and
+   fix before Phase 2.
+2. **Case 01 IV tracking:** bias_sweep configured without a sweep
+   contact records `J = 0`; the IV relative-error column in case 01 is
+   an artifact (see `docs/PHYSICS_AUDIT.md` Notes section). Fix by
+   using `contacts[*].voltage_sweep` in the test config.
+3. **Case 06 (transient FFT):** needs a `bc_voltage_callback` hook in
+   `run_transient`; deferred to a future feature PR.
+
+Phase 2 (external validation against Sze and Nicollian-Brews) and
+Phase 3 (adversarial robustness) follow once item 1 is resolved. M15
+(GPU backend) is deferred until the full validation suite has run.
 
 ## Roadmap
 
