@@ -29,8 +29,128 @@ DEFAULT_PETSC_OPTIONS = {
 }
 
 
+# Option keys that dolfinx 0.10's NonlinearProblem stores in the PETSc
+# options database under the SNES prefix but that PETSc never consumes
+# from there. The MUMPS factor matrix is created lazily during PCSetUp,
+# after SNESSetFromOptions has already run, so any
+# `<prefix>mat_mumps_*` / `<prefix>pc_factor_*` entries are reported as
+# "Option left" at finalize and have no effect on the solve. We extract
+# these keys before passing the dict to NonlinearProblem and apply them
+# via the direct petsc4py API after construction (see
+# `_apply_factor_options`). The numeric suffix on the MUMPS keys is
+# the (i)cntl index PETSc/MUMPS uses (e.g. mat_mumps_cntl_3 -> CNTL(3),
+# the null-pivot threshold).
+_MUMPS_CNTL_PREFIX = "mat_mumps_cntl_"
+_MUMPS_ICNTL_PREFIX = "mat_mumps_icntl_"
+_PC_FACTOR_DIRECT_KEYS = {
+    "pc_factor_zeropivot",
+    "pc_factor_shift_type",
+    "pc_factor_shift_amount",
+}
+
+
+def _split_factor_options(opts: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """
+    Separate factor-matrix / MUMPS direct-API options from the rest.
+
+    Returns ``(rest, factor_opts)`` where ``rest`` is the dict to hand
+    to NonlinearProblem (consumed by SNES/KSP setFromOptions normally)
+    and ``factor_opts`` collects the keys we will apply after the
+    problem is constructed.
+    """
+    rest: dict[str, Any] = {}
+    factor: dict[str, Any] = {}
+    for k, v in opts.items():
+        if k in _PC_FACTOR_DIRECT_KEYS:
+            factor[k] = v
+        elif k.startswith(_MUMPS_CNTL_PREFIX) or k.startswith(_MUMPS_ICNTL_PREFIX):
+            factor[k] = v
+        else:
+            rest[k] = v
+    return rest, factor
+
+
+def _apply_factor_options(snes, factor_opts: dict[str, Any]) -> None:
+    """
+    Apply pc-factor and MUMPS controls via the direct petsc4py API.
+
+    Forces the factor matrix to exist (PCFactorSetUpMatSolverType) and
+    then sets the requested controls. Safe no-op when ``factor_opts``
+    is empty.
+    """
+    if not factor_opts:
+        return
+    from petsc4py import PETSc
+
+    ksp = snes.getKSP()
+    pc = ksp.getPC()
+    # Required so the factor matrix is materialised before we ask for it.
+    pc.setFactorSetUpSolverType()
+
+    shift_type = factor_opts.get("pc_factor_shift_type")
+    shift_amount = factor_opts.get("pc_factor_shift_amount")
+    if shift_type is not None or shift_amount is not None:
+        st = None
+        if shift_type is not None:
+            st = getattr(PETSc.Mat.FactorShiftType, str(shift_type).upper())
+        pc.setFactorShift(
+            shift_type=st,
+            amount=float(shift_amount) if shift_amount is not None else None,
+        )
+    if "pc_factor_zeropivot" in factor_opts:
+        pc.setFactorPivot(float(factor_opts["pc_factor_zeropivot"]))
+
+    # MUMPS controls require the factor matrix.
+    needs_mumps = any(
+        k.startswith(_MUMPS_CNTL_PREFIX) or k.startswith(_MUMPS_ICNTL_PREFIX)
+        for k in factor_opts
+    )
+    if not needs_mumps:
+        return
+    Fmat = pc.getFactorMatrix()
+    for k, v in factor_opts.items():
+        if k.startswith(_MUMPS_CNTL_PREFIX):
+            idx = int(k[len(_MUMPS_CNTL_PREFIX):])
+            Fmat.setMumpsCntl(idx, float(v))
+        elif k.startswith(_MUMPS_ICNTL_PREFIX):
+            idx = int(k[len(_MUMPS_ICNTL_PREFIX):])
+            Fmat.setMumpsIcntl(idx, int(v))
+
+
+def _install_jacobian_shift(snes, epsilon: float) -> None:
+    """
+    Wrap the SNES Jacobian callback to add ``epsilon * I`` to the
+    assembled operator before the linear solve.
+
+    Used by the transient runner to regularise rank-deficient (phi_n)
+    / (phi_p) rows in the Slotboom continuity Jacobian where the
+    minority carrier density is below floating-point precision (deep
+    p-bulk / n-bulk respectively). Without the shift MUMPS reports
+    null pivots and the returned Newton update has unbounded
+    components in those rows, sending exp(psi - phi_n) to infinity
+    and the next residual evaluation to NaN. The shift is small
+    enough that it does not affect the converged solution at the
+    tolerances used here.
+    """
+    if epsilon is None or epsilon == 0.0:
+        return
+    J_mat, P_mat, jac_callback = snes.getJacobian()
+    orig_J_fn, orig_args, orig_kwargs = jac_callback
+    args = orig_args or ()
+    kwargs = orig_kwargs or {}
+
+    def shifted_jacobian(snes_, X, J, P):
+        orig_J_fn(snes_, X, J, P, *args, **kwargs)
+        J.shift(epsilon)
+        if P.handle != J.handle:
+            P.shift(epsilon)
+
+    snes.setJacobian(shifted_jacobian, J_mat, P_mat)
+
+
 def solve_nonlinear(F, u, bcs: list, prefix: str,
-                    petsc_options: dict[str, Any] | None = None):
+                    petsc_options: dict[str, Any] | None = None,
+                    jacobian_shift: float = 0.0):
     """
     Solve a nonlinear variational problem F(u; v) = 0.
 
@@ -46,6 +166,12 @@ def solve_nonlinear(F, u, bcs: list, prefix: str,
         PETSc options prefix. Must be unique per problem (required in 0.10+).
     petsc_options : dict, optional
         Override DEFAULT_PETSC_OPTIONS.
+    jacobian_shift : float, optional
+        If non-zero, add ``jacobian_shift * I`` to the assembled
+        Jacobian on every Newton step. Use this to regularise
+        formulations with locally rank-deficient rows (the Slotboom
+        transient time-loop is the canonical caller; see
+        ``_install_jacobian_shift``). Default ``0.0`` (no shift).
 
     Returns
     -------
@@ -57,13 +183,16 @@ def solve_nonlinear(F, u, bcs: list, prefix: str,
     opts = dict(DEFAULT_PETSC_OPTIONS)
     if petsc_options:
         opts.update(petsc_options)
+    rest, factor_opts = _split_factor_options(opts)
 
     problem = NonlinearProblem(
         F, u,
         bcs=bcs,
         petsc_options_prefix=prefix,
-        petsc_options=opts,
+        petsc_options=rest,
     )
+    _apply_factor_options(problem.solver, factor_opts)
+    _install_jacobian_shift(problem.solver, jacobian_shift)
     problem.solve()
     reason = problem.solver.getConvergedReason()
     n_iter = problem.solver.getIterationNumber()
@@ -84,6 +213,7 @@ def solve_nonlinear_block(
     petsc_options: dict[str, Any] | None = None,
     kind: str | None = None,
     entity_maps: list | None = None,
+    jacobian_shift: float = 0.0,
 ):
     """
     Solve a coupled block nonlinear problem via SNES.
@@ -114,6 +244,12 @@ def solve_nonlinear_block(
         (for example, when psi lives on the parent mesh and phi_n /
         phi_p live on a semiconductor submesh). `None` (the default)
         leaves the single-region path unchanged.
+    jacobian_shift : float, optional
+        Add ``jacobian_shift * I`` to the assembled block Jacobian on
+        every Newton step. Used by the transient runner (~1e-12) to
+        keep the LU factorisation well-defined where the Slotboom
+        continuity equation has rank-deficient minority-side rows.
+        Default ``0.0``.
 
     Returns
     -------
@@ -125,11 +261,12 @@ def solve_nonlinear_block(
     opts = dict(DEFAULT_PETSC_OPTIONS)
     if petsc_options:
         opts.update(petsc_options)
+    rest, factor_opts = _split_factor_options(opts)
 
     np_kwargs: dict[str, Any] = dict(
         bcs=list(bcs),
         petsc_options_prefix=prefix,
-        petsc_options=opts,
+        petsc_options=rest,
         kind=kind,
     )
     if entity_maps is not None:
@@ -139,6 +276,8 @@ def solve_nonlinear_block(
         list(F_list), list(u_list),
         **np_kwargs,
     )
+    _apply_factor_options(problem.solver, factor_opts)
+    _install_jacobian_shift(problem.solver, jacobian_shift)
     problem.solve()
     reason = problem.solver.getConvergedReason()
     n_iter = problem.solver.getIterationNumber()
