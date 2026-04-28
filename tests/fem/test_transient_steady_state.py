@@ -23,8 +23,6 @@ Configuration used
 """
 from __future__ import annotations
 
-import pytest
-
 _L = 2.0e-6    # device length, m
 _TAU = 1.0e-9  # short lifetime for fast convergence to steady state, s
 _V_F = 0.3     # forward bias, V
