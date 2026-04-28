@@ -407,11 +407,25 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
         # delta_D = -eps * grad(delta_psi); the displacement-evaluator
         # returns Q_psi = +eps * grad(delta_psi).n_outward, so the
         # contact-outward displacement field is -Q_psi. Therefore
-        #   I_disp = j*omega * delta_D_outward = -j*omega * Q_psi
-        # I_total = I_cond - j*omega*(Q_re + j*Q_im)
-        #         = (I_cond_re + omega*Q_im) + j*(I_cond_im - omega*Q_re)
-        I_total_re = I_cond_re + omega * Q_psi_im
-        I_total_im = I_cond_im - omega * Q_psi_re
+        #   I_disp_out = j*omega * delta_D_outward = -j*omega * Q_psi
+        # I_total_out = I_cond_out - j*omega*(Q_re + j*Q_im)
+        #             = (I_cond_re + omega*Q_im) + j*(I_cond_im - omega*Q_re)
+        # The conduction-current evaluator and the displacement evaluator
+        # both contract with the FE FacetNormal (outward), so I_total_out
+        # is the small-signal terminal current flowing OUT of the device.
+        # bias_sweep / postprocess.evaluate_current_at_contact reports
+        # dI/dV with the opposite sign (positive at forward bias);
+        # algebraically, in (n,p)-primary form the linearised conduction
+        # current d(J_bs)/dV = -[delta_J_n_out + delta_J_p_out] (the two
+        # forms differ by a global sign because Slotboom phi_n carries the
+        # opposite sign to the (n,p)-primary outward flux; see ADR 0011
+        # "Errata"). To produce a Y in the same convention as
+        # bias_sweep -- so that Re(Y(omega->0)) == dI/dV at the same V_DC
+        # -- we negate the assembled OUT-convention current. With this
+        # convention an ideal capacitor has Y = +j*omega*C and the
+        # corresponding capacitance read-out is C = +Im(Y)/(2*pi*f).
+        I_total_re = -(I_cond_re + omega * Q_psi_im)
+        I_total_im = -(I_cond_im - omega * Q_psi_re)
 
         Y = complex(I_total_re, I_total_im)
         Y_list.append(Y)
@@ -422,15 +436,12 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
             Z_list.append(1.0 / Y)
 
         if f > 0.0:
-            # Sign convention: terminal current Y is reported with the
-            # "positive = current OUT of device" convention used by
-            # bias_sweep / postprocess.evaluate_current_at_contact. In
-            # that convention a pure capacitor has Y = -j*omega*C (the
-            # circuit-side I_into_contact has Y = +j*omega*C; flipping
-            # to OUT-of-contact flips the sign). So a positive
-            # depletion capacitance maps to negative Im(Y), and the
-            # capacitance is C = -Im(Y) / (2*pi*f).
-            C_list.append(-Y.imag / (2.0 * math.pi * float(f)))
+            # Convention: Y is reported with the "positive = current INTO
+            # device" sign used by bias_sweep / postprocess
+            # .evaluate_current_at_contact. An ideal capacitor terminal
+            # has Y = +j*omega*C, so a positive depletion capacitance
+            # maps to a positive Im(Y) and C = +Im(Y)/(2*pi*f).
+            C_list.append(Y.imag / (2.0 * math.pi * float(f)))
         else:
             C_list.append(0.0)
         G_list.append(Y.real)
@@ -746,8 +757,10 @@ def _eval_linearised_conduction_current(
 
     # Conduction current density (linearised) dotted with the FE
     # FacetNormal, which already points OUT of the computational domain
-    # at boundary facets. This matches the sign convention used by
-    # postprocess.evaluate_current_at_contact (no outward_sign factor).
+    # at boundary facets. This produces the OUT-of-device current; the
+    # runner negates Y at assembly to convert to the INTO-device
+    # convention used by bias_sweep / postprocess (see ADR 0011 Errata
+    # and the assembly site in run_ac_sweep).
     Jn_lin = (
         Q * mu_n_SI * V_t * ufl.dot(grad_dn_phys, n_vec)
         - Q * mu_n_SI * (
@@ -813,11 +826,14 @@ def _eval_displacement_charge(
         eps_r_v = eps_r
 
     grad_dpsi_phys = sc.V0 * ufl.grad(psi_pert_fn)
-    # D_n = eps0 * eps_r * grad(psi).n_FE. n_FE = FacetNormal points
-    # outward from the computational domain at boundary facets, so the
-    # sign matches the conduction-current evaluator (which also uses
-    # n_FE without an outward_sign correction; see
-    # postprocess.evaluate_current_at_contact).
+    # Q_psi = eps0 * eps_r * grad(delta_psi).n_FE / area. n_FE points
+    # outward from the computational domain at boundary facets. The
+    # physical displacement field is D = -eps*grad(psi), so the
+    # outward-D-field is -Q_psi and the OUT-of-device displacement
+    # current at the contact is I_disp_out = -j*omega*Q_psi. As with
+    # the conduction-current evaluator, the runner converts the
+    # OUT-convention total current to the bias_sweep INTO convention by
+    # negating Y at assembly.
     D_n_form = EPS0 * eps_r_v * ufl.dot(grad_dpsi_phys, n_vec)
     form_Q = fem.form(D_n_form * ds)
     form_A = fem.form(1.0 * ds)
