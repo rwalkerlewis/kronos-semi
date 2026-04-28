@@ -88,19 +88,22 @@ M15 through M18. Summary:
 
 ## Next task
 
-**Physics validation suite, Phase 1: cross-runner consistency audit.**
-Six audit cases (under `tests/audit/`, `pytest -m audit`) compare
-runners against each other on shared problems: bias_sweep vs
-transient at deep steady state, AC sweep at omega=0 vs bias_sweep
-DC sensitivity, mos_cv vs mos_cap_ac on Q_gate, equilibrium vs
-bias_sweep at V=0, AC sweep terminal current vs bias_sweep dI/dV,
-and transient with sinusoidal bias (FFT) vs ac_sweep at the same
-frequency. Findings written to `docs/PHYSICS_AUDIT.md`. Bugs found
-that are small (<50 lines) get fixed in the same PR; larger
-findings open tracking issues. Phases 2 (external validation
-against Sze and Nicollian-Brews) and 3 (adversarial robustness)
-follow in subsequent PRs. M15 (GPU backend) is deferred until the
-validation suite has run.
+**Physics validation suite, Phase 2: external validation against textbook
+references.** Phase 1 (cross-runner consistency audit) shipped in the
+audit + ROADMAP refresh PR; results are recorded in
+[`docs/PHYSICS_AUDIT.md`](docs/PHYSICS_AUDIT.md). Headline Phase 1
+findings: M13.1 close-out confirmed at 1e-4 across V_F in {0.1, 0.3,
+0.5} V (case 01); M14.1 byte-identity confirmed (case 03);
+equilibrium / bias_sweep BC convention agrees (case 04). One Class C
+finding deferred to a tracking issue: AC Re(Y) vs bias_sweep dI/dV
+diverge in forward-bias high-injection (case 05). Case 06 deferred to
+a separate issue (`run_transient` does not yet accept a time-varying
+contact voltage). Phase 2 compares the engine against published
+analytical and numerical references (Sze, Nicollian-Brews) on
+canonical devices: pn diode IV (forward and reverse), MOS C-V across
+the depletion-inversion transition, BJT IB-IC characteristic. Phase 3
+(adversarial robustness) follows. M15 (GPU backend) remains deferred
+until the validation suite has run.
 
 ## Roadmap
 
@@ -216,6 +219,33 @@ items.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **Physics validation Phase 1 + ROADMAP refresh (2026-04-28):** Phase 1
+  audit suite scaffolded in PR #55 populated with real findings.
+  Five active cases ran on dolfinx 0.10.0.post2; case 06 skipped per
+  scaffolding (transient runner needs a `bc_voltage_callback` hook to
+  drive a time-varying contact voltage). Headline findings:
+  case 01 (bias_sweep vs transient deep SS) within 1e-4 relative
+  across V_F in {0.1, 0.3, 0.5} V, formalising the M13.1 close-out
+  across multiple operating points; case 03 (mos_cv vs mos_cap_ac
+  on Q_gate) byte-identical at 0.0 relative error, confirming PR
+  #38's claim; case 04 (equilibrium vs bias_sweep at V=0) gauge
+  offset numerically zero, confirming the shared `arcsinh`-based
+  ohmic BC; case 02 (AC ω→0 vs bias_sweep dI/dV at V=-1 V) within
+  7.2 % (Class B); case 05 (AC Re(Y) vs bias_sweep dI/dV at V=+0.4 V
+  forward) 121 % (Class C, deferred to a tracking issue — real
+  inconsistency between the linearised AC operator and DC nonlinear
+  sensitivity in high-injection). Five small bugs in the audit
+  scaffolding fixed in `tests/audit/_helpers.py`,
+  `tests/audit/conftest.py`, and the case files (no `semi/` runner
+  code modified). `docs/ROADMAP.md` rewritten: capability matrix
+  expanded from end-of-M8 to end-of-M14.1 (eight new rows including
+  M9 artifact writer, M10 HTTP server, M11 schema versioning, M12
+  MOSFET-2D / SNES tols, M13 / M13.1 transient, M14 AC, M14.1
+  differential C); scope-vs-COMSOL lists corrected (transient and AC
+  moved out of "out of scope"); delivery history extended with M9
+  through M14.1 entries (eight new sections) linking to ADRs 0008,
+  0010, 0011, 0012, 0013, 0014 and PRs #38, #44-#52, #54.
 
 - **M13.1 (2026-04-27):** 1D transient close-out via Slotboom primary
   unknowns (ADR 0014), BC-ramp continuation (ADR 0013), SG primitives
