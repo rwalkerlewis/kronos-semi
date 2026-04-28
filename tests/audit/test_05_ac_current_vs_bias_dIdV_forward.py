@@ -81,5 +81,5 @@ def test_ac_terminal_current_vs_dIdV():
     # Audit assertion: pass unless there's a crash (NaN/Inf).
     # A large relative error here is a C-level finding (sign convention
     # difference between AC Y and DC dI/dV) documented in the CSV/MD above.
-    assert not math.isnan(G_ac) and not math.isnan(dIdV_bs), \
-        f"NaN in conductance: G_ac={G_ac}, dI/dV={dIdV_bs}"
+    assert math.isfinite(G_ac) and math.isfinite(dIdV_bs), \
+        f"Non-finite conductance: G_ac={G_ac}, dI/dV={dIdV_bs}"

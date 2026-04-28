@@ -93,5 +93,5 @@ def test_ac_omega0_vs_bias_dIdV():
     # At V_DC=-1V deep reverse bias the conductances are tiny and opposite
     # sign conventions between Y (AC) and dI/dV (DC) produce a large
     # relative error — this is a C-level finding documented above.
-    assert not math.isnan(G_ac) and not math.isnan(dIdV_bs), \
-        f"NaN in conductance: G_ac={G_ac}, dI/dV={dIdV_bs}"
+    assert math.isfinite(G_ac) and math.isfinite(dIdV_bs), \
+        f"Non-finite conductance: G_ac={G_ac}, dI/dV={dIdV_bs}"
