@@ -303,7 +303,9 @@ identically (they compare via absolute values and ratios).
 `result.C`, which is bit-identical because both `Im(Y)` and the
 read-out formula flipped sign together.
 
+## References
 
+- Selberherr, S. (1984). *Analysis and Simulation of Semiconductor
   Devices*. Springer. Chapter 7 §"Small-signal AC analysis".
 - Schenk, A. (1998). *Advanced Physical Models for Silicon Device
   Simulation*. Springer. Chapter 5 §"Linearised continuity equations

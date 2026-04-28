@@ -92,7 +92,7 @@ CSV: `/tmp/audit/06_transient_fft_vs_ac_sweep.csv`
 
 ### Issues opened / deferred
 
-- ~~**AC sign convention (Cases 02, 05)**~~: **Resolved** in this PR — see the Resolution section below.
+- **AC sign convention (Cases 02, 05)**: Resolved in this PR — see the Resolution section below.
 - **Case 01 IV comparison**: `bias_sweep` has no sweep contact when configured via baked `contacts[*].voltage` (no `voltage_sweep`), so `iv[-1]["J"] = 0`. The IV relative error of 2066% at V=0.5 V is an artifact, not a physics disagreement. Tracked separately.
 - **Case 06 (transient FFT)**: Needs a `bc_voltage_callback` hook in `run_transient`. Deferred to a future feature PR.
 
