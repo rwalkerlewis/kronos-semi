@@ -73,9 +73,10 @@ force-include = {"schemas" = "schemas"}
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -m 'not audit'"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "audit: physics validation audit suite (Phase 1 cross-runner consistency); deselected by default, run with `-m audit`",
 ]
 
 [tool.coverage.run]
