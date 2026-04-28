@@ -60,5 +60,16 @@ def pytest_sessionfinish(session, exitstatus):
         parts.append(frag.read_text())
         parts.append("\n\n---\n\n")
 
+    # Optional manual notes appended at the end of the regenerated
+    # document. The notes file is committed with the PR that records
+    # the audit findings; the per-case fragments above are the
+    # mechanical numerical record, while the notes are the narrative
+    # summary, classification, deferred issues, and recommendation.
+    notes_path = Path(__file__).resolve().parent / "notes_phase1.md"
+    if notes_path.exists():
+        parts.append(notes_path.read_text())
+        if not parts[-1].endswith("\n"):
+            parts.append("\n")
+
     PHYSICS_AUDIT_MD.parent.mkdir(parents=True, exist_ok=True)
     PHYSICS_AUDIT_MD.write_text("".join(parts))

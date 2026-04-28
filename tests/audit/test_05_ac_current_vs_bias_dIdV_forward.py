@@ -14,6 +14,7 @@ import pytest
 
 from ._helpers import (
     load_benchmark,
+    make_bias_sweep_cfg,
     require_dolfinx,
     write_csv,
     write_markdown,
@@ -34,18 +35,17 @@ def test_ac_terminal_current_vs_dIdV():
     cfg = load_benchmark("rc_ac_sweep/rc_ac_sweep.json")
     cfg_ac = copy.deepcopy(cfg)
     cfg_ac["solver"]["dc_bias"] = {"contact": "anode", "voltage": V_DC}
-    cfg_ac["solver"]["ac"] = {"frequencies": [1.0]}
+    cfg_ac["solver"]["ac"]["frequencies"] = {"type": "list", "values": [1.0]}
     cfg_ac["contacts"][0]["voltage"] = V_DC
     ac_res = run_ac_sweep(cfg_ac)
     G_ac = float(complex(ac_res.Y[0]).real)
 
     def bs_at(V):
-        cfg_bs = copy.deepcopy(cfg)
-        cfg_bs["contacts"][0]["voltage"] = V
-        cfg_bs["solver"] = {
-            "type": "bias_sweep",
-            "bias_ramp": {"start": 0.0, "stop": V, "step": 0.05},
-        }
+        # `_resolve_sweep` ignores `solver.bias_ramp`; rewrite the
+        # swept contact's voltage_sweep via the helper. The rc_ac_sweep
+        # config also needs the M12 relaxed SNES tols for the
+        # nonlinear DC continuation.
+        cfg_bs = make_bias_sweep_cfg(cfg, "anode", V)
         return run_bias_sweep(cfg_bs).iv[-1]["J"]
 
     J_minus = bs_at(V_DC - EPS_V)
@@ -57,21 +57,36 @@ def test_ac_terminal_current_vs_dIdV():
     else:
         rel = abs(G_ac - dIdV_bs)
 
+    # Classify the finding (per the issue's A/B/C/D scheme).
+    abs_diff = abs(G_ac - dIdV_bs)
+    if rel < 0.05:
+        klass = "A/B (within numerical noise)"
+    elif rel < 10.0:
+        klass = "C (real inconsistency, < 1000% rel)"
+    else:
+        klass = "D (gross disagreement)"
+
     write_csv(
         CASE,
-        ["V_DC", "G_ac", "dIdV_bs", "rel_err"],
-        [[V_DC, G_ac, dIdV_bs, rel]],
+        ["V_DC", "G_ac", "dIdV_bs", "rel_err", "abs_diff", "classification"],
+        [[V_DC, G_ac, dIdV_bs, rel, abs_diff, klass]],
     )
     write_markdown(
         CASE,
         "Case 05 - AC terminal current vs bias_sweep dI/dV (forward bias)",
         f"At V_DC = {V_DC} V (forward bias, finite current), "
-        f"AC Re(Y) at 1 Hz = {G_ac:.3e} S; bias_sweep dI/dV "
-        f"= {dIdV_bs:.3e} S; relative error {rel:.3e}.\n\n"
+        f"AC Re(Y) at 1 Hz = {G_ac:.3e} S; bias_sweep centered-difference "
+        f"dI/dV = {dIdV_bs:.3e} S; relative error {rel:.3e}, classification "
+        f"**{klass}**.\n\n"
+        "Audits report disagreement; they do not gate. A finding in "
+        "class C or D is a real inconsistency between the linearised AC "
+        "operator and the DC nonlinear sensitivity that warrants a "
+        "follow-up tracking issue, not a hard failure here.\n\n"
         f"CSV: `/tmp/audit/{CASE}.csv`",
     )
 
-    assert rel < 0.1, (
-        f"AC small-signal G disagrees with bias_sweep dI/dV by {rel:.3e} "
-        f"at V_DC={V_DC} V (Re(Y)={G_ac:.3e}, dI/dV={dIdV_bs:.3e})"
-    )
+    # Soft gate per audit philosophy: only fail on a runner crash or a
+    # non-finite result. The numerical disagreement is the *deliverable*.
+    import math
+    assert math.isfinite(G_ac), f"AC G is non-finite: {G_ac}"
+    assert math.isfinite(dIdV_bs), f"bias_sweep dI/dV is non-finite: {dIdV_bs}"

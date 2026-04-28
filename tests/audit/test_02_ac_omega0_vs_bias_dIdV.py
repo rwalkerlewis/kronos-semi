@@ -15,6 +15,7 @@ import pytest
 
 from ._helpers import (
     load_benchmark,
+    make_bias_sweep_cfg,
     require_dolfinx,
     write_csv,
     write_markdown,
@@ -33,28 +34,22 @@ def test_ac_omega0_vs_bias_dIdV():
     from semi.runners.bias_sweep import run_bias_sweep
 
     cfg_ac = load_benchmark("rc_ac_sweep/rc_ac_sweep.json")
-    # Restrict the sweep to one low-omega frequency for speed.
+    # Restrict the sweep to one low-omega frequency for speed. Preserve
+    # the contact/amplitude block and only override the frequency list.
     cfg_ac = copy.deepcopy(cfg_ac)
-    cfg_ac["solver"]["ac"] = {"frequencies": [1.0]}
+    cfg_ac["solver"]["ac"]["frequencies"] = {"type": "list", "values": [1.0]}
 
     ac_result = run_ac_sweep(cfg_ac)
     Y0 = complex(ac_result.Y[0])
     G_ac = float(Y0.real)
 
-    # Bias sweep finite difference: dI/dV at V_DC.
-    cfg_bs_minus = copy.deepcopy(cfg_ac)
-    cfg_bs_minus["solver"] = {
-        "type": "bias_sweep",
-        "bias_ramp": {"start": 0.0, "stop": V_DC - EPS_V, "step": -0.05},
-    }
-    cfg_bs_minus["contacts"][0]["voltage"] = V_DC - EPS_V
-
-    cfg_bs_plus = copy.deepcopy(cfg_ac)
-    cfg_bs_plus["solver"] = {
-        "type": "bias_sweep",
-        "bias_ramp": {"start": 0.0, "stop": V_DC + EPS_V, "step": -0.05},
-    }
-    cfg_bs_plus["contacts"][0]["voltage"] = V_DC + EPS_V
+    # Bias sweep finite difference: dI/dV at V_DC. Use the helper to
+    # rewrite the swept contact's voltage_sweep (run_bias_sweep ignores
+    # solver.bias_ramp) and inject the M12 relaxed SNES tols (the
+    # rc_ac_sweep config uses tighter tols suitable for the linear AC
+    # system but too tight for the nonlinear DC continuation).
+    cfg_bs_minus = make_bias_sweep_cfg(cfg_ac, "anode", V_DC - EPS_V)
+    cfg_bs_plus = make_bias_sweep_cfg(cfg_ac, "anode", V_DC + EPS_V)
 
     res_minus = run_bias_sweep(cfg_bs_minus)
     res_plus = run_bias_sweep(cfg_bs_plus)

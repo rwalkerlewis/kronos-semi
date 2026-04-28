@@ -18,7 +18,9 @@ import numpy as np
 import pytest
 
 from ._helpers import (
+    final_field,
     load_benchmark,
+    make_bias_sweep_cfg,
     relative_l2,
     require_dolfinx,
     write_csv,
@@ -26,7 +28,7 @@ from ._helpers import (
 )
 
 CASE = "01_bias_vs_transient_steady_state"
-BIASES = [0.3, 0.5]  # V_F values; deep SS for forward bias diode
+BIASES = [0.1, 0.3, 0.5]  # V_F values; deep SS for forward bias diode
 
 
 @pytest.mark.audit
@@ -40,13 +42,11 @@ def test_bias_sweep_vs_transient_steady_state():
 
     rows: list[list[float]] = []
     for V_F in BIASES:
-        # Bias sweep solve at V_F.
-        cfg_bs = copy.deepcopy(cfg_base)
-        cfg_bs["contacts"][0]["voltage"] = V_F
-        cfg_bs["solver"] = {
-            "type": "bias_sweep",
-            "bias_ramp": {"start": 0.0, "stop": V_F, "step": 0.05},
-        }
+        # Bias sweep solve at V_F. The pn_1d_turnon config is authored
+        # for the transient runner; reconfigure it for bias_sweep using
+        # the helper (rewrites the swept contact's voltage_sweep and
+        # injects M12-relaxed SNES tols where needed).
+        cfg_bs = make_bias_sweep_cfg(cfg_base, "anode", V_F)
         bs_result = run_bias_sweep(cfg_bs)
 
         # Transient with BC ramp + long t_end so the solution settles.
@@ -59,30 +59,17 @@ def test_bias_sweep_vs_transient_steady_state():
         cfg_tr["solver"]["output_every"] = 10000  # only need final
         tr_result = run_transient(cfg_tr)
 
-        # Pull last-snapshot fields (transient) and compare with bias_sweep
-        # final fields by L2 relative error. Both runners expose fields
-        # under .fields with keys "psi"/"n"/"p" (or "potential").
-        def last(field_name, fields):
-            keys = [field_name] + ([
-                "potential" if field_name == "psi" else field_name
-            ])
-            for k in keys:
-                if k in fields and len(fields[k]) > 0:
-                    return np.asarray(fields[k][-1])
-            raise KeyError(f"field {field_name} not in {list(fields.keys())}")
-
-        bs_fields = getattr(bs_result, "fields", {}) or {}
-        tr_fields = getattr(tr_result, "fields", {}) or {}
-
+        # Pull final fields from each runner. `bias_sweep` exposes
+        # `psi_phys`/`n_phys`/`p_phys` attributes; `transient` writes
+        # snapshot lists into `.fields`. `final_field` hides the
+        # difference.
         try:
-            psi_err = relative_l2(last("psi", tr_fields), last("psi", bs_fields))
-            n_err = relative_l2(last("n", tr_fields), last("n", bs_fields))
-            p_err = relative_l2(last("p", tr_fields), last("p", bs_fields))
+            psi_err = relative_l2(final_field(tr_result, "psi"), final_field(bs_result, "psi"))
+            n_err = relative_l2(final_field(tr_result, "n"), final_field(bs_result, "n"))
+            p_err = relative_l2(final_field(tr_result, "p"), final_field(bs_result, "p"))
         except KeyError as exc:
             pytest.fail(
-                f"{CASE}: required field missing from runner output: {exc}. "
-                f"bs_fields keys = {list(bs_fields)}; "
-                f"tr_fields keys = {list(tr_fields)}"
+                f"{CASE}: required field missing from runner output: {exc}"
             )
 
         # IV: take last current at the swept contact.
