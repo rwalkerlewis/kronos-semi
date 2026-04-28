@@ -9,6 +9,7 @@ relative comparisons are well-conditioned.
 from __future__ import annotations
 
 import copy
+import math
 
 import pytest
 
@@ -80,6 +81,5 @@ def test_ac_terminal_current_vs_dIdV():
     # Audit assertion: pass unless there's a crash (NaN/Inf).
     # A large relative error here is a C-level finding (sign convention
     # difference between AC Y and DC dI/dV) documented in the CSV/MD above.
-    import math
     assert not math.isnan(G_ac) and not math.isnan(dIdV_bs), \
         f"NaN in conductance: G_ac={G_ac}, dI/dV={dIdV_bs}"

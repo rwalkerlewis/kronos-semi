@@ -438,8 +438,8 @@ contributors and reviewers know the intended direction.
 - **Fermi-Dirac statistics:** needed for degeneracy in source/drain
   regions and for wide-gap materials at low temperature.
 - **Incomplete dopant ionization:** freeze-out effects at low T.
-- **AC small-signal:** ~~shipped in M14~~ — no longer a stretch goal.
-- **Transient solver:** ~~shipped in M13/M13.1~~ — no longer a stretch goal.
+- **AC small-signal:** Shipped in M14 — no longer a stretch goal.
+- **Transient solver:** Shipped in M13/M13.1 — no longer a stretch goal.
 - **Band-to-band and trap-assisted tunneling:** breakdown and gate
   leakage.
 - **Heterojunctions:** multi-semiconductor stacks (GaAs/AlGaAs,

@@ -9,6 +9,7 @@ paths.
 from __future__ import annotations
 
 import copy
+import math
 
 import numpy as np
 import pytest
@@ -92,7 +93,6 @@ def test_equilibrium_vs_bias_sweep_V0():
     # Audit assertion: only fail on clear crashes (NaN / gross disagreement).
     # A relative L2 > 0.01 (1%) for psi is a C-level finding worth
     # investigating in a follow-up; it should NOT stop this audit PR.
-    import math
     assert not math.isnan(e_psi) and not math.isnan(e_n) and not math.isnan(e_p), \
         f"NaN in field comparison: psi={e_psi}, n={e_n}, p={e_p}"
     assert e_psi < 0.1, f"psi disagrees by >10%: {e_psi:.3e} (C-level finding)"
