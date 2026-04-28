@@ -78,8 +78,17 @@ def test_ac_terminal_current_vs_dIdV():
         f"CSV: `/tmp/audit/{CASE}.csv`",
     )
 
-    # Audit assertion: pass unless there's a crash (NaN/Inf).
-    # A large relative error here is a C-level finding (sign convention
-    # difference between AC Y and DC dI/dV) documented in the CSV/MD above.
+    # Audit assertion: post sign-convention fix.  Re(Y) at low frequency
+    # must agree in sign with bias_sweep dI/dV; relative error within
+    # 5% (forward bias is more nonlinear than reverse, so a looser gate
+    # than Case 02's 1% is appropriate).
     assert math.isfinite(G_ac) and math.isfinite(dIdV_bs), \
         f"Non-finite conductance: G_ac={G_ac}, dI/dV={dIdV_bs}"
+    if dIdV_bs != 0.0:
+        assert (G_ac > 0) == (dIdV_bs > 0), (
+            f"Re(Y) and dI/dV disagree in sign: G_ac={G_ac}, dI/dV={dIdV_bs}"
+        )
+    assert rel < 0.05, (
+        f"Re(Y) vs dI/dV exceeds 5% tolerance: rel_err={rel:.3e} "
+        f"(G_ac={G_ac:.3e}, dI/dV={dIdV_bs:.3e})"
+    )

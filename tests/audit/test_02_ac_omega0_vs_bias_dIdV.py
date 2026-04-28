@@ -89,9 +89,17 @@ def test_ac_omega0_vs_bias_dIdV():
         f"CSV: `/tmp/audit/{CASE}.csv`",
     )
 
-    # Audit assertion: pass unless there's a crash (NaN/Inf).
-    # At V_DC=-1V deep reverse bias the conductances are tiny and opposite
-    # sign conventions between Y (AC) and dI/dV (DC) produce a large
-    # relative error — this is a C-level finding documented above.
+    # Audit assertion: post sign-convention fix (PR fixing M14 ac_sweep).
+    # Re(Y(omega->0)) must agree in sign with bias_sweep's centered-
+    # difference dI/dV at the same V_DC, and the magnitudes must match
+    # within 1% (Class A linearisation tolerance).
     assert math.isfinite(G_ac) and math.isfinite(dIdV_bs), \
         f"Non-finite conductance: G_ac={G_ac}, dI/dV={dIdV_bs}"
+    if dIdV_bs != 0.0:
+        assert (G_ac > 0) == (dIdV_bs > 0), (
+            f"Re(Y) and dI/dV disagree in sign: G_ac={G_ac}, dI/dV={dIdV_bs}"
+        )
+    assert rel_err < 0.01, (
+        f"Re(Y) vs dI/dV exceeds 1% tolerance: rel_err={rel_err:.3e} "
+        f"(G_ac={G_ac:.3e}, dI/dV={dIdV_bs:.3e})"
+    )

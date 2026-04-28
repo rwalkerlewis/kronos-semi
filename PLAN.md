@@ -89,14 +89,17 @@ M15 through M18. Summary:
 ## Next task
 
 **Physics validation suite — address Phase 1 findings and begin Phase 2.**
-Phase 1 audit is complete (results in `docs/PHYSICS_AUDIT.md`). The
-three open items from Phase 1 are:
+Phase 1 audit is complete (results in `docs/PHYSICS_AUDIT.md`). Open
+items from Phase 1:
 
-1. **AC sign convention (C-level, Cases 02 and 05):** `_eval_linearised_conduction_current`
-   in `semi/runners/ac_sweep.py` reports Re(Y) with opposite sign to
-   `evaluate_current_at_contact` in `semi/postprocess.py`. Investigate
-   the outward-normal orientation in the linearised current integral and
-   fix before Phase 2.
+1. ~~**AC sign convention (C-level, Cases 02 and 05):**~~ **Resolved.**
+   `run_ac_sweep` reported Y in the OUT-of-device convention while
+   `bias_sweep` reports terminal current INTO the device; the two
+   linearisations therefore disagreed in sign at the same DC operating
+   point. Fixed by a single global negation in the AC terminal-current
+   assembly with a matching flip in the C read-out, plus an Errata
+   section in ADR 0011. Cases 02 and 05 audit assertions tightened
+   from NaN-guards to sign-equality + 1% / 5% relative-error gates.
 2. **Case 01 IV tracking:** bias_sweep configured without a sweep
    contact records `J = 0`; the IV relative-error column in case 01 is
    an artifact (see `docs/PHYSICS_AUDIT.md` Notes section). Fix by
@@ -104,9 +107,10 @@ three open items from Phase 1 are:
 3. **Case 06 (transient FFT):** needs a `bc_voltage_callback` hook in
    `run_transient`; deferred to a future feature PR.
 
-Phase 2 (external validation against Sze and Nicollian-Brews) and
-Phase 3 (adversarial robustness) follow once item 1 is resolved. M15
-(GPU backend) is deferred until the full validation suite has run.
+Phase 2 (external validation against Sze and Nicollian-Brews) is now
+unblocked and is the next planned activity. Phase 3 (adversarial
+robustness) follows. M15 (GPU backend) is deferred until the full
+validation suite has run.
 
 ## Roadmap
 
@@ -222,6 +226,23 @@ items.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M14 sign-convention fix (2026-04-28):** Resolved Phase 1 audit
+  Cases 02 and 05 (Class C). `run_ac_sweep` was reporting terminal
+  admittance Y in the OUT-of-device convention, while `bias_sweep`
+  / `semi/postprocess.evaluate_current_at_contact` reports current
+  INTO the device. The two linearisations therefore disagreed in
+  sign at the same DC operating point. Fixed by negating the
+  assembled total terminal current at the assembly site in
+  `run_ac_sweep` and flipping the sign of the C read-out
+  (`C = +Im(Y)/(2πf)`) so `result.C` is bit-identical and
+  `benchmarks/rc_ac_sweep` plus `tests/fem/test_ac_dc_limit.py`
+  pass without modification. ADR 0011 grew an Errata section
+  documenting the convention as "current INTO device" with
+  `Y = +jωC` for an ideal capacitor. Audit Cases 02 and 05
+  assertions tightened from NaN-guards to sign-equality + 1% / 5%
+  relative-error gates. `docs/PHYSICS_AUDIT.md` Resolution section
+  added.
 
 - **M13.1 (2026-04-27):** 1D transient close-out via Slotboom primary
   unknowns (ADR 0014), BC-ramp continuation (ADR 0013), SG primitives

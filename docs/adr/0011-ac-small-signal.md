@@ -121,21 +121,32 @@ during M14.
 
 ### Sign convention for terminal admittance
 
-The runner reports Y with the **"positive = current OUT of the device"**
+The runner reports Y with the **"positive = current INTO the device"**
 convention used throughout `semi/postprocess.py` for the steady-state
-runners (the `evaluate_current_at_contact` helper integrates J · n_FE
-where the FE FacetNormal points outward at boundary facets). Under
-this convention, a pure ideal capacitor terminal has
+runners (`evaluate_current_at_contact` integrates
+`q μ_n n ∇φ_n · n_FE`, which by Slotboom algebra is the negative of
+the (n,p)-primary outward current density at the contact, i.e. it
+reports the current INTO the device). Under this convention an
+ideal capacitor terminal has
 
-    Y = -j * omega * C
+    Y = +j * omega * C
 
-(because the circuit-side Y_in_into_contact = +j*omega*C; flipping to
-out-of-contact flips the sign). Therefore the runner reports
+so the runner reports
 
-    C(omega) = -Im(Y) / (2 * pi * f)
+    C(omega) = +Im(Y) / (2 * pi * f)
 
-so a positive physical capacitance maps to a positive C in
-`AcSweepResult.C`. The same sign convention applies to G = Re(Y).
+and a positive physical capacitance maps to a positive C in
+`AcSweepResult.C`. The same sign convention applies to G = Re(Y):
+positive G corresponds to a positive `dI/dV` from `bias_sweep` at
+the same operating point.
+
+> **Note (2026-04-28):** The original M14 implementation had a sign
+> bug — it reported Y in the OUT-of-device convention while this
+> ADR's prose described the same OUT convention. Audit Cases 02 and
+> 05 surfaced the inconsistency with `bias_sweep`. Both the
+> implementation and this section were corrected to the
+> INTO-device convention. See the **Errata** section at the bottom
+> of this ADR for diagnosis and fix details.
 
 ## Validation
 
@@ -231,9 +242,68 @@ continuity rows. Discarded for the same reasons that drove ADR 0009.
   but is **not** done in this PR — `mos_cv` is left untouched. Tracked
   as M14.1.
 
-## References
+## Errata (2026-04-28) — terminal admittance sign convention fix
 
-- Selberherr, S. (1984). *Analysis and Simulation of Semiconductor
+The original M14 implementation reported `Y` and `C` with the
+**opposite** sign to the convention this ADR claimed. The Phase 1
+physics validation audit (Cases 02 and 05 in `docs/PHYSICS_AUDIT.md`)
+flagged this as a Class C finding: `Re(Y(omega→0))` at the same DC
+operating point came out with the same magnitude but opposite sign
+to `bias_sweep`'s centered-difference `dI/dV`. Since `bias_sweep` is
+the convention authority used by all M11/M12 benchmarks, the fix is
+a global sign correction in `run_ac_sweep`, not in `bias_sweep`.
+
+### Convention (post-fix)
+
+`Y` is reported with the **"positive = current INTO the device"**
+convention used by `bias_sweep` /
+`semi/postprocess.evaluate_current_at_contact` (i.e. the same sign
+that `iv_row["J"]` carries on the steady-state IV record). Under
+this convention an ideal capacitor terminal has
+
+    Y = +j * omega * C
+
+and the runner reports
+
+    C(omega) = +Im(Y) / (2 * pi * f)
+
+so a positive depletion capacitance maps to a positive
+`AcSweepResult.C[k]`, matching the "Validation" section above and
+the `benchmarks/rc_ac_sweep` verifier. `G = Re(Y)` is positive when
+the linearised terminal current increases with applied bias (i.e.
+`dI/dV > 0`).
+
+### Why the original implementation had it backwards
+
+In Slotboom variables (`n = n_i exp(psi - phi_n)`), `bias_sweep`
+integrates `+q*mu_n*n*grad(phi_n).n_outward` at the contact. After
+substituting Slotboom into the (n,p)-primary outward flux
+`q*mu_n*V_t*grad(n) - q*mu_n*n*grad(psi)`, algebra gives
+
+    bias_sweep_J = -[(n,p)-primary outward J]
+
+The M14 ac_sweep runner computes the linearised `(n,p)-primary
+outward J` (and an analogous outward displacement current); the
+result is the small-signal terminal current flowing OUT of the
+device. Bias_sweep's reported value is the negative of that, so to
+make `Re(Y(omega→0))` agree with `dI/dV` we must negate the
+assembled total current. The fix is one negation at the assembly
+site in `run_ac_sweep` plus a matching sign-flip in the `C` formula
+so that `result.C` (and hence the RC depletion-C verifier) is
+numerically unchanged.
+
+### Verification
+
+After the fix, audit Cases 02 and 05 are tightened from NaN-guards
+to `sign(Re(Y)) == sign(dI/dV)` plus a 1% (Case 02) / 5% (Case 05)
+relative-error gate. `tests/mms/test_ac_consistency.py` and
+`tests/fem/test_ac_dc_limit.py` are unchanged and pass bit-
+identically (they compare via absolute values and ratios).
+`benchmarks/rc_ac_sweep` is unchanged: the verifier reads
+`result.C`, which is bit-identical because both `Im(Y)` and the
+read-out formula flipped sign together.
+
+
   Devices*. Springer. Chapter 7 §"Small-signal AC analysis".
 - Schenk, A. (1998). *Advanced Physical Models for Silicon Device
   Simulation*. Springer. Chapter 5 §"Linearised continuity equations

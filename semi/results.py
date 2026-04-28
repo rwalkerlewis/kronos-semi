@@ -77,12 +77,14 @@ class AcSweepResult:
         convention. Entries with |Y| < 1e-300 are reported as 0.0 (no
         terminal response).
     C : list of float
-        Effective capacitance C(omega) = -Im(Y) / (2*pi*f). The runner
-        reports Y with the "positive = current OUT of the device"
-        convention used by ``postprocess.evaluate_current_at_contact``.
-        In that convention a pure capacitor has Y = -j*omega*C, so a
-        positive physical capacitance maps to negative Im(Y) and the
-        leading minus in the formula recovers a positive C. Same
+        Effective capacitance C(omega) = +Im(Y) / (2*pi*f). The runner
+        reports Y with the "positive = current INTO the device"
+        convention used by ``postprocess.evaluate_current_at_contact``
+        and by ``bias_sweep`` (i.e. ``Re(Y(omega->0))`` matches
+        ``dI/dV`` from a centered finite difference at the same
+        ``V_DC``). In that convention an ideal capacitor terminal has
+        ``Y = +j*omega*C``, so a positive depletion capacitance maps
+        to a positive ``Im(Y)`` and to a positive ``C``. Same
         per-unit convention as Y. Entries at f=0 are reported as 0.0.
     G : list of float
         Effective conductance G(omega) = Re(Y). Same per-unit convention.
