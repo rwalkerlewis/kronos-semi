@@ -219,11 +219,14 @@ Append-only. Newest entries on top.
 
 - **M13.1 (2026-04-27):** 1D transient close-out via Slotboom primary
   unknowns (ADR 0014), BC-ramp continuation (ADR 0013), SG primitives
-  (ADR 0012), and MUMPS pivot threshold relaxation for the
-  lumped-mass time term. Both previously-xfailed tests
-  (test_transient_steady_state_limit and the BDF rate tests)
-  now pass without xfail. PRs #44, #45, #46, #47, #48, #49,
-  #50, #51, #52. v0.14.1.
+  (ADR 0012), and a Jacobian shift plus MUMPS workspace bump
+  (`mat_mumps_icntl_14=200`, shift 1e-14) for the rank-deficient
+  phi_n row in the deep p-bulk of the Slotboom lumped-mass time
+  term. PR #52's pivot-threshold approach was superseded by PR #54
+  (factor-mat options never reached MUMPS in dolfinx 0.10). Both
+  previously-xfailed tests (test_transient_steady_state_limit and
+  the BDF rate tests) now pass without xfail. PRs #44, #45, #46,
+  #47, #48, #49, #50, #51, #52, #54. v0.14.1.
 
 - **M14 (2026-04-26):** Small-signal AC sweep runner. Added
   `semi/runners/ac_sweep.py` solving the linearised system

@@ -7,14 +7,24 @@
   (ADR 0014); BC-ramp continuation in transient runner (ADR 0013);
   SG flux primitives in semi/fem/scharfetter_gummel.py and
   semi/fem/sg_assembly.py (ADR 0012); Slotboom-native MMS rate
-  tests; MUMPS pivot threshold options for transient time term.
+  tests; configurable Jacobian shift (`solver.jacobian_shift`) and
+  MUMPS workspace bump (`mat_mumps_icntl_14=200`) on the transient
+  factorization path.
 
 ### Fixed
 - M13.1 close-out: 1D transient deep-steady-state now matches
-  bias_sweep within 1e-4 relative error (PR #52 was the final
-  piece, relaxing MUMPS pivot threshold for the Slotboom
-  lumped-mass time term whose Jacobian diagonal spans ~30 OOM
-  across the device).
+  bias_sweep within 1e-4 relative error and the BDF1/BDF2 MMS
+  rate tests pass (PR #54 was the final piece). Root cause was
+  twofold: MUMPS workspace exhaustion plus a numerically rank-
+  deficient phi_n row in the deep p-bulk where every term carries
+  exp(psi - phi_n) below floating-point precision. Resolution: a
+  small Jacobian shift (1e-14) applied after each assembly via the
+  SNES Jacobian callback, plus 200 % MUMPS workspace allocation.
+  PR #52's pivot-threshold options (`pc_factor_zeropivot`,
+  `mat_mumps_cntl_3`) never reached MUMPS in dolfinx 0.10 because
+  the factor Mat is created lazily after `NonlinearProblem.__init__`
+  pushes the options DB; that approach is superseded by #54's
+  direct petsc4py path.
 
 ### Changed
 - ADR 0009 superseded by ADR 0014; ADR 0012 amended (primary-
