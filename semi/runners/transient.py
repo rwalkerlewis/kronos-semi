@@ -154,6 +154,33 @@ def run_transient(
         "snes_atol": float(snes_opts.get("atol", 1.0e-7)),
         "snes_stol": float(snes_opts.get("stol", 1.0e-14)),
         "snes_max_it": int(snes_opts.get("max_it", 100)),
+        # MUMPS pivot-relaxation. The Slotboom continuity equation has
+        # lumped-mass time-term Jacobian entries proportional to
+        # `n_ufl = ni*exp(psi - phi_n)`, which spans ~30 orders of
+        # magnitude across a 1e17-doped pn junction (large on the
+        # n-doped side, ~1e-26 in scaled units in the p-doped bulk
+        # minority-carrier region). At minority-side vertices the
+        # entire (phi_n) row of the Jacobian is well below MUMPS's
+        # default zero-pivot threshold (~2.2e-14), and a fresh LU
+        # factorisation reports a singular pivot on the first time
+        # step where the spatial-residual leftover from the previous
+        # step forces Newton to actually update those rows. The
+        # symptom is `SNES_DIVERGED_LINEAR_SOLVE` (reason=-3) on
+        # step 2 of a fixed-bias transient. The remedy is to push the
+        # zero-pivot threshold below the floor of meaningful pivots
+        # on this device (1e-30 is comfortably below the ~1e-26 floor
+        # in the rate-test config) and enable a tiny shift on detected
+        # null pivots so the LU stays usable. This matches the regime
+        # `bias_sweep` operates in implicitly -- bias_sweep has the
+        # same near-zero rows but never triggers a refactorisation
+        # with a non-zero RHS at minority-side vertices because its
+        # ramp produces a near-zero residual everywhere on
+        # convergence.
+        "pc_factor_zeropivot": 1.0e-30,
+        "pc_factor_shift_type": "NONZERO",
+        "pc_factor_shift_amount": 1.0e-30,
+        "mat_mumps_icntl_24": 1,
+        "mat_mumps_cntl_3": 1.0e-30,
     }
 
     # ------------------------------------------------------------------
@@ -421,9 +448,15 @@ def run_transient(
         _apply_bc_values(bcs)
 
         tag = fmt_tag(t_next)
+        # `fmt_tag` rounds to 4 decimal places (sub-microvolt
+        # resolution); for time tags at sub-nanosecond `t_next` it
+        # collapses adjacent steps to the same string. Disambiguate
+        # by appending the step counter so the PETSc options database
+        # gets a fresh prefix per solve and MUMPS does not reuse
+        # cached symbolic-factor state across steps.
         info = solve_nonlinear_block(
             F_list, [psi, phi_n, phi_p], bcs,
-            prefix=f"{cfg['name']}_tr_{tag}_",
+            prefix=f"{cfg['name']}_tr_{tag}_s{step_count}_",
             petsc_options=snes_petsc_options,
         )
 
