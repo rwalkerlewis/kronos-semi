@@ -61,8 +61,8 @@
     "output_every": 50,
     "bc_ramp_steps": 0,
     "snes": {
-      "rtol": 1.0e-10,
-      "atol": 1.0e-10,
+      "rtol": 1.0e-6,
+      "atol": 1.0e-7,
       "stol": 1.0e-14,
       "max_it": 100
     }
