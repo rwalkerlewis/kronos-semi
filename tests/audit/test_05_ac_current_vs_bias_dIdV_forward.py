@@ -9,6 +9,7 @@ relative comparisons are well-conditioned.
 from __future__ import annotations
 
 import copy
+import math
 
 import pytest
 
@@ -87,6 +88,5 @@ def test_ac_terminal_current_vs_dIdV():
 
     # Soft gate per audit philosophy: only fail on a runner crash or a
     # non-finite result. The numerical disagreement is the *deliverable*.
-    import math
     assert math.isfinite(G_ac), f"AC G is non-finite: {G_ac}"
     assert math.isfinite(dIdV_bs), f"bias_sweep dI/dV is non-finite: {dIdV_bs}"

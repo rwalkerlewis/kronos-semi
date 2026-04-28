@@ -9,9 +9,11 @@ collects the markdown fragments into `docs/PHYSICS_AUDIT.md`.
 """
 from __future__ import annotations
 
+import copy
 import csv
 import importlib
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -82,8 +84,6 @@ def make_bias_sweep_cfg(cfg_base: dict, contact_name: str, V_target: float,
     relaxed SNES tolerances for configs whose solver block was authored
     for a tighter linear path (e.g., rc_ac_sweep).
     """
-    import copy
-
     cfg = copy.deepcopy(cfg_base)
     found = False
     for c in cfg.get("contacts", []):
@@ -97,9 +97,8 @@ def make_bias_sweep_cfg(cfg_base: dict, contact_name: str, V_target: float,
             # avoids the rounding artifact in `_resolve_sweep` where a
             # `voltage_sweep.stop` that is not an exact multiple of
             # `.step` overshoots to the next step boundary.
-            import math as _math
             target_step = 0.05
-            n = max(1, int(_math.ceil(abs(float(V_target)) / target_step)))
+            n = max(1, int(math.ceil(abs(float(V_target)) / target_step)))
             step = abs(float(V_target)) / n
             c["voltage_sweep"] = {
                 "start": 0.0,
