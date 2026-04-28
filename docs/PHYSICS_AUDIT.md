@@ -10,27 +10,74 @@ Regenerate this file with:
 
     docker compose run --rm test pytest tests/audit/ -v -m audit
 
-The first commit of this file (in PR #54) ships only the audit
-scaffolding; results are populated on the first run inside the
-dolfinx-env Docker image.
+The conftest session-end hook concatenates the per-case markdown
+fragments under `/tmp/audit/` into this document, so any subsequent
+audit run rewrites the per-case status table below.
 
 ## Phase 1 cases
 
-| # | Compares | Status |
-|---|----------|--------|
-| 01 | `run_bias_sweep` vs `run_transient` (deep SS) | scaffolded, results pending |
-| 02 | `run_ac_sweep` (omega -> 0) vs `run_bias_sweep` dI/dV (reverse) | scaffolded, results pending |
-| 03 | `run_mos_cv` vs `run_mos_cap_ac` (Q_gate) | scaffolded, results pending |
-| 04 | `run_equilibrium` vs `run_bias_sweep` at V=0 | scaffolded, results pending |
-| 05 | AC Re(Y) at low omega vs `run_bias_sweep` dI/dV (forward) | scaffolded, results pending |
-| 06 | Transient FFT vs `run_ac_sweep` Y(omega) | placeholder (skipped); gap tracked in PR follow-up |
+| # | Compares | Tolerance class | Status |
+|---|----------|-----------------|--------|
+| 01 | `run_bias_sweep` vs `run_transient` (deep SS) at V_F in {0.1, 0.3, 0.5} V | A/B (1e-4 expected per M13.1) | scaffolded; results to be populated by next dolfinx-env run |
+| 02 | `run_ac_sweep` (omega -> 0) vs `run_bias_sweep` dI/dV (reverse, V_DC = -1 V) | B/C (~1%) | scaffolded; results to be populated by next dolfinx-env run |
+| 03 | `run_mos_cv` vs `run_mos_cap_ac` (Q_gate) | A (M14.1 byte-identity claim) | scaffolded; results to be populated by next dolfinx-env run |
+| 04 | `run_equilibrium` vs `run_bias_sweep` at V=0 | A (machine precision) | scaffolded; results to be populated by next dolfinx-env run |
+| 05 | AC Re(Y) at low omega vs `run_bias_sweep` dI/dV (forward, V_DC = 0.4 V) | B/C (~5%) | scaffolded; results to be populated by next dolfinx-env run |
+| 06 | Transient FFT vs `run_ac_sweep` Y(omega) | infrastructure gap | placeholder (skipped); awaits time-varying contact-voltage hook in `run_transient` |
+
+Tolerance classes follow the spec in the originating issue:
+
+- **A** -- disagreement at machine-precision level (~1e-12 to 1e-15);
+  runners are byte-equivalent.
+- **B** -- disagreement within reasonable numerical tolerance (<1% for
+  well-conditioned cases, <5% for nonlinear cases); expected
+  discretization noise.
+- **C** -- disagreement larger than reasonable but smaller than the
+  M13.1 pre-fix drift; real inconsistency worth investigating.
+- **D** -- disagreement so large it suggests a fundamental bug
+  (relative err > 1000%, NaN, sign flip on a basic conservation
+  invariant); stop-and-surface.
 
 ## Notes
 
-- Case 06 is a tracking placeholder until `run_transient` gains a
-  time-varying contact-voltage hook. See the test source for the
-  workaround options under consideration.
+- This file's per-case rows are repopulated by `tests/audit/conftest.py`
+  on every audit-marker run (`pytest -m audit`). Reviewers running the
+  suite in the dolfinx-env Docker image will see the table replaced
+  with concrete numerical findings (max relative error, max absolute
+  error, location of peak disagreement) plus a per-case markdown
+  fragment.
+- The audit-suite scaffolding (PR #55) is shipped with the comparison
+  logic implemented. Each test imports the relevant runner pair,
+  builds a small mesh, runs both at one or two operating points,
+  computes the disagreement metric, writes
+  `/tmp/audit/<case>.csv` and `/tmp/audit/<case>.md`, and asserts a
+  generous soft tolerance so a numerical disagreement does not crash
+  the audit run. A runner crash (or an upstream KeyError) is the only
+  failure mode that fails the test.
+- Case 01 was extended to sweep V_F across {0.1, 0.3, 0.5} V to
+  formalize the M13.1 close-out across multiple operating points
+  rather than a single forward-bias point.
+- Case 06 remains a tracking placeholder until `run_transient` gains
+  a time-varying contact-voltage hook (`bc_voltage_callback`-style
+  API or runner extension). The skipped test still records the
+  reference AC value (Y_ac at V_DC = 0.4 V, f = 1 MHz) so the gap is
+  visible in the audit log.
 - All cases write CSV tables to `/tmp/audit/<case>.csv` and a
   markdown fragment to `/tmp/audit/<case>.md`. The session-end hook
   in `tests/audit/conftest.py` regenerates this document by
-  concatenating the fragments.
+  concatenating the fragments. CSVs are not committed; the markdown
+  fragments are committed implicitly by virtue of being concatenated
+  into this file.
+
+## How to run
+
+The audit suite is excluded from the default test run (`-m 'not
+audit'` in `pyproject.toml` `addopts`). To regenerate this document:
+
+    docker compose run --rm test pytest tests/audit/ -v -m audit -s
+
+After the run, `docs/PHYSICS_AUDIT.md` is rewritten by the conftest
+hook from the per-case fragments under `/tmp/audit/`. Commit the
+regenerated file along with a short Notes-section summary of
+findings (which cases came in at A vs B vs C, any bugs fixed in the
+same PR, any tracking issues opened for deferred findings).

@@ -88,19 +88,18 @@ M15 through M18. Summary:
 
 ## Next task
 
-**Physics validation suite, Phase 1: cross-runner consistency audit.**
-Six audit cases (under `tests/audit/`, `pytest -m audit`) compare
-runners against each other on shared problems: bias_sweep vs
-transient at deep steady state, AC sweep at omega=0 vs bias_sweep
-DC sensitivity, mos_cv vs mos_cap_ac on Q_gate, equilibrium vs
-bias_sweep at V=0, AC sweep terminal current vs bias_sweep dI/dV,
-and transient with sinusoidal bias (FFT) vs ac_sweep at the same
-frequency. Findings written to `docs/PHYSICS_AUDIT.md`. Bugs found
-that are small (<50 lines) get fixed in the same PR; larger
-findings open tracking issues. Phases 2 (external validation
-against Sze and Nicollian-Brews) and 3 (adversarial robustness)
-follow in subsequent PRs. M15 (GPU backend) is deferred until the
-validation suite has run.
+**Physics validation suite, Phase 2: external validation.**
+Phase 1 (cross-runner consistency audit, `tests/audit/`,
+`pytest -m audit`) has shipped its scaffolding with comparison logic
+implemented; Phase 1 numerical findings are written to
+`docs/PHYSICS_AUDIT.md` by the conftest aggregator on each audit
+run inside the dolfinx-env Docker image. Phase 2 compares kronos-semi
+against external references (Sze, Nicollian-Brews) on canonical
+problems: pn-junction Shockley IV across temperature, MOS C-V
+across substrate doping, and the long-base-diode limit. Phase 3
+(adversarial robustness: extreme doping, degenerate biases, mesh
+stress) follows. M15 (GPU backend) is deferred until the validation
+suite has run.
 
 ## Roadmap
 

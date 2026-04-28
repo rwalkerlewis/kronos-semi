@@ -26,7 +26,7 @@ from ._helpers import (
 )
 
 CASE = "01_bias_vs_transient_steady_state"
-BIASES = [0.3, 0.5]  # V_F values; deep SS for forward bias diode
+BIASES = [0.1, 0.3, 0.5]  # V_F values; deep SS for forward bias diode
 
 
 @pytest.mark.audit
