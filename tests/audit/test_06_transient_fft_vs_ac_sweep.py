@@ -48,7 +48,7 @@ def test_transient_fft_vs_ac_sweep():
     cfg_ac = copy.deepcopy(cfg)
     cfg_ac["contacts"][0]["voltage"] = V_DC
     cfg_ac["solver"]["dc_bias"] = {"contact": "anode", "voltage": V_DC}
-    cfg_ac["solver"]["ac"] = {"frequencies": [F_HZ]}
+    cfg_ac["solver"]["ac"]["frequencies"] = {"type": "list", "values": [F_HZ]}
     ac_res = run_ac_sweep(cfg_ac)
     Y_ac = complex(ac_res.Y[0])
 

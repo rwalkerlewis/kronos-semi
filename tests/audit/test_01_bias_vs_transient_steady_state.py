@@ -59,31 +59,36 @@ def test_bias_sweep_vs_transient_steady_state():
         cfg_tr["solver"]["output_every"] = 10000  # only need final
         tr_result = run_transient(cfg_tr)
 
-        # Pull last-snapshot fields (transient) and compare with bias_sweep
-        # final fields by L2 relative error. Both runners expose fields
-        # under .fields with keys "psi"/"n"/"p" (or "potential").
-        def last(field_name, fields):
-            keys = [field_name] + ([
-                "potential" if field_name == "psi" else field_name
-            ])
-            for k in keys:
-                if k in fields and len(fields[k]) > 0:
-                    return np.asarray(fields[k][-1])
-            raise KeyError(f"field {field_name} not in {list(fields.keys())}")
-
-        bs_fields = getattr(bs_result, "fields", {}) or {}
+        # Pull last-snapshot fields.
+        #
+        # run_bias_sweep returns SimulationResult with .psi_phys / .n_phys /
+        # .p_phys as plain numpy arrays (physical units, Volts and m^-3).
+        #
+        # run_transient returns TransientResult whose .fields dict maps
+        # field names to lists of per-snapshot numpy arrays, also in
+        # physical units.  We take the final snapshot (index -1).
         tr_fields = getattr(tr_result, "fields", {}) or {}
 
         try:
-            psi_err = relative_l2(last("psi", tr_fields), last("psi", bs_fields))
-            n_err = relative_l2(last("n", tr_fields), last("n", bs_fields))
-            p_err = relative_l2(last("p", tr_fields), last("p", bs_fields))
-        except KeyError as exc:
+            bs_psi = np.asarray(bs_result.psi_phys)
+            bs_n = np.asarray(bs_result.n_phys)
+            bs_p = np.asarray(bs_result.p_phys)
+
+            if not (tr_fields.get("psi") and len(tr_fields["psi"]) > 0):
+                raise KeyError("psi not in transient fields or empty snapshot list")
+            tr_psi = np.asarray(tr_fields["psi"][-1])
+            tr_n = np.asarray(tr_fields["n"][-1])
+            tr_p = np.asarray(tr_fields["p"][-1])
+        except (KeyError, AttributeError) as exc:
             pytest.fail(
                 f"{CASE}: required field missing from runner output: {exc}. "
-                f"bs_fields keys = {list(bs_fields)}; "
+                f"bs keys = {[a for a in ('psi_phys','n_phys','p_phys') if getattr(bs_result, a, None) is not None]}; "
                 f"tr_fields keys = {list(tr_fields)}"
             )
+
+        psi_err = relative_l2(tr_psi, bs_psi)
+        n_err = relative_l2(tr_n, bs_n)
+        p_err = relative_l2(tr_p, bs_p)
 
         # IV: take last current at the swept contact.
         bs_J = bs_result.iv[-1]["J"] if bs_result.iv else float("nan")
