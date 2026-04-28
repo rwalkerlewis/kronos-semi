@@ -1,191 +1,40 @@
 # Changelog
 
-## [Unreleased] - M13.1: Scharfetter-Gummel transient (in flight)
+## [0.14.1] - 2026-04-27
 
-### Added (on `dev/m13.1-scharfetter-gummel`, not yet on main)
-- `docs/adr/0012-scharfetter-gummel.md`: ADR superseding the (n, p)
-  Galerkin convection-diffusion choice in ADR 0009 with Scharfetter-Gummel
-  edge-flux assembly. Sign convention: Sandia / Farrell-et-al. Open
-  sources cited and read end-to-end: arXiv 1911.00377 Eq (30), Sandia
-  OSTI 2011-3865 Eq (18), Spevak TU Wien thesis Section 3.2.6. Cites
-  Scharfetter-Gummel 1969, Bank-Rose 1987, Brezzi-Marini-Pietra 1989,
-  Selberherr 1984 ch. 4.4 with explanations of why open reproductions
-  cover what each paywalled source contains.
-- `semi/fem/scharfetter_gummel.py`: Bernoulli function `B(x) = x/(exp(x)-1)`
-  with four-regime stable evaluation (Taylor for `|x| < 1e-3`,
-  `x*exp(-x)/(1-exp(-x))` for `x > 30`, closed form elsewhere).
-  1D SG edge fluxes for electrons and holes in Sandia / Farrell convention.
-  UFL Bernoulli (tanh-blended, no conditionals) for the modified-diffusion
-  form. Midpoint-Galerkin reference for the small-Peclet sign / scaling
-  guard (different derivation than SG, so it catches sign errors that the
-  Slotboom 2-node closed form would miss).
-- `semi/fem/sg_assembly.py`: per-edge SG residual assembler for 1D
-  meshes. Computes the per-cell flux from the DOF arrays, scatters into
-  per-vertex residuals with the correct divergence sign convention.
-  Plus the `solve_sg_block_1d` SNES wrapper scaffold (marked
-  `# pragma: no cover`, in flight pending dolfinx-0.10 block API debug).
-- `tests/test_scharfetter_gummel.py` (64 tests): mpmath cross-check at
-  1000 log-uniform points to 1e-12 relative; the corrected identity
-  `B(x) - B(-x) = -x` (the prompt's first-draft `B(x) + B(-x) = -x`
-  was wrong, the sum is `x*coth(x/2)`); two-direction sign tests for
-  electrons and holes; hole-flux device-equation symmetry guard 2b
-  to 1e-10 relative; midpoint-Galerkin agreement at small Peclet to
-  5 % relative; UFL Bernoulli matches NumPy reference at sample points.
-- `tests/fem/test_sg_assembly.py` (5 tests): per-cell vertex ordering
-  by x-coordinate, zero residual at zero state, zero at uniform-n
-  zero-field equilibrium, per-vertex scatter matches scalar fluxes,
-  divergence-of-constant-flux is zero at interior vertices to 1e-12
-  relative.
+### Added
+- Slotboom (psi, phi_n, phi_p) primary unknowns in run_transient
+  (ADR 0014); BC-ramp continuation in transient runner (ADR 0013);
+  SG flux primitives in semi/fem/scharfetter_gummel.py and
+  semi/fem/sg_assembly.py (ADR 0012); Slotboom-native MMS rate
+  tests; configurable Jacobian shift (`solver.jacobian_shift`) and
+  MUMPS workspace bump (`mat_mumps_icntl_14=200`) on the transient
+  factorization path.
 
-### Added (M13.1 follow-up #1, 2026-04-26)
-- `semi/fem/sg_assembly.py::solve_sg_block_1d`: rewritten to wrap
-  `dolfinx.fem.petsc.NonlinearProblem` and override the SNES function
-  + Jacobian callbacks. The function callback runs the standard UFL
-  M13 Galerkin block-residual assembly, then subtracts the Galerkin
-  convection-diffusion contribution and adds the per-edge SG flux from
-  `assemble_sg_residual_1d` (in M13 sign convention — the SG primitive
-  uses the opposite sign convention from the M13 weak form, verified
-  at zero field on a 3-node mesh).
-- `semi/fem/sg_assembly.py::_bernoulli_prime_array`: numerically stable
-  derivative `B'(x)` in four regimes (Taylor for `|x| < 1e-3`, closed
-  form mid-range, asymptotic for `|x| > 30`).
-- `semi/fem/sg_assembly.py::assemble_sg_jacobian_correction_1d`:
-  analytic per-edge Jacobian correction `J_sg_M13 - J_galerkin_convdiff`
-  for the SG-corrected block residual. FD-verified against the residual
-  on a 3-node test mesh to 1e-7 relative on all 16 entries per edge
-  across the (n, p) row blocks and (psi, n, p) column blocks.
+### Fixed
+- M13.1 close-out: 1D transient deep-steady-state now matches
+  bias_sweep within 1e-4 relative error and the BDF1/BDF2 MMS
+  rate tests pass (PR #54 was the final piece). Root cause was
+  twofold: MUMPS workspace exhaustion plus a numerically rank-
+  deficient phi_n row in the deep p-bulk where every term carries
+  exp(psi - phi_n) below floating-point precision. Resolution: a
+  small Jacobian shift (1e-14) applied after each assembly via the
+  SNES Jacobian callback, plus 200 % MUMPS workspace allocation.
+  PR #52's pivot-threshold options (`pc_factor_zeropivot`,
+  `mat_mumps_cntl_3`) never reached MUMPS in dolfinx 0.10 because
+  the factor Mat is created lazily after `NonlinearProblem.__init__`
+  pushes the options DB; that approach is superseded by #54's
+  direct petsc4py path.
 
-### Status (M13.1 follow-up #1, NOT yet ready for merge)
-- The SG residual + analytic-Jacobian-correction primitives are wired
-  up and FD-verified, but `solve_sg_block_1d` is not yet routed from
-  the transient runner. When routed, SNES converges (4-8 Newton iters
-  per step) but the iterate develops a small numerical seed of
-  negative `p` in the depletion region at the first time step that
-  amplifies across subsequent steps; SG primary-variable continuity
-  is not strictly positivity-preserving. The transient diverges
-  (line search failure) around `t ~ tau_p / 30`. Closing this needs
-  either a positivity-preserving change of variables (Slotboom
-  transform with chain-rule time term, abandoned in ADR 0009 for
-  ill-conditioning) or a continuation strategy for the first time
-  step where `V` is ramped from 0 to `V_F`.
-- The transient runner stays on the M13 Galerkin path so M13 + M14
-  transient/AC tests continue to pass; the steady-state agreement
-  xfail in `tests/fem/test_transient_steady_state.py` is updated with
-  this status. See `/tmp/m13.1-integration-blocker.md` for details on
-  the FD-verification of the Jacobian and the iteration-cap reasoning.
-- 2D simplicial assembly: explicitly raises `NotImplementedError` per
-  the "1D before 2D, hard" guard.
+### Changed
+- ADR 0009 superseded by ADR 0014; ADR 0012 amended (primary-
+  unknown assumption updated by ADR 0014); ADR 0013 amended
+  (applies in either formulation).
 
-### Added (M13.1 follow-up #3, 2026-04-26 — BC-ramp continuation)
-- `semi/runners/transient.py::_run_bc_continuation`: BC-ramp
-  continuation helper that walks the bias from V=0 to V_target through
-  N steady-state sub-steps via `run_bias_sweep` BEFORE the time loop
-  begins. Converts the Slotboom `(psi, phi_n, phi_p)` triple to
-  `(psi, n_hat, p_hat)` via Boltzmann and uses the result as the
-  time-loop IC. Configurable via `solver.bc_ramp_steps` (default 10);
-  set to 0 to disable continuation entirely.
-- `schemas/input.v1.json`: new `solver.bc_ramp_steps` field, integer
-  >= 0, default 10. Documented as "set to 0 to disable continuation
-  and start the time loop from the V=0 equilibrium IC (the right
-  choice for transient turn-on benchmarks where the step bias at
-  t=0+ is the physical scenario being measured)."
-- `benchmarks/pn_1d_turnon/config.json`: `solver.bc_ramp_steps = 0`,
-  preserving the equilibrium-then-step-bias scenario the verify.py
-  lifetime extraction relies on.
-- `scripts/debug_bc_ramp.py`: diagnostic script that reproduces the
-  IC-vs-time-loop comparison in the SS-limit test. Used to verify the
-  BC-ramp IC matches `run_bias_sweep` to 5.7e-7 relative at t=0, and
-  shows the (n, p) Galerkin time loop drift to its OWN discrete
-  fixed point within ~12 BDF2 steps. Kept in repo for the M13.1
-  follow-up #4 agent.
-- `semi/fem/sg_assembly.py::solve_sg_block_1d`: re-applied the
-  `# pragma: no cover - reserved for M13.1 follow-up #4` comment.
-  Follow-up #1 (commit 2a7bf45) removed the pragma anticipating that
-  the function would be wired into the runner; that wiring regresses
-  the M13 transient MMS test (see status block) and is deferred to
-  follow-up #4. Until the SG path is routed in, the function is
-  uncovered by tests and would otherwise drag the project below the
-  95% coverage gate. The pragma is appropriate: this is dead code on
-  main today, kept in tree for the follow-up.
-
-### Status (M13.1 follow-up #3, NOT yet ready for merge)
-- BC-ramp continuation is correct infrastructure but does NOT close
-  the steady-state agreement gate. The IC produced by the ramp
-  matches `run_bias_sweep` at V_target to 5.7e-7 relative, but the
-  (n, p) Galerkin time loop drifts to its own discrete fixed point
-  within ~12 BDF steps (J_final = -6.273e+05 vs J_ss = +2.884). The
-  drift target is determined by the spatial discretisation, not by
-  where the time loop starts; no IC choice can prevent it. Closing
-  the test requires switching the time-loop convection-diffusion
-  discretisation from Galerkin to SG (deferred to follow-up #4).
-- `tests/fem/test_transient_steady_state.py`: still xfail with
-  `strict=False`. Reason updated to reflect the corrected diagnosis
-  (the previous-session "MMS source terms calibrated against
-  Galerkin" claim is incorrect — the MMS test is a pairwise-
-  difference temporal-convergence test, not source-driven; the SG
-  regression's actual root cause was not nailed down before the
-  iteration cap was hit).
-- M13.1 close-out: still blocked. v0.14.1 NOT ready to tag.
-- Full test suite: 262 passed, 1 skipped, 1 xfailed (the SS-limit
-  test). MMS pairwise-difference test passes with BC-ramp default
-  10 (continuation does not affect temporal-convergence rates).
-- All M11-M14 benchmarks (pn_1d, pn_1d_bias, pn_1d_bias_reverse,
-  mos_2d, mosfet_2d, resistor_3d, rc_ac_sweep, pn_1d_turnon)
-  pass with existing tolerances.
-
-### Added (M13.1 follow-up #4, 2026-04-27 — partial)
-- `semi/runners/transient.py`: opt-in dispatch of the 1D time-loop
-  convection-diffusion block to `solve_sg_block_1d`. Gated by
-  `solver.use_sg_flux` (default False). When False (default and all
-  existing tests / benchmarks), the M13 Galerkin path runs and the
-  runner is bit-identical to the prior PR #44 behaviour. When True
-  on a 1D mesh, the time loop swaps in the FD-verified SG residual +
-  analytic Jacobian.
-- `semi/fem/sg_assembly.py::solve_sg_block_1d`: BC-dof detection bug
-  fix. The previous `bc.function_space is V_phi_n` identity check
-  silently matched zero dofs because dolfinx 0.10's `bc.function_space`
-  returns the C++ `dolfinx.cpp.fem.FunctionSpace_float64` wrapper, a
-  different Python object from the Python-level `dolfinx.fem.FunctionSpace`
-  in `spaces.V_phi_n`. With the empty BC dof set, the SG residual
-  callback's `b += -sg_n - gn` patched Dirichlet rows, allowing SNES
-  to drive minority-carrier BC dofs off their pinned values by an
-  amount proportional to the SG flux at the contact (e.g.
-  p[cathode_minority]: 1e-14 → 9.92e-15 in one BDF step). The fix
-  uses `bc.function_space.contains(V_phi_n._cpp_object)`, which
-  reports identity at the C++ level. Pragma `# pragma: no cover`
-  removed (the function is now reachable via `use_sg_flux: True`).
-- `semi/fem/sg_assembly.py::solve_sg_block_1d`: orthant projection on
-  n,p dofs via `SNESSetUpdate`. Floors carrier dofs at 1e-30 before
-  each Newton residual evaluation. Defense-in-depth against the
-  (n,p) primary form's lack of unconditional positivity preservation;
-  matches the standard fix in production semiconductor codes.
-
-### Status (M13.1 follow-up #4, NOT yet ready for full close-out)
-- The opt-in SG path closes the BC-overwrite bug and adds positivity
-  defense, but the V_F=0.3 V SS-limit test still does not pass. With
-  `use_sg_flux: True`, the 1D time loop progresses ~52 BDF2 steps
-  (dt=50ps) before SNES line-search divergence. `-snes_test_jacobian`
-  reports `||J - Jfd||/||J||` = 4.24e-9, so the failure is not a
-  Jacobian bug. See `/tmp/m13.1-positivity-blocker.md` for the
-  close-out audit, hypotheses for the next iteration, and reproducer.
-- `tests/fem/test_transient_steady_state.py`: still xfail with
-  `strict=False`; xfail reason updated to point at the new audit.
-- M13 transient MMS, M14 AC, pn_1d_turnon, and all M11-M14 benchmarks
-  pass unchanged (the flag defaults to False and they do not opt in).
-  v0.14.1 NOT ready to tag.
-
-### Decisions surfaced and resolved during this work
-- **Bernoulli identity correction**: the prompt's `B(x) + B(-x) = -x`
-  is wrong; the correct identity is `B(x) - B(-x) = -x` (the sum is
-  `x*coth(x/2)`). Verified algebraically and numerically; the corrected
-  identity is in the unit tests.
-- **SG sign convention**: the prompt's first-draft formula
-  `F = (mu V_t/h)[B(-dpsi) n_j - B(+dpsi) n_i]` had B-arguments swapped
-  relative to the standard convention; caught by the midpoint-Galerkin
-  cross-check guard (27 % disagreement at small Peclet) before any
-  residual code was wired. Corrected to `(mu V_t/h)[n_j B(+dpsi) - n_i B(-dpsi)]`
-  matching arXiv 1911.00377 Eq (30) and Sandia OSTI 2011-3865 Eq (18);
-  agreement vs MG drops to 0.35 %.
+### Removed
+- The (psi, n_hat, p_hat) primary-unknown transient path
+  (replaced by Slotboom per ADR 0014); the use_sg_flux opt-in
+  flag (no longer needed).
 
 ## [0.14.0] - M14: Small-signal AC sweep
 
