@@ -57,31 +57,36 @@ RUN set -eux; \
 
 WORKDIR /workspaces/kronos-semi
 
-# Install Python dev dependencies first so the layer caches across code edits.
-# Using --system-site-packages semantics: dolfinx is already importable from
-# the base image's Python; we install into the same interpreter.
+# Two-stage install so the heavy dependency layer caches across source-only
+# edits (Dockerfile change #1 in CI-speedup pass):
+#
+#   1. Copy *only* pyproject.toml + README.md plus minimal package stubs and
+#      run `pip install -e ".[dev,server,test]"`. This layer's cache key
+#      depends only on pyproject.toml, so a typical PR (which only edits
+#      semi/ or tests/) hits the cache and skips re-resolving wheels.
+#   2. `COPY . .` overlays the real source. The hatchling editable install
+#      from step 1 emits a redirector for packages=["semi", "kronos_server"]
+#      that resolves through PYTHONPATH/finders to whatever lives at those
+#      paths at runtime, so we do *not* need a second `pip install -e`.
+#
+# We add jupyterlab + ipykernel here because they aren't pyproject deps but
+# are wanted in the dev image. BuildKit's pip cache mount keeps wheels
+# across builds without bloating the final image (PIP_NO_CACHE_DIR is
+# unchanged for runtime; the mount supplies its own cache directory).
 COPY pyproject.toml README.md ./
-RUN pip install --break-system-packages \
-        "numpy>=1.24" \
-        "matplotlib>=3.7" \
-        "jsonschema>=4.0" \
-        "pytest>=7.0" \
-        "pytest-cov>=4.0" \
-        "nbformat>=5.0" \
-        "ruff>=0.1" \
+COPY schemas ./schemas
+RUN mkdir -p semi kronos_server \
+ && touch semi/__init__.py kronos_server/__init__.py
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    PIP_NO_CACHE_DIR=0 pip install --break-system-packages \
+        -e ".[dev,server,test]" \
         "jupyterlab>=4.0" \
-        "ipykernel>=6.0" \
-        "fastapi>=0.115,<0.120" \
-        "uvicorn[standard]>=0.32,<0.40" \
-        "httpx>=0.27,<0.29" \
-        "pydantic>=2.8,<3.0"
+        "ipykernel>=6.0"
 
-# Copy the rest of the source and install the package editable. The bind
-# mount in docker-compose will overlay /workspaces/kronos-semi at runtime,
-# but installing here ensures `import semi` works if the image is run without
-# a bind mount (e.g., CI).
+# Overlay the real source. The bind mount in docker-compose / CI will
+# overlay /workspaces/kronos-semi again at runtime; this COPY guarantees
+# `import semi` works when the image is run without a bind mount.
 COPY . .
-RUN pip install --break-system-packages -e ".[dev,server]"
 
 RUN chown -R ${USER_UID}:${USER_GID} /workspaces
 

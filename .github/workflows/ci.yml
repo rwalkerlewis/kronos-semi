@@ -49,31 +49,46 @@ jobs:
       - run: pip install ruff
       - run: ruff check semi/ tests/
 
-  docker-fem:
-    # FEM integration: build the dolfinx dev image, run pytest inside,
-    # and execute the benchmark verifiers plus the full V&V suite.
-    # This is the only place the dolfinx code paths actually run.
+  docker-fem-build:
+    # Build the dolfinx-based dev image once and populate the GHA buildx
+    # cache. Downstream jobs (`docker-fem-tests`, `docker-fem-benchmarks`,
+    # `docker-fem-vv`) read from this cache via `cache-from: type=gha` and
+    # rebuild near-instantly because all heavy layers (dolfinx base, pip
+    # dependency layer keyed on pyproject.toml) are cache hits.
     #
-    # Budget: the coverage pytest step takes ~7 min on GHA runners,
-    # each of the five benchmarks runs in 1-5 min, and the V&V suite
-    # adds another ~5 min. 45 min leaves comfortable headroom so a
-    # slow runner does not flake the job.
+    # CI-speedup pass: previously a single 45-minute serial job. Splitting
+    # the test, benchmark, and V&V steps lets them run on parallel runners,
+    # cutting wall time roughly in half on a typical PR.
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image and populate GHA cache
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          tags: kronos-semi:ci
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            USER_UID=1001
+            USER_GID=127
 
-      - name: Show runner UID/GID
-        # First-run diagnostic. Leave this in until the job proves stable,
-        # then it can be removed in a follow-up. The UID/GID determine
-        # whether bind-mounted files are writable from inside the container.
-        run: id
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image with GHA cache
+  docker-fem-tests:
+    # Coverage-gated pytest run inside the dolfinx image. Uses pytest-xdist
+    # (`-n auto --dist=loadfile`) to parallelize across runner cores; the
+    # `loadfile` distribution keeps each test file on one worker so PETSc/
+    # MPI fixtures aren't shared across processes.
+    needs: docker-fem-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Load image from GHA cache
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -81,36 +96,25 @@ jobs:
           tags: kronos-semi:ci
           load: true
           cache-from: type=gha
-          cache-to: type=gha,mode=max
           build-args: |
             USER_UID=1001
             USER_GID=127
 
       - name: Run pytest with coverage gate (>= 92% on semi/)
-        # Single pytest invocation: runs the full suite (including the
-        # dolfinx-dependent tests under tests/fem/) with coverage and
-        # enforces the 92% gate. Gate lowered from 95% in M13.1 follow-up:
-        # semi/fem/sg_assembly.py (269 stmts, no production caller since the
-        # transient runner switched to Slotboom form in ADR 0014) is retained
-        # for future 2D high-Peclet work in M13.2 but contributes ~3% coverage
-        # gap. TODO: re-raise to 95% when SG is wired into the M13.2 runner.
-        # We used to run pytest twice (plain then with coverage) which doubled
-        # wall time for no signal.
-        # Writes coverage.xml at the workspace root for the upload step below.
+        # Coverage gate at 92% — see the comment block in pyproject.toml's
+        # [tool.coverage.report] table for the rationale (M13.1 follow-up,
+        # SG retained for M13.2). pytest-xdist roughly halves wall time on
+        # the 2-core GHA runner; bump to a larger runner for further gains.
         run: |
           docker run --rm \
             -v "${{ github.workspace }}:/workspaces/kronos-semi" \
             -w /workspaces/kronos-semi \
             kronos-semi:ci \
-            pytest tests/ -v --tb=short \
+            pytest tests/ -n auto --dist=loadfile --tb=short \
               --cov=semi --cov-report=term-missing --cov-report=xml \
               --cov-fail-under=92
 
       - name: Upload coverage XML
-        # Local-artifact only (no Codecov yet); CI consumers can grab the
-        # file from the run page. Always: ensures the artifact lands even
-        # if a downstream benchmark step fails so reviewers can still see
-        # what coverage looked like.
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -118,97 +122,89 @@ jobs:
           path: coverage.xml
           retention-days: 14
 
-      - name: Run pn_1d benchmark
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
-            -w /workspaces/kronos-semi \
-            -e MPLBACKEND=Agg \
-            kronos-semi:ci \
-            python scripts/run_benchmark.py pn_1d
+  docker-fem-benchmarks:
+    # One matrix entry per benchmark so they run on parallel runners
+    # instead of serially inside one 45-minute job. Each matrix job is
+    # independent: pulls the image from the GHA buildx cache, runs one
+    # benchmark, uploads its own results artifact.
+    needs: docker-fem-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: pn_1d
+            args: pn_1d
+          - name: pn_1d_bias
+            args: pn_1d_bias
+          - name: pn_1d_bias_reverse
+            args: pn_1d_bias_reverse
+          - name: mos_2d
+            args: mos_2d
+          - name: mosfet_2d
+            args: mosfet_2d
+          - name: pn_1d_turnon
+            args: pn_1d_turnon
+          - name: rc_ac_sweep
+            args: rc_ac_sweep
+          - name: resistor_3d_builtin
+            args: resistor_3d --input benchmarks/resistor_3d/resistor.json
+          - name: resistor_3d_gmsh
+            args: resistor_3d --input benchmarks/resistor_3d/resistor_gmsh.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Load image from GHA cache
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          tags: kronos-semi:ci
+          load: true
+          cache-from: type=gha
+          build-args: |
+            USER_UID=1001
+            USER_GID=127
 
-      - name: Run pn_1d_bias benchmark
+      - name: Run benchmark ${{ matrix.name }}
         run: |
           docker run --rm \
             -v "${{ github.workspace }}:/workspaces/kronos-semi" \
             -w /workspaces/kronos-semi \
             -e MPLBACKEND=Agg \
             kronos-semi:ci \
-            python scripts/run_benchmark.py pn_1d_bias
+            python scripts/run_benchmark.py ${{ matrix.args }}
 
-      - name: Run pn_1d_bias_reverse benchmark
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
-            -w /workspaces/kronos-semi \
-            -e MPLBACKEND=Agg \
-            kronos-semi:ci \
-            python scripts/run_benchmark.py pn_1d_bias_reverse
+      - name: Upload results for ${{ matrix.name }}
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fem-results-${{ matrix.name }}
+          path: results/
+          retention-days: 14
 
-      - name: Run mos_2d benchmark (2D MOS capacitor C-V via analytic AC, M14.1)
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
-            -w /workspaces/kronos-semi \
-            -e MPLBACKEND=Agg \
-            kronos-semi:ci \
-            python scripts/run_benchmark.py mos_2d
-
-      - name: Run mosfet_2d benchmark (2D MOSFET, M12)
-        # No registered verifier today; smoke-test that the multi-region
-        # SNES bias sweep with Gaussian n+ implants converges across all
-        # bias points. run_benchmark.py exits non-zero on SNES failure.
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
-            -w /workspaces/kronos-semi \
-            -e MPLBACKEND=Agg \
-            kronos-semi:ci \
-            python scripts/run_benchmark.py mosfet_2d
-
-      - name: Run pn_1d_turnon benchmark (transient BDF, M13)
-        # No registered verifier in run_benchmark.py today; smoke-test
-        # that the transient runner takes steps end-to-end. The lifetime
-        # extraction in benchmarks/pn_1d_turnon/verify.py runs separately
-        # and is wired in by M13.1 (issue #34) once the SG rewrite lands.
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
-            -w /workspaces/kronos-semi \
-            -e MPLBACKEND=Agg \
-            kronos-semi:ci \
-            python scripts/run_benchmark.py pn_1d_turnon
-
-      - name: Run rc_ac_sweep benchmark (small-signal AC, M14)
-        # Has a registered verifier: asserts |C(f) - C_dep(V_DC)| within
-        # 5% over [1 Hz, 1 MHz] and plateau flat to 2%.
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
-            -w /workspaces/kronos-semi \
-            -e MPLBACKEND=Agg \
-            kronos-semi:ci \
-            python scripts/run_benchmark.py rc_ac_sweep
-
-      - name: Run resistor_3d benchmark (3D Ohmic V-I, builtin box)
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
-            -w /workspaces/kronos-semi \
-            -e MPLBACKEND=Agg \
-            kronos-semi:ci \
-            python scripts/run_benchmark.py resistor_3d \
-              --input benchmarks/resistor_3d/resistor.json
-
-      - name: Run resistor_3d benchmark (3D Ohmic V-I, gmsh fixture)
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
-            -w /workspaces/kronos-semi \
-            -e MPLBACKEND=Agg \
-            kronos-semi:ci \
-            python scripts/run_benchmark.py resistor_3d \
-              --input benchmarks/resistor_3d/resistor_gmsh.json
+  docker-fem-vv:
+    # V&V suite (MMS Poisson, mesh convergence, conservation, MMS DD).
+    # Has a registered verifier with strict thresholds; runs in its own
+    # job so a benchmark-matrix flake doesn't block the V&V signal.
+    needs: docker-fem-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Load image from GHA cache
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          tags: kronos-semi:ci
+          load: true
+          cache-from: type=gha
+          build-args: |
+            USER_UID=1001
+            USER_GID=127
 
       - name: Run V&V suite (MMS Poisson, mesh convergence, conservation, MMS DD)
         run: |
@@ -219,10 +215,10 @@ jobs:
             kronos-semi:ci \
             python scripts/run_verification.py all
 
-      - name: Upload results (benchmarks + V&V artifacts)
+      - name: Upload V&V results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fem-results
+          name: fem-results-vv
           path: results/
           retention-days: 14
