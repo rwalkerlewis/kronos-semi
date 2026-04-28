@@ -35,41 +35,14 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M14.1 are merged into `main`. M9 delivered the on-disk artifact
-contract; M10 exposed the engine over HTTP; M11 versions the input
-schema and ships the UI-facing schema companion; M12 closes out the
-MOSFET benchmark with n+ Gaussian source/drain implants and amends the
-SNES tolerances for high-injection multi-region problems; M13 delivers
-the transient solver with BDF1/BDF2 time integration in (psi, n, p)
-primary-density form; M14 ships the small-signal AC sweep runner with
-a real 2x2 block reformulation of the (J + j*omega*M) delta_u = -dF/dV delta_V
-system, displacement current at the contact, and an RC depletion-capacitance
-benchmark validated to 0.4 % of the analytical model. M14.1 rewires the
-mos_2d C-V benchmark to an analytic-AC differential-capacitance runner
-(`mos_cap_ac`); worst error 6.79 % vs theory in the depletion window.
-`CHANGELOG.md` records the `[0.14.0] - M14` entry; M14.1 ships under
-the same minor version (PR #38).
-
-**M13.1 follow-up #4 (`dev/m13.1-sg-time-loop`)** continues the
-Scharfetter-Gummel edge-flux integration into the 1D transient time
-loop. Two real bugs were fixed in this branch: (1) `solve_sg_block_1d`
-identified BC dofs via `bc.function_space is V_phi_n`, which silently
-matches zero dofs because dolfinx 0.10's `bc.function_space` returns
-the C++ wrapper, a different Python object — the SG residual callback
-was overwriting Dirichlet rows; the fix uses
-`bc.function_space.contains(V_phi_n._cpp_object)`. (2) An orthant
-projection on n,p dofs (`SNESSetUpdate`-driven, floor 1e-30) is added
-as defense-in-depth against the (n,p) primary form's lack of
-unconditional positivity preservation. The SG dispatch is gated by
-`solver.use_sg_flux` (default False), so the M13 Galerkin path stays
-the default and existing MMS / AC / pn_1d_turnon tests are unaffected.
-With the flag on, the V_F=0.3 V steady-state test progresses through
-~52 BDF2 steps before SNES line-search divergence (reason -5);
-`-snes_test_jacobian` confirms the SG Jacobian agrees with FD to
-4.2e-9 at the working iterate, so the failure is not a Jacobian bug.
-The xfail on `tests/fem/test_transient_steady_state.py` stays in
-place; the reason is updated to point at the close-out audit at
-`/tmp/m13.1-positivity-blocker.md`. Issue #34 stays open.
+M1 through M14.1 are merged into `main`, with M13.1 closed in
+v0.14.1: the 1D transient runner uses Slotboom primary unknowns
+(ADR 0014, supersedes ADR 0009) and matches bias_sweep at deep
+steady state. SG flux primitives ship in semi/fem/ for use by
+future work but are not the active CD path in the transient
+runner. ADRs 0012 (SG flux) and 0013 (BC-ramp continuation)
+remain in force. The xfailed test_transient_steady_state_limit
+and BDF rate tests are now active and passing.
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
@@ -115,15 +88,19 @@ M15 through M18. Summary:
 
 ## Next task
 
-**M13.1 / M14.1 cleanup** (small follow-ups before M15) —
-- M13.1: re-enable the xfailed `test_transient_steady_state.py` once
-  the SRH-coupled steady-state limit is investigated (see ADR 0009
-  "Known limitation").
-- M14.1: rewire `benchmarks/mos_2d` to use the AC admittance for true
-  C(V) rather than the `mos_cv` runner's numerical dQ/dV.
-
-After both, **M15: GPU linear solver path** (see
-[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §M15).
+**Physics validation suite, Phase 1: cross-runner consistency audit.**
+Six audit cases (under `tests/audit/`, `pytest -m audit`) compare
+runners against each other on shared problems: bias_sweep vs
+transient at deep steady state, AC sweep at omega=0 vs bias_sweep
+DC sensitivity, mos_cv vs mos_cap_ac on Q_gate, equilibrium vs
+bias_sweep at V=0, AC sweep terminal current vs bias_sweep dI/dV,
+and transient with sinusoidal bias (FFT) vs ac_sweep at the same
+frequency. Findings written to `docs/PHYSICS_AUDIT.md`. Bugs found
+that are small (<50 lines) get fixed in the same PR; larger
+findings open tracking issues. Phases 2 (external validation
+against Sze and Nicollian-Brews) and 3 (adversarial robustness)
+follow in subsequent PRs. M15 (GPU backend) is deferred until the
+validation suite has run.
 
 ## Roadmap
 
@@ -239,6 +216,17 @@ items.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M13.1 (2026-04-27):** 1D transient close-out via Slotboom primary
+  unknowns (ADR 0014), BC-ramp continuation (ADR 0013), SG primitives
+  (ADR 0012), and a Jacobian shift plus MUMPS workspace bump
+  (`mat_mumps_icntl_14=200`, shift 1e-14) for the rank-deficient
+  phi_n row in the deep p-bulk of the Slotboom lumped-mass time
+  term. PR #52's pivot-threshold approach was superseded by PR #54
+  (factor-mat options never reached MUMPS in dolfinx 0.10). Both
+  previously-xfailed tests (test_transient_steady_state_limit and
+  the BDF rate tests) now pass without xfail. PRs #44, #45, #46,
+  #47, #48, #49, #50, #51, #52, #54. v0.14.1.
 
 - **M14 (2026-04-26):** Small-signal AC sweep runner. Added
   `semi/runners/ac_sweep.py` solving the linearised system
