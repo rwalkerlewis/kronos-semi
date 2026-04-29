@@ -303,6 +303,106 @@ identically (they compare via absolute values and ratios).
 `result.C`, which is bit-identical because both `Im(Y)` and the
 read-out formula flipped sign together.
 
+## Errata #2 (2026-04-29) — primary-unknown reconciliation across runners
+
+After Errata (sign convention) shipped, audit Cases 02 and 05 still
+disagreed numerically with `bias_sweep` `dI/dV` at the operating
+points V_DC = -1.0 V (~7%, h-dependent) and V_DC = +0.4 V (~12%,
+h-independent at h = 0.05 V). Both cases were `xfail`-pinned with a
+note "under investigation" pending a deeper diagnosis.
+
+### Diagnosis
+
+The original M14 ac_sweep was written in **(n, p)-primary form**
+(carrier-density variables) per the original "Primary unknowns"
+section of this ADR. It obtained the operating point by running
+`bias_sweep` (Slotboom variables) and converting the converged state
+to (n, p) at nodes via Boltzmann (`n = n_i exp(psi - phi_n)`,
+`p = n_i exp(phi_p - psi)`).
+
+The bug: at a Slotboom-converged solution, the **discrete (n,p)-form
+DD residual is non-zero** — the two forms agree at the continuous
+PDE solution, but the FE discretisation produces different
+linearisations. So at the converted u_0, J_(n,p) * delta_u_DC was
+no longer equal to the AC RHS -dF/dV * delta_V, and the assembled
+b = J * delta_u_DC was systematically biased away from the
+linearisation that bias_sweep would compute. The bias is small at
+reverse bias (low currents, small carrier gradients) and grows with
+forward bias — exactly the pattern the audit cases observed.
+
+Step 1 of the diagnostic plan ruled out displacement-current-as-
+cause: an omega-sweep at f ∈ {1, 0.1, 0.01, 0.001} Hz at V_DC =
++0.4 V showed Re(Y) drift below 2e-6 across four decades, so the
+disagreement is in the conduction part. Step 2 confirmed the
+(n,p)-form Jacobian / Slotboom-form operating-point inconsistency
+by directly inspecting the residual norm of F_(n,p)(u_0_converted),
+which was on order 1e-6 in scaled units — orders of magnitude above
+the SNES tolerance the original Slotboom solve had achieved.
+
+### Fix
+
+`semi/runners/ac_sweep.py` is rewritten in **Slotboom variables
+(psi, phi_n, phi_p)** throughout. The Jacobian is now exactly the
+discrete `bias_sweep` Jacobian (built via
+`semi.physics.drift_diffusion.build_dd_block_residual` and dolfinx
+`assemble_matrix_block` with the same Dirichlet BCs), so by Newton's
+lemma the linear system
+
+    J_Slotboom * delta_u_DC = -dF_Slotboom/dV * delta_V
+
+is exact at the bias_sweep operating point with **no conversion
+step**. The terminal-current evaluator uses `ufl.derivative` of the
+Slotboom-form contact-current expression
+`q*mu_n*n_ufl*grad(phi_n).n_outward + q*mu_p*p_ufl*grad(phi_p).n_outward`,
+which by construction is the linearisation of the same expression
+that `bias_sweep` reports — closing the cross-runner consistency
+gap. The mass matrix is no longer a lumped diagonal on (n, p) rows;
+in Slotboom variables the chain-rule mass form
+`(n_ufl * v_n + p_ufl * v_p) * dx_lump` produces a sparse 3x3 block
+mass matrix coupling (psi, phi_n) and (psi, phi_p), which `ufl.derivative`
++ `assemble_matrix_block` build automatically. Vertex-quadrature
+lumping is preserved on the diagonal continuity blocks; the (psi,
+phi) cross-block entries are also lumped via the same quadrature
+metadata so the Slotboom mass operator agrees with the (n, p)-form
+in the linear-Boltzmann limit.
+
+This change supersedes the "Slotboom-variable AC formulation
+(rejected)" alternative in the original Decision: the chain-rule
+mass coupling is small (carriers depend on Slotboom variables only
+through Boltzmann exponentials, so the cross-block entries are
+proportional to n, p which are small in depletion regions where
+the displacement-dominated AC physics live) and is handled
+mechanically by UFL.
+
+### Verification
+
+EPS-sweep diagnostic (`scripts/diag_case0205_eps_sweep.py`) at
+V_DC = +0.4 V shows the rewritten ac_sweep `Re(Y) = 74.81 S`
+agreeing with bias_sweep centered-FD `dI/dV` to **0.024%** at h =
+0.01 V (the FD curvature minimum) and within 1.4% across h ∈
+[0.001, 0.01] V. At V_DC = -1.0 V, ac_sweep `Re(Y) = 5.26e-3 S`
+agrees with bias_sweep dI/dV at h = 0.005 V to **0.7%**. The
+audit-test EPS values are tightened from h = 0.05 V (where FD
+curvature dominates the disagreement) to h = 0.005 V (where the
+FD has converged). With this h, both Cases 02 and 05 unxfail at
+their original 1% / 5% gates. The audit `xfail` decorators are
+removed.
+
+### Why this is consistent with ADR 0009's primary-density
+**transient** choice
+
+ADR 0009 chose (psi, n, p)-primary-density form for the M13
+**transient** runner because the time term naturally sits on the
+density rows (∂n/∂t, ∂p/∂t), the lumped mass matrix is sparse and
+diagonal there, and steady-state convergence in (n, p) is easier
+to reuse infrastructure-wise. **M13.1** (ADR 0014) reverted that
+choice — the transient runner is now also Slotboom — for the same
+reason driving this Errata #2: keeping primary unknowns aligned
+across the engine prevents discrete-residual mismatches when one
+runner consumes another's output. M14 ac_sweep was written before
+M13.1 and was the last (n, p)-primary runner; this errata closes
+that gap.
+
 ## References
 
 - Selberherr, S. (1984). *Analysis and Simulation of Semiconductor
