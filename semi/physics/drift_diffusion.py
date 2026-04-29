@@ -73,6 +73,8 @@ def build_dd_block_residual(
     tau_n_hat: float,
     tau_p_hat: float,
     E_t_over_Vt: float = 0.0,
+    *,
+    coordinates: str = "cartesian",
 ):
     """
     Build the three-block residual for the coupled drift-diffusion system.
@@ -95,6 +97,10 @@ def build_dd_block_residual(
         Scaled lifetimes, tau / t0.
     E_t_over_Vt : float
         Trap level relative to the intrinsic level, divided by V_t.
+    coordinates : str, optional
+        ``"cartesian"`` (default, byte-identical with the M12 close-out)
+        or ``"axisymmetric"`` to assemble against the cylindrical
+        ``r * dx`` volume measure (see ADR 0015).
 
     Returns
     -------
@@ -105,6 +111,7 @@ def build_dd_block_residual(
     from dolfinx import fem
     from petsc4py import PETSc
 
+    from ..fem.coordinates import get_volume_measure
     from .slotboom import n_from_slotboom, p_from_slotboom
 
     psi = spaces.psi
@@ -142,17 +149,19 @@ def build_dd_block_residual(
 
     rho_hat = p_hat - n_hat + N_hat_fn
 
+    dx = get_volume_measure(msh, coordinates)
+
     F_psi = (
-        L_D2 * eps_r_ufl * ufl.inner(ufl.grad(psi), ufl.grad(v_psi)) * ufl.dx
-        - rho_hat * v_psi * ufl.dx
+        L_D2 * eps_r_ufl * ufl.inner(ufl.grad(psi), ufl.grad(v_psi)) * dx
+        - rho_hat * v_psi * dx
     )
     F_phi_n = (
-        L0_sq * mu_n_hat * n_hat * ufl.inner(ufl.grad(phi_n), ufl.grad(v_n)) * ufl.dx
-        - R * v_n * ufl.dx
+        L0_sq * mu_n_hat * n_hat * ufl.inner(ufl.grad(phi_n), ufl.grad(v_n)) * dx
+        - R * v_n * dx
     )
     F_phi_p = (
-        L0_sq * mu_p_hat * p_hat * ufl.inner(ufl.grad(phi_p), ufl.grad(v_p)) * ufl.dx
-        + R * v_p * ufl.dx
+        L0_sq * mu_p_hat * p_hat * ufl.inner(ufl.grad(phi_p), ufl.grad(v_p)) * dx
+        + R * v_p * dx
     )
     return [F_psi, F_phi_n, F_phi_p]
 

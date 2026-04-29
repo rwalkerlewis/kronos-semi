@@ -18,6 +18,7 @@ def run_equilibrium(cfg: dict[str, Any], *, progress_callback=None):
 
     from ..bcs import build_psi_dirichlet_bcs, resolve_contacts
     from ..doping import build_profile
+    from ..fem.coordinates import resolve_coordinates
     from ..mesh import build_mesh
     from ..physics.poisson import build_equilibrium_poisson_form
     from ..run import SimulationResult
@@ -27,6 +28,7 @@ def run_equilibrium(cfg: dict[str, Any], *, progress_callback=None):
 
     ref_mat = reference_material(cfg)
     sc = make_scaling_from_config(cfg, ref_mat)
+    coordinates = resolve_coordinates(cfg)
 
     msh, _cell_tags, facet_tags = build_mesh(cfg)
     V = fem.functionspace(msh, ("Lagrange", 1))
@@ -53,7 +55,10 @@ def run_equilibrium(cfg: dict[str, Any], *, progress_callback=None):
         bc.set(psi.x.array)
     psi.x.scatter_forward()
 
-    F = build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, ref_mat.epsilon_r)
+    F = build_equilibrium_poisson_form(
+        V, psi, N_hat_fn, sc, ref_mat.epsilon_r,
+        coordinates=coordinates,
+    )
     if progress_callback is not None:
         progress_callback({"type": "step_started", "bias_step": 0, "V_applied": 0.0})
     info = solve_nonlinear(F, psi, bcs, prefix=f"{cfg['name']}_")

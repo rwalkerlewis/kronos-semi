@@ -42,6 +42,7 @@ def run_bias_sweep(
     from ..bcs import build_dd_dirichlet_bcs, resolve_contacts
     from ..continuation import AdaptiveStepController, StepTooSmall
     from ..doping import build_profile
+    from ..fem.coordinates import resolve_coordinates
     from ..mesh import build_mesh
     from ..physics.drift_diffusion import build_dd_block_residual, make_dd_block_spaces
     from ..postprocess import (
@@ -56,6 +57,7 @@ def run_bias_sweep(
 
     ref_mat = reference_material(cfg)
     sc = make_scaling_from_config(cfg, ref_mat)
+    coordinates = resolve_coordinates(cfg)
 
     msh, _cell_tags, facet_tags = build_mesh(cfg)
 
@@ -113,6 +115,7 @@ def run_bias_sweep(
     F_list = build_dd_block_residual(
         spaces, N_hat_fn, sc, ref_mat.epsilon_r,
         mu_n_hat, mu_p_hat, tau_n_hat, tau_p_hat, E_t_over_Vt,
+        coordinates=coordinates,
     )
 
     static_voltages: dict[str, float] = {}
@@ -206,7 +209,8 @@ def run_bias_sweep(
     last_info = info
     V_prev = V_seed
     record_iv(iv_rows, V_seed, spaces, sc, ref_mat,
-              sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI)
+              sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI,
+              coordinates=coordinates)
     if post_step_hook is not None:
         post_step_hook(V_seed, spaces, iv_rows[-1])
     if progress_callback is not None:
@@ -259,7 +263,8 @@ def run_bias_sweep(
                 last_info = info
                 V_prev = V_try
                 record_iv(iv_rows, V_try, spaces, sc, ref_mat,
-                          sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI)
+                          sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI,
+                          coordinates=coordinates)
                 if post_step_hook is not None:
                     post_step_hook(V_try, spaces, iv_rows[-1])
                 if progress_callback is not None:

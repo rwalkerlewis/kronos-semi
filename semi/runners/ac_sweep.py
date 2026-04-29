@@ -120,6 +120,9 @@ def _build_dc_subcfg(cfg: dict, contact_name: str, voltage: float) -> dict:
         "type": "bias_sweep",
         "continuation": cont,
     }
+    coords = cfg.get("solver", {}).get("coordinates")
+    if coords is not None:
+        sub["solver"]["coordinates"] = coords
     if snes_overrides:
         sub["solver"]["snes"] = dict(snes_overrides)
     found = False
@@ -168,6 +171,7 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
 
     from ..bcs import build_dd_dirichlet_bcs, resolve_contacts
     from ..doping import build_profile
+    from ..fem.coordinates import resolve_coordinates
     from ..mesh import build_mesh
     from ..physics.drift_diffusion import build_dd_block_residual, make_dd_block_spaces
     from ..physics.slotboom import n_from_slotboom, p_from_slotboom
@@ -218,6 +222,7 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
     # ------------------------------------------------------------------
     ref_mat = reference_material(cfg)
     sc = make_scaling_from_config(cfg, ref_mat)
+    coordinates = resolve_coordinates(cfg)
     msh, _cell_tags, facet_tags = build_mesh(cfg)
 
     N_raw_fn = build_profile(cfg["doping"])
@@ -278,6 +283,7 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
     F_list = build_dd_block_residual(
         spaces, N_hat_fn, sc, ref_mat.epsilon_r,
         mu_n_hat, mu_p_hat, tau_n_hat_v, tau_p_hat_v, E_t_over_Vt,
+        coordinates=coordinates,
     )
     a_blocks = [
         [ufl.derivative(F_list[i], u_j) for u_j in (psi, phi_n, phi_p)]
@@ -355,6 +361,15 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
         "quadrature_rule": "vertex",
         "quadrature_degree": 1,
     })
+    if coordinates == "axisymmetric":
+        # Apply the cylindrical r-weighting to the lumped continuity
+        # time term so it is consistent with the steady-state Slotboom
+        # residual block (which uses r * ufl.dx via build_dd_block_residual).
+        r_coord = ufl.SpatialCoordinate(msh)[0]
+        dx_lump = r_coord * dx_lump
+        dx_zero = r_coord * ufl.dx
+    else:
+        dx_zero = ufl.dx
 
     # Poisson row has no time term, but UFL refuses to compile a
     # bare 0*test*dx without a function-valued integrand. Multiply by
@@ -362,7 +377,7 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
     # contributes a zero block.
     zero_psi_c = fem.Constant(msh, _PETSc.ScalarType(0.0))
     F_mass = [
-        zero_psi_c * v_psi * ufl.dx,
+        zero_psi_c * v_psi * dx_zero,
         n_ufl * v_n * dx_lump,
         p_ufl * v_p * dx_lump,
     ]
@@ -415,6 +430,7 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
         psi_pert, phi_n_pert, phi_p_pert,
         sc, ref_mat, mu_n_SI, mu_p_SI,
         sweep_facet_info, msh,
+        coordinates=coordinates,
     )
 
     for k, f in enumerate(frequencies):
@@ -441,11 +457,11 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
         # OUT. So I_disp_into = +j*omega*Q_psi.
         Q_psi_re = _eval_displacement_charge(
             x_real[:N_psi], psi_pert, sc, ref_mat.epsilon_r,
-            sweep_facet_info, msh,
+            sweep_facet_info, msh, coordinates=coordinates,
         )
         Q_psi_im = _eval_displacement_charge(
             x_imag[:N_psi], psi_pert, sc, ref_mat.epsilon_r,
-            sweep_facet_info, msh,
+            sweep_facet_info, msh, coordinates=coordinates,
         )
 
         # I_total = I_cond + j*omega*Q_psi
@@ -589,6 +605,8 @@ def _make_terminal_current_forms(
     psi_pert, phi_n_pert, phi_p_pert,
     sc, ref_mat, mu_n_SI: float, mu_p_SI: float,
     facet_info, msh,
+    *,
+    coordinates: str = "cartesian",
 ):
     """Build the linearised Slotboom-form terminal-current form.
 
@@ -620,6 +638,7 @@ def _make_terminal_current_forms(
     from petsc4py import PETSc
 
     from ..constants import Q
+    from ..fem.coordinates import get_surface_measure
     from ..physics.slotboom import n_from_slotboom, p_from_slotboom
 
     tag = int(facet_info["tag"])
@@ -632,7 +651,9 @@ def _make_terminal_current_forms(
     indices = np.asarray(facets, dtype=np.int32)
     sort = np.argsort(indices)
     facet_mt = meshtags(msh, fdim, indices[sort], values[sort])
-    ds = ufl.Measure("ds", domain=msh, subdomain_data=facet_mt, subdomain_id=tag)
+    ds = get_surface_measure(
+        msh, coordinates, subdomain_data=facet_mt, subdomain_id=tag,
+    )
     n_vec = ufl.FacetNormal(msh)
 
     ni_hat_c = fem.Constant(msh, PETSc.ScalarType(ref_mat.n_i / sc.C0))
@@ -701,6 +722,8 @@ def _eval_terminal_current(
 def _eval_displacement_charge(
     delta_psi_arr, psi_pert_fn, sc, eps_r,
     facet_info, msh,
+    *,
+    coordinates: str = "cartesian",
 ) -> float:
     """Evaluate Q_psi = eps * integral(grad(delta_psi) . n) dS / area.
 
@@ -716,6 +739,7 @@ def _eval_displacement_charge(
     from mpi4py import MPI
 
     from ..constants import EPS0
+    from ..fem.coordinates import get_surface_measure
 
     psi_pert_fn.x.array[:] = delta_psi_arr
     psi_pert_fn.x.scatter_forward()
@@ -729,7 +753,9 @@ def _eval_displacement_charge(
     indices = np.asarray(facets, dtype=np.int32)
     sort = np.argsort(indices)
     facet_mt = meshtags(msh, fdim, indices[sort], values[sort])
-    ds = ufl.Measure("ds", domain=msh, subdomain_data=facet_mt, subdomain_id=tag)
+    ds = get_surface_measure(
+        msh, coordinates, subdomain_data=facet_mt, subdomain_id=tag,
+    )
     n_vec = ufl.FacetNormal(msh)
 
     if isinstance(eps_r, (int, float)):

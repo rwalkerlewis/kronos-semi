@@ -50,7 +50,8 @@ def resolve_contact_facets(cfg, msh, facet_tags, contact_name):
 
 
 def evaluate_current_at_contact(spaces, sc, ref_mat, facet_info,
-                                mu_n_SI, mu_p_SI) -> float:
+                                mu_n_SI, mu_p_SI, *,
+                                coordinates: str = "cartesian") -> float:
     """
     Evaluate J = J_n + J_p at a contact via a UFL weak form:
 
@@ -60,6 +61,12 @@ def evaluate_current_at_contact(spaces, sc, ref_mat, facet_info,
     Integrated over the contact facet and divided by its measure.
     Positive J = current flowing outward (out of the device through
     the contact).
+
+    With ``coordinates="axisymmetric"`` both the current and area
+    integrals on the contact pick up the radial ``r`` weight, so the
+    reported current density on a ring-shaped contact at fixed ``z``
+    is the area-averaged ``J`` over the ring (consistent with the
+    cartesian convention which divides by the facet length).
     """
     import ufl
     from dolfinx import fem
@@ -68,6 +75,7 @@ def evaluate_current_at_contact(spaces, sc, ref_mat, facet_info,
     from petsc4py import PETSc
 
     from .constants import Q
+    from .fem.coordinates import get_surface_measure
     from .physics.slotboom import n_from_slotboom, p_from_slotboom
 
     msh = spaces.V_psi.mesh
@@ -82,7 +90,9 @@ def evaluate_current_at_contact(spaces, sc, ref_mat, facet_info,
     indices = np.asarray(facets, dtype=np.int32)
     sort = np.argsort(indices)
     facet_mt = meshtags(msh, fdim, indices[sort], values[sort])
-    ds = ufl.Measure("ds", domain=msh, subdomain_data=facet_mt, subdomain_id=tag)
+    ds = get_surface_measure(
+        msh, coordinates, subdomain_data=facet_mt, subdomain_id=tag,
+    )
     n_vec = ufl.FacetNormal(msh)
 
     ni_hat = fem.Constant(msh, PETSc.ScalarType(ref_mat.n_i / sc.C0))
@@ -118,7 +128,8 @@ def evaluate_current_at_contact(spaces, sc, ref_mat, facet_info,
 
 
 def evaluate_partial_currents(spaces, sc, ref_mat, facet_info,
-                              mu_n_SI, mu_p_SI) -> tuple[float, float]:
+                              mu_n_SI, mu_p_SI, *,
+                              coordinates: str = "cartesian") -> tuple[float, float]:
     """
     Evaluate J_n and J_p separately at a contact.
 
@@ -135,6 +146,7 @@ def evaluate_partial_currents(spaces, sc, ref_mat, facet_info,
     from petsc4py import PETSc
 
     from .constants import Q
+    from .fem.coordinates import get_surface_measure
     from .physics.slotboom import n_from_slotboom, p_from_slotboom
 
     msh = spaces.V_psi.mesh
@@ -149,7 +161,9 @@ def evaluate_partial_currents(spaces, sc, ref_mat, facet_info,
     indices = np.asarray(facets, dtype=np.int32)
     sort = np.argsort(indices)
     facet_mt = meshtags(msh, fdim, indices[sort], values[sort])
-    ds = ufl.Measure("ds", domain=msh, subdomain_data=facet_mt, subdomain_id=tag)
+    ds = get_surface_measure(
+        msh, coordinates, subdomain_data=facet_mt, subdomain_id=tag,
+    )
     n_vec = ufl.FacetNormal(msh)
 
     ni_hat = fem.Constant(msh, PETSc.ScalarType(ref_mat.n_i / sc.C0))
@@ -181,13 +195,15 @@ def evaluate_partial_currents(spaces, sc, ref_mat, facet_info,
 
 
 def record_iv(iv_rows, V_applied, spaces, sc, ref_mat,
-              sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI):
+              sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI,
+              *, coordinates: str = "cartesian"):
     """Append one (V, J) row to `iv_rows`, evaluating J at the sweep contact."""
     if sweep_contact is None or sweep_facet_info is None:
         iv_rows.append({"V": float(V_applied), "J": 0.0})
         return
     J = evaluate_current_at_contact(
         spaces, sc, ref_mat, sweep_facet_info, mu_n_SI, mu_p_SI,
+        coordinates=coordinates,
     )
     iv_rows.append({"V": float(V_applied), "J": float(J)})
 

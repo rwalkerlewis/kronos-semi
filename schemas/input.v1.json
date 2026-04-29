@@ -8,8 +8,8 @@
     "schema_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.2.0.",
-      "examples": ["1.0.0", "1.1.0", "1.2.0"]
+      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.3.0.",
+      "examples": ["1.0.0", "1.1.0", "1.2.0", "1.3.0"]
     },
     "name": {
       "type": "string",
@@ -447,6 +447,13 @@
           ],
           "description": "Which runner to dispatch. `equilibrium` solves Poisson at zero bias; `drift_diffusion` solves the coupled system at a single bias point; `bias_sweep` ramps a contact voltage; `mos_cv` walks a gate sweep and integrates gate charge by numerical dQ/dV (legacy); `mos_cap_ac` (M14.1) walks a gate sweep and reports analytic differential capacitance from PDE sensitivity (preferred over `mos_cv`); `transient` runs BDF1/BDF2 time integration; `ac_sweep` (M14) runs small-signal AC analysis around a DC operating point; `newton_block` is a legacy alias.",
           "default": "equilibrium"
+        },
+        "coordinates": {
+          "type": "string",
+          "enum": ["cartesian", "axisymmetric"],
+          "title": "Coordinate system for the FEM assembly",
+          "description": "Coordinate system used by the FEM-core assembly. `cartesian` (default) uses the unmodified UFL volume / surface measures and treats the mesh coordinates as `(x, y[, z])`. `axisymmetric` interprets a 2D mesh as `(r, z)` cylindrical coordinates with the axis of symmetry at `r=0`; every volume and surface integrand picks up an extra `r` factor so the assembled forms represent the cylindrical-coordinate integrals `2*pi*int f r dr dz`. See ADR 0015. Honoured by the `equilibrium`, `bias_sweep`, `ac_sweep`, and `mos_cap_ac` runners; ignored by `transient` and `mos_cv` (those runners stay cartesian-only in this milestone).",
+          "default": "cartesian"
         },
         "dc_bias": {
           "type": "object",

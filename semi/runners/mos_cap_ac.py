@@ -77,6 +77,7 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
     from ..bcs import build_psi_dirichlet_bcs, resolve_contacts
     from ..constants import Q
     from ..doping import build_profile
+    from ..fem.coordinates import get_volume_measure, resolve_coordinates
     from ..mesh import build_eps_r_function, build_mesh
     from ..physics.poisson import build_equilibrium_poisson_form_mr
     from ..run import SimulationResult
@@ -86,6 +87,7 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
 
     ref_mat = reference_material(cfg)
     sc = make_scaling_from_config(cfg, ref_mat)
+    coordinates = resolve_coordinates(cfg)
 
     msh, cell_tags, facet_tags = build_mesh(cfg)
     if cell_tags is None:  # pragma: no cover - guarded by schema/build_mesh
@@ -109,6 +111,7 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
 
     F = build_equilibrium_poisson_form_mr(
         V_psi, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
+        coordinates=coordinates,
     )
 
     sweep_contact, sweep_values = _resolve_gate_sweep(cfg)
@@ -126,8 +129,9 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
         static_voltages[c["name"]] = float(c.get("voltage", 0.0))
 
     ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
-    dx_semi = ufl.Measure(
-        "dx", domain=msh, subdomain_data=cell_tags, subdomain_id=int(semi_tag),
+    dx_semi = get_volume_measure(
+        msh, coordinates,
+        subdomain_data=cell_tags, subdomain_id=int(semi_tag),
     )
     rho_hat_scaled = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
     charge_form = fem.form(rho_hat_scaled * dx_semi)
@@ -145,7 +149,10 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
     # at the converged psi. ufl.derivative gives this directly.
     trial_psi = ufl.TrialFunction(V_psi)
     a_form = ufl.derivative(F, psi, trial_psi)
-    L_zero = fem.Constant(msh, PETSc.ScalarType(0.0)) * ufl.TestFunction(V_psi) * ufl.dx
+    # Zero RHS form. Cartesian uses bare ufl.dx; axisymmetric uses
+    # r*ufl.dx so the Jacobian / RHS measures match.
+    dx_zero = get_volume_measure(msh, coordinates)
+    L_zero = fem.Constant(msh, PETSc.ScalarType(0.0)) * ufl.TestFunction(V_psi) * dx_zero
 
     extents = cfg["mesh"]["extents"]
     W_lat = float(extents[0][1] - extents[0][0])
