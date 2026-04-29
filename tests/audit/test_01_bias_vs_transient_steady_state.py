@@ -95,8 +95,18 @@ def test_bias_sweep_vs_transient_steady_state():
         p_err = relative_l2(tr_p, bs_p)
 
         # IV: take last current at the swept contact.
+        #
+        # `run_transient` writes one IV row per ohmic contact at every
+        # output step (see semi/runners/transient.py::_record_all_iv),
+        # so `tr_result.iv[-1]` is the cathode (appended last) which has
+        # the opposite sign to the anode current.  `bias_sweep.iv[-1]`
+        # is at the swept (anode) contact.  Filter the transient rows
+        # to the same contact before differencing — see the equivalent
+        # filter in tests/fem/test_transient_steady_state.py.
+        sweep_name = cfg_base["contacts"][0]["name"]
         bs_J = bs_result.iv[-1]["J"] if bs_result.iv else float("nan")
-        tr_J = tr_result.iv[-1]["J"] if tr_result.iv else float("nan")
+        tr_iv_sweep = [r for r in (tr_result.iv or []) if r.get("contact") == sweep_name]
+        tr_J = tr_iv_sweep[-1]["J"] if tr_iv_sweep else float("nan")
         if abs(bs_J) > 1e-300:
             iv_err = abs(tr_J - bs_J) / abs(bs_J)
         else:
