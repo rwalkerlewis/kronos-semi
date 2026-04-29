@@ -71,10 +71,13 @@ production code path bit-identical: the dispatch returns the bare
 
 ## Validation
 
-- A cylindrical Poisson MMS on the unit `(r, z)` cylinder using a
-  smooth manufactured solution `phi(r, z) = (1 - r^2) cos(pi z / 2)`
-  with constant `eps`. The test asserts an L2 convergence rate
-  `>= 1.9` on a CG1 mesh sequence
+- A cylindrical Poisson MMS on the unit `(r, z)` square using the
+  smooth manufactured solution `phi(r, z) = (1 - r^2) sin(pi z)`
+  with constant `eps`. The solution vanishes on `r=1`, `z=0`, and
+  `z=1` (homogeneous Dirichlet, no BC interpolation error) and has
+  zero radial derivative at `r=0`, so the natural Neumann
+  zero-flux axis condition is satisfied exactly. The test asserts
+  an L2 convergence rate `>= 1.9` on a CG1 mesh sequence
   `h in {1/4, 1/8, 1/16, 1/32}` (theoretical rate 2; some
   degradation near `r=0` is acceptable from the `r`-weighted
   measure).

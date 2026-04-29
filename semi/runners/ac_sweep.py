@@ -171,7 +171,7 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
 
     from ..bcs import build_dd_dirichlet_bcs, resolve_contacts
     from ..doping import build_profile
-    from ..fem.coordinates import resolve_coordinates
+    from ..fem.coordinates import get_volume_measure, resolve_coordinates
     from ..mesh import build_mesh
     from ..physics.drift_diffusion import build_dd_block_residual, make_dd_block_spaces
     from ..physics.slotboom import n_from_slotboom, p_from_slotboom
@@ -365,11 +365,11 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
         # Apply the cylindrical r-weighting to the lumped continuity
         # time term so it is consistent with the steady-state Slotboom
         # residual block (which uses r * ufl.dx via build_dd_block_residual).
-        r_coord = ufl.SpatialCoordinate(msh)[0]
-        dx_lump = r_coord * dx_lump
-        dx_zero = r_coord * ufl.dx
-    else:
-        dx_zero = ufl.dx
+        dx_lump = ufl.SpatialCoordinate(msh)[0] * dx_lump
+    # Use the centralised dispatch for the (zero) Poisson-row time term
+    # so the axisymmetric r-factor wrapping stays consistent with the
+    # other runners.
+    dx_zero = get_volume_measure(msh, coordinates)
 
     # Poisson row has no time term, but UFL refuses to compile a
     # bare 0*test*dx without a function-valued integrand. Multiply by
