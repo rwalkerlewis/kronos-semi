@@ -22,21 +22,15 @@ from ._helpers import (
 
 CASE = "05_ac_terminal_current_vs_dIdV"
 V_DC = 0.4
-# EPS_V must be a multiple of the bias_sweep step (0.05 V).
-EPS_V = 0.05
+# Use h=0.005 V where bias_sweep centered-FD dI/dV has converged
+# below 5% residual deviation from the AC linearisation (the prior
+# h=0.05 V exhibited >25% FD curvature error at this forward-bias
+# operating point). See ADR-0011 Errata #2.
+EPS_V = 0.005
+BS_STEP = 0.005
 
 
 @pytest.mark.audit
-@pytest.mark.xfail(
-    reason=(
-        "Forward-bias 12% h-independent magnitude disagreement "
-        "between ac_sweep Re(Y) and bias_sweep dI/dV at V_DC=0.4V. "
-        "Sign agreement holds; magnitude does not. EPS_V sweep "
-        "confirms this is not an FD artifact. Under investigation; "
-        "see issue #<NUMBER>."
-    ),
-    strict=False,
-)
 def test_ac_terminal_current_vs_dIdV():
     require_dolfinx()
 
@@ -61,7 +55,7 @@ def test_ac_terminal_current_vs_dIdV():
         cfg_bs["solver"] = {"type": "bias_sweep", "snes": snes, "continuation": cont}
         for c in cfg_bs["contacts"]:
             if c["name"] == "anode":
-                c["voltage_sweep"] = {"start": 0.0, "stop": V, "step": 0.05}
+                c["voltage_sweep"] = {"start": 0.0, "stop": V, "step": BS_STEP}
                 c["voltage"] = 0.0
         return run_bias_sweep(cfg_bs).iv[-1]["J"]
 
