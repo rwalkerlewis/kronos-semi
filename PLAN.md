@@ -88,29 +88,14 @@ M15 through M18. Summary:
 
 ## Next task
 
-**Physics validation suite — address Phase 1 findings and begin Phase 2.**
-Phase 1 audit is complete (results in `docs/PHYSICS_AUDIT.md`). Open
-items from Phase 1:
+**Phase 2 of physics validation suite — external validation against
+Sze and Nicollian-Brews.** Phase 1 is complete: cases 01-04 pass
+internal-consistency checks; case 05 has a tracked 12% magnitude
+disagreement (issue #<NUMBER>); case 06 deferred. Audit suite is now
+CI-gated via `docker-fem-audit` job.
 
-1. ~~**AC sign convention (C-level, Cases 02 and 05):**~~ **Resolved.**
-   `run_ac_sweep` reported Y in the OUT-of-device convention while
-   `bias_sweep` reports terminal current INTO the device; the two
-   linearisations therefore disagreed in sign at the same DC operating
-   point. Fixed by a single global negation in the AC terminal-current
-   assembly with a matching flip in the C read-out, plus an Errata
-   section in ADR 0011. Cases 02 and 05 audit assertions tightened
-   from NaN-guards to sign-equality + 1% / 5% relative-error gates.
-2. **Case 01 IV tracking:** bias_sweep configured without a sweep
-   contact records `J = 0`; the IV relative-error column in case 01 is
-   an artifact (see `docs/PHYSICS_AUDIT.md` Notes section). Fix by
-   using `contacts[*].voltage_sweep` in the test config.
-3. **Case 06 (transient FFT):** needs a `bc_voltage_callback` hook in
-   `run_transient`; deferred to a future feature PR.
-
-Phase 2 (external validation against Sze and Nicollian-Brews) is now
-unblocked and is the next planned activity. Phase 3 (adversarial
-robustness) follows. M15 (GPU backend) is deferred until the full
-validation suite has run.
+Phase 3 (adversarial robustness) follows. M15 (GPU backend) is
+deferred until the full validation suite has run.
 
 ## Roadmap
 

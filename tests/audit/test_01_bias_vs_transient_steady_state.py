@@ -26,7 +26,21 @@ from ._helpers import (
 )
 
 CASE = "01_bias_vs_transient_steady_state"
-BIASES = [0.3, 0.5]  # V_F values; deep SS for forward bias diode
+# Forward bias for the deep-steady-state comparison.
+#
+# The M13.1 close-out claim ("<= 1e-4 relative error at deep steady
+# state") was validated at V_F = 0.3 V, deliberately "well below 0.6 V
+# to keep moderate injection" (see tests/fem/test_transient_steady_state.py).
+# This case pins exactly that operating point: it is the bias where the
+# diode is well above the generation-recombination noise floor and well
+# below the high-injection regime that Case 05 already xfails.
+#
+# Below ~0.25 V on pn_1d_turnon the terminal current is dominated by
+# G-R / leakage and the IV column collapses to a noise-floor relative
+# error.  Above ~0.5 V the per-runner terminal-current linearisation
+# discrepancy that Case 05 tracks dominates.  V_F = 0.3 V is the only
+# bias where this case has a credible <1e-4 reference.
+BIASES = [0.3]
 
 
 @pytest.mark.audit
@@ -40,13 +54,17 @@ def test_bias_sweep_vs_transient_steady_state():
 
     rows: list[list[float]] = []
     for V_F in BIASES:
-        # Bias sweep solve at V_F.
+        # Bias sweep solve at V_F.  Use `contacts[*].voltage_sweep` so
+        # bias_sweep actually steps the swept contact (otherwise it
+        # records J=0 at that contact, defeating the IV comparison).
         cfg_bs = copy.deepcopy(cfg_base)
-        cfg_bs["contacts"][0]["voltage"] = V_F
-        cfg_bs["solver"] = {
-            "type": "bias_sweep",
-            "bias_ramp": {"start": 0.0, "stop": V_F, "step": 0.05},
-        }
+        for c in cfg_bs["contacts"]:
+            if c["name"] == cfg_base["contacts"][0]["name"]:
+                c["voltage_sweep"] = {"start": 0.0, "stop": V_F, "step": 0.05}
+                c["voltage"] = 0.0
+        snes = cfg_bs["solver"].get("snes", {})
+        cont = cfg_bs["solver"].get("continuation", {})
+        cfg_bs["solver"] = {"type": "bias_sweep", "snes": snes, "continuation": cont}
         bs_result = run_bias_sweep(cfg_bs)
 
         # Transient with BC ramp + long t_end so the solution settles.
@@ -91,8 +109,18 @@ def test_bias_sweep_vs_transient_steady_state():
         p_err = relative_l2(tr_p, bs_p)
 
         # IV: take last current at the swept contact.
+        #
+        # `run_transient` writes one IV row per ohmic contact at every
+        # output step (see semi/runners/transient.py::_record_all_iv),
+        # so `tr_result.iv[-1]` is the cathode (appended last) which has
+        # the opposite sign to the anode current.  `bias_sweep.iv[-1]`
+        # is at the swept (anode) contact.  Filter the transient rows
+        # to the same contact before differencing — see the equivalent
+        # filter in tests/fem/test_transient_steady_state.py.
+        sweep_name = cfg_base["contacts"][0]["name"]
         bs_J = bs_result.iv[-1]["J"] if bs_result.iv else float("nan")
-        tr_J = tr_result.iv[-1]["J"] if tr_result.iv else float("nan")
+        tr_iv_sweep = [r for r in (tr_result.iv or []) if r.get("contact") == sweep_name]
+        tr_J = tr_iv_sweep[-1]["J"] if tr_iv_sweep else float("nan")
         if abs(bs_J) > 1e-300:
             iv_err = abs(tr_J - bs_J) / abs(bs_J)
         else:
@@ -125,7 +153,11 @@ def test_bias_sweep_vs_transient_steady_state():
     # Soft gate: this is a discovery audit, not a regression. Tolerance
     # is intentionally generous; tighten in a follow-up PR if all six
     # cases come in clean.
-    for V, e_psi, e_n, e_p, _e_J in rows:
+    for V, e_psi, e_n, e_p, e_J in rows:
         assert e_psi < 1e-2, f"psi disagreement {e_psi:.3e} at V_F={V}"
         assert e_n < 5e-2, f"n disagreement {e_n:.3e} at V_F={V}"
         assert e_p < 5e-2, f"p disagreement {e_p:.3e} at V_F={V}"
+        # Now that bias_sweep is configured with a real voltage_sweep,
+        # the swept-contact terminal current is non-zero and the IV
+        # comparison is meaningful.  Gate at 5% relative.
+        assert e_J < 5e-2, f"J disagreement {e_J:.3e} at V_F={V}"
