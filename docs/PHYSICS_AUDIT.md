@@ -19,19 +19,23 @@ disagreement (`rel J`) is gated at 5%.
 
 | V_F (V) | rel_L2 psi | rel_L2 n | rel_L2 p | rel J |
 |---:|---:|---:|---:|---:|
+| 0.200 | (regenerated) | (regenerated) | (regenerated) | (regenerated) |
 | 0.300 | (regenerated) | (regenerated) | (regenerated) | (regenerated) |
-| 0.500 | (regenerated) | (regenerated) | (regenerated) | (regenerated) |
 
 CSV: `/tmp/audit/01_bias_vs_transient_steady_state.csv`
 
 
 ---
 
-## Case 02 - AC sweep at small omega vs bias_sweep dI/dV
+## Case 02 - AC sweep at small omega vs bias_sweep dI/dV  *(XFAIL — under investigation)*
 
 At V_DC = -1.0 V, AC sweep at 1 Hz reports Re(Y) and bias_sweep
-centered-difference dI/dV in agreement: same sign, magnitudes within
-1% relative error (Class A linearisation tolerance).
+centered-difference dI/dV with **sign agreement** but a magnitude
+disagreement of order ~7 % (h-dependent at the EPS_V = 0.05 V step
+size).  Same family of finding as Case 05: a real cross-runner
+linearisation discrepancy, not a wiring/configuration artifact.
+Marked `xfail(strict=False)` pending the investigation tracked under
+the Case 05 issue.
 
 CSV: `/tmp/audit/02_ac_omega0_vs_bias_dIdV.csv`
 

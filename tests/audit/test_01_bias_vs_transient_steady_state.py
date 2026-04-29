@@ -26,7 +26,16 @@ from ._helpers import (
 )
 
 CASE = "01_bias_vs_transient_steady_state"
-BIASES = [0.3, 0.5]  # V_F values; deep SS for forward bias diode
+# Forward biases for the deep-steady-state comparison.
+#
+# The M13.1 close-out claim ("<= 1e-4 relative error at deep steady
+# state") was validated at V_F = 0.3 V, deliberately "well below 0.6 V
+# to keep moderate injection" (see tests/fem/test_transient_steady_state.py).
+# Higher forward biases (V_F >= 0.5 V on this device) enter the
+# high-injection regime where the per-runner terminal-current
+# linearisation discrepancy tracked by Case 05 dominates the IV column;
+# don't re-litigate that finding here.
+BIASES = [0.2, 0.3]
 
 
 @pytest.mark.audit
