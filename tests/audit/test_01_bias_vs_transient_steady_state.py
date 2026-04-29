@@ -40,13 +40,17 @@ def test_bias_sweep_vs_transient_steady_state():
 
     rows: list[list[float]] = []
     for V_F in BIASES:
-        # Bias sweep solve at V_F.
+        # Bias sweep solve at V_F.  Use `contacts[*].voltage_sweep` so
+        # bias_sweep actually steps the swept contact (otherwise it
+        # records J=0 at that contact, defeating the IV comparison).
         cfg_bs = copy.deepcopy(cfg_base)
-        cfg_bs["contacts"][0]["voltage"] = V_F
-        cfg_bs["solver"] = {
-            "type": "bias_sweep",
-            "bias_ramp": {"start": 0.0, "stop": V_F, "step": 0.05},
-        }
+        for c in cfg_bs["contacts"]:
+            if c["name"] == cfg_base["contacts"][0]["name"]:
+                c["voltage_sweep"] = {"start": 0.0, "stop": V_F, "step": 0.05}
+                c["voltage"] = 0.0
+        snes = cfg_bs["solver"].get("snes", {})
+        cont = cfg_bs["solver"].get("continuation", {})
+        cfg_bs["solver"] = {"type": "bias_sweep", "snes": snes, "continuation": cont}
         bs_result = run_bias_sweep(cfg_bs)
 
         # Transient with BC ramp + long t_end so the solution settles.
@@ -125,7 +129,11 @@ def test_bias_sweep_vs_transient_steady_state():
     # Soft gate: this is a discovery audit, not a regression. Tolerance
     # is intentionally generous; tighten in a follow-up PR if all six
     # cases come in clean.
-    for V, e_psi, e_n, e_p, _e_J in rows:
+    for V, e_psi, e_n, e_p, e_J in rows:
         assert e_psi < 1e-2, f"psi disagreement {e_psi:.3e} at V_F={V}"
         assert e_n < 5e-2, f"n disagreement {e_n:.3e} at V_F={V}"
         assert e_p < 5e-2, f"p disagreement {e_p:.3e} at V_F={V}"
+        # Now that bias_sweep is configured with a real voltage_sweep,
+        # the swept-contact terminal current is non-zero and the IV
+        # comparison is meaningful.  Gate at 5% relative.
+        assert e_J < 5e-2, f"J disagreement {e_J:.3e} at V_F={V}"

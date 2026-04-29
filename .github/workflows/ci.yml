@@ -222,3 +222,47 @@ jobs:
           name: fem-results-vv
           path: results/
           retention-days: 14
+
+  docker-fem-audit:
+    # Physics validation audit suite (Phase 1: cross-runner consistency
+    # cases). The suite is deselected from the default test run via
+    # pyproject.toml's `-m 'not audit'`; this job opts back in with
+    # `-m audit -s` and writes per-case CSVs to /tmp/audit/. The conftest
+    # session-finish hook regenerates `docs/PHYSICS_AUDIT.md` from the
+    # markdown fragments; the second step verifies the committed file
+    # matches the freshly generated one so stale audit docs cannot land
+    # again (PR #60 regression guard).
+    needs: docker-fem-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Load image from GHA cache
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          tags: kronos-semi:ci
+          load: true
+          cache-from: type=gha
+          build-args: |
+            USER_UID=1001
+            USER_GID=127
+
+      - name: Run physics validation audit
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
+            -w /workspaces/kronos-semi \
+            kronos-semi:ci \
+            pytest tests/audit/ -v -m audit -s
+
+      - name: Verify PHYSICS_AUDIT.md is in sync with audit run
+        run: |
+          git diff --exit-code docs/PHYSICS_AUDIT.md || (
+            echo "::error::docs/PHYSICS_AUDIT.md is stale. Run 'pytest tests/audit/ -m audit' locally and commit the regenerated file."
+            exit 1
+          )
