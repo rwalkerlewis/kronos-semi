@@ -19,7 +19,6 @@ disagreement (`rel J`) is gated at 5%.
 
 | V_F (V) | rel_L2 psi | rel_L2 n | rel_L2 p | rel J |
 |---:|---:|---:|---:|---:|
-| 0.200 | (regenerated) | (regenerated) | (regenerated) | (regenerated) |
 | 0.300 | (regenerated) | (regenerated) | (regenerated) | (regenerated) |
 
 CSV: `/tmp/audit/01_bias_vs_transient_steady_state.csv`

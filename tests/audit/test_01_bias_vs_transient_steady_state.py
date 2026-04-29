@@ -26,16 +26,21 @@ from ._helpers import (
 )
 
 CASE = "01_bias_vs_transient_steady_state"
-# Forward biases for the deep-steady-state comparison.
+# Forward bias for the deep-steady-state comparison.
 #
 # The M13.1 close-out claim ("<= 1e-4 relative error at deep steady
 # state") was validated at V_F = 0.3 V, deliberately "well below 0.6 V
 # to keep moderate injection" (see tests/fem/test_transient_steady_state.py).
-# Higher forward biases (V_F >= 0.5 V on this device) enter the
-# high-injection regime where the per-runner terminal-current
-# linearisation discrepancy tracked by Case 05 dominates the IV column;
-# don't re-litigate that finding here.
-BIASES = [0.2, 0.3]
+# This case pins exactly that operating point: it is the bias where the
+# diode is well above the generation-recombination noise floor and well
+# below the high-injection regime that Case 05 already xfails.
+#
+# Below ~0.25 V on pn_1d_turnon the terminal current is dominated by
+# G-R / leakage and the IV column collapses to a noise-floor relative
+# error.  Above ~0.5 V the per-runner terminal-current linearisation
+# discrepancy that Case 05 tracks dominates.  V_F = 0.3 V is the only
+# bias where this case has a credible <1e-4 reference.
+BIASES = [0.3]
 
 
 @pytest.mark.audit
