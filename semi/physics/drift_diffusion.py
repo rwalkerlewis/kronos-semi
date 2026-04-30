@@ -309,3 +309,92 @@ def build_dd_block_residual_mr(
         + R * v_p * dx_sub
     )
     return [F_psi, F_phi_n, F_phi_p]
+
+
+def build_dd_block_residual_mr_axi(
+    spaces: DDBlockSpacesMR,
+    N_hat_fn,
+    sc,
+    eps_r,
+    mu_n_over_mu0: float,
+    mu_p_over_mu0: float,
+    tau_n_hat: float,
+    tau_p_hat: float,
+    cell_tags,
+    semi_tag: int,
+    E_t_over_Vt: float = 0.0,
+):
+    """
+    Axisymmetric multi-region (submesh-based) block residual.
+
+    Same as build_dd_block_residual_mr but all measures are weighted by
+    r = x[0] (the radial coordinate) for the cylindrical geometry.
+    """
+    import math as _math
+
+    import ufl
+    from dolfinx import fem
+    from petsc4py import PETSc
+
+    from .slotboom import n_from_slotboom, p_from_slotboom
+
+    psi = spaces.psi
+    phi_n = spaces.phi_n
+    phi_p = spaces.phi_p
+    msh = spaces.parent_mesh
+    submesh = spaces.submesh
+
+    x_parent = ufl.SpatialCoordinate(msh)
+    r_parent = x_parent[0]
+    x_sub = ufl.SpatialCoordinate(submesh)
+    r_sub = x_sub[0]
+
+    v_psi = ufl.TestFunction(spaces.V_psi)
+    v_n = ufl.TestFunction(spaces.V_phi_n)
+    v_p = ufl.TestFunction(spaces.V_phi_p)
+
+    L_D2 = fem.Constant(msh, PETSc.ScalarType(sc.lambda2 * sc.L0 ** 2))
+    L0_sq = fem.Constant(submesh, PETSc.ScalarType(sc.L0 ** 2))
+    if isinstance(eps_r, (int, float)):
+        eps_r_ufl = fem.Constant(msh, PETSc.ScalarType(float(eps_r)))
+    else:
+        eps_r_ufl = eps_r
+    ni_hat_parent = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
+    ni_hat_sub = fem.Constant(submesh, PETSc.ScalarType(sc.n_i / sc.C0))
+    mu_n_hat = fem.Constant(submesh, PETSc.ScalarType(mu_n_over_mu0))
+    mu_p_hat = fem.Constant(submesh, PETSc.ScalarType(mu_p_over_mu0))
+    tau_n = fem.Constant(submesh, PETSc.ScalarType(tau_n_hat))
+    tau_p = fem.Constant(submesh, PETSc.ScalarType(tau_p_hat))
+
+    dx_parent = ufl.Measure("dx", domain=msh, subdomain_data=cell_tags)
+    dx_semi_parent = dx_parent(int(semi_tag))
+    dx_sub = ufl.Measure("dx", domain=submesh)
+
+    n_hat_parent = n_from_slotboom(psi, phi_n, ni_hat_parent)
+    p_hat_parent = p_from_slotboom(psi, phi_p, ni_hat_parent)
+    rho_hat = p_hat_parent - n_hat_parent + N_hat_fn
+
+    n_hat_sub = n_from_slotboom(psi, phi_n, ni_hat_sub)
+    p_hat_sub = p_from_slotboom(psi, phi_p, ni_hat_sub)
+
+    n1 = ni_hat_sub * _math.exp(E_t_over_Vt)
+    p1 = ni_hat_sub * _math.exp(-E_t_over_Vt)
+    R = (n_hat_sub * p_hat_sub - ni_hat_sub * ni_hat_sub) / (
+        tau_p * (n_hat_sub + n1) + tau_n * (p_hat_sub + p1)
+    )
+
+    F_psi = (
+        L_D2 * eps_r_ufl * ufl.inner(ufl.grad(psi), ufl.grad(v_psi)) * r_parent * dx_parent
+        - rho_hat * v_psi * r_parent * dx_semi_parent
+    )
+    F_phi_n = (
+        L0_sq * mu_n_hat * n_hat_sub
+        * ufl.inner(ufl.grad(phi_n), ufl.grad(v_n)) * r_sub * dx_sub
+        - R * v_n * r_sub * dx_sub
+    )
+    F_phi_p = (
+        L0_sq * mu_p_hat * p_hat_sub
+        * ufl.inner(ufl.grad(phi_p), ufl.grad(v_p)) * r_sub * dx_sub
+        + R * v_p * r_sub * dx_sub
+    )
+    return [F_psi, F_phi_n, F_phi_p]

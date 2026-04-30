@@ -116,3 +116,42 @@ def build_equilibrium_poisson_form_mr(
         - rho_hat * v * dx_semi
     )
     return F
+
+
+def build_equilibrium_poisson_form_mr_axi(
+    V, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
+):
+    """
+    Axisymmetric (r-weighted) multi-region equilibrium Poisson.
+
+    Identical to build_equilibrium_poisson_form_mr but all integrals
+    are multiplied by r = x[0], the radial coordinate, to account for
+    the 2*pi*r Jacobian factor in cylindrical coordinates (the 2*pi
+    prefactor is absorbed into the gate-area normalization outside).
+    """
+    import ufl
+    from dolfinx import fem
+    from petsc4py import PETSc
+
+    msh = V.mesh
+    x = ufl.SpatialCoordinate(msh)
+    r = x[0]
+
+    v = ufl.TestFunction(V)
+
+    L_D2 = fem.Constant(msh, PETSc.ScalarType(sc.lambda2 * sc.L0 ** 2))
+    ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
+
+    dx_full = ufl.Measure("dx", domain=msh)
+    dx_semi = ufl.Measure(
+        "dx", domain=msh, subdomain_data=cell_tags, subdomain_id=int(semi_tag),
+    )
+
+    rho_hat = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
+
+    F = (
+        L_D2 * eps_r_fn * ufl.inner(ufl.grad(psi), ufl.grad(v)) * r * dx_full
+        - rho_hat * v * r * dx_semi
+    )
+    return F
+

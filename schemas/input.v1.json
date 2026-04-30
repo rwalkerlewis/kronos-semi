@@ -1,21 +1,36 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "kronos-semi input v1",
-  "description": "Top-level input configuration for a kronos-semi simulation run. Describes the device geometry, materials, doping, contacts, physics models, solver parameters, and output controls. This schema is the contract between the UI form-builder and the engine; see docs/IMPROVEMENT_GUIDE.md §4 M11.",
+  "description": "Top-level input configuration for a kronos-semi simulation run. Describes the device geometry, materials, doping, contacts, physics models, solver parameters, and output controls. This schema is the contract between the UI form-builder and the engine; see docs/IMPROVEMENT_GUIDE.md \u00a74 M11.",
   "type": "object",
-  "required": ["schema_version", "name", "dimension", "mesh", "regions", "doping", "contacts"],
+  "required": [
+    "schema_version",
+    "name",
+    "dimension",
+    "mesh",
+    "regions",
+    "doping",
+    "contacts"
+  ],
   "properties": {
     "schema_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
       "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.2.0.",
-      "examples": ["1.0.0", "1.1.0", "1.2.0"]
+      "examples": [
+        "1.0.0",
+        "1.1.0",
+        "1.2.0"
+      ]
     },
     "name": {
       "type": "string",
       "title": "Case name",
       "description": "Human-readable case name; used in output paths and plot titles.",
-      "examples": ["pn_junction_1d", "mos_cap_2d"]
+      "examples": [
+        "pn_junction_1d",
+        "mos_cap_2d"
+      ]
     },
     "description": {
       "type": "string",
@@ -23,11 +38,24 @@
       "description": "Free-form description of the device and the numerical experiment. Optional."
     },
     "dimension": {
-      "type": "integer",
-      "enum": [1, 2, 3],
+      "oneOf": [
+        {
+          "type": "integer",
+          "enum": [
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "type": "string",
+          "enum": [
+            "axisymmetric_2d"
+          ]
+        }
+      ],
       "title": "Geometric dimension",
-      "description": "Spatial dimension of the device mesh: 1 (line), 2 (area), or 3 (volume).",
-      "examples": [1, 2, 3]
+      "description": "Spatial dimension: 1, 2, 3, or 'axisymmetric_2d' for a 2D axisymmetric domain."
     },
     "mesh": {
       "type": "object",
@@ -38,7 +66,10 @@
           "type": "object",
           "title": "External mesh file",
           "description": "Load a mesh from a gmsh .msh or XDMF file on disk. Physical groups in the file supply region and facet tags.",
-          "required": ["source", "path"],
+          "required": [
+            "source",
+            "path"
+          ],
           "properties": {
             "source": {
               "const": "file",
@@ -47,13 +78,20 @@
             "path": {
               "type": "string",
               "description": "Path to the mesh file, resolved relative to the input JSON file's directory.",
-              "examples": ["fixtures/box.msh"]
+              "examples": [
+                "fixtures/box.msh"
+              ]
             },
             "format": {
               "type": "string",
-              "enum": ["gmsh", "xdmf"],
+              "enum": [
+                "gmsh",
+                "xdmf"
+              ],
               "description": "Mesh file format. gmsh .msh files carry physical groups directly; XDMF is currently not implemented.",
-              "examples": ["gmsh"]
+              "examples": [
+                "gmsh"
+              ]
             }
           }
         },
@@ -61,7 +99,11 @@
           "type": "object",
           "title": "Builtin box mesh",
           "description": "Generate a structured axis-aligned interval/rectangle/box mesh directly, with regions and facets tagged by JSON-described boxes and planes.",
-          "required": ["source", "extents", "resolution"],
+          "required": [
+            "source",
+            "extents",
+            "resolution"
+          ],
           "properties": {
             "source": {
               "const": "builtin",
@@ -72,17 +114,33 @@
               "description": "Bounds per dimension in meters, [[xmin, xmax], [ymin, ymax], ...]. Length must equal dimension.",
               "items": {
                 "type": "array",
-                "items": {"type": "number"},
+                "items": {
+                  "type": "number"
+                },
                 "minItems": 2,
                 "maxItems": 2
               },
-              "examples": [[[0.0, 2.0e-6]]]
+              "examples": [
+                [
+                  [
+                    0.0,
+                    2e-06
+                  ]
+                ]
+              ]
             },
             "resolution": {
               "type": "array",
               "description": "Number of cells per dimension. Length must equal dimension.",
-              "items": {"type": "integer", "minimum": 1},
-              "examples": [[400]]
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "examples": [
+                [
+                  400
+                ]
+              ]
             },
             "regions_by_box": {
               "type": "array",
@@ -91,7 +149,11 @@
                 "type": "object",
                 "title": "Region box",
                 "description": "Axis-aligned sub-box used to tag all mesh cells whose centroid lies inside it with the named region tag.",
-                "required": ["name", "tag", "bounds"],
+                "required": [
+                  "name",
+                  "tag",
+                  "bounds"
+                ],
                 "properties": {
                   "name": {
                     "type": "string",
@@ -106,7 +168,9 @@
                     "description": "Box bounds per dimension, [[xmin, xmax], ...].",
                     "items": {
                       "type": "array",
-                      "items": {"type": "number"},
+                      "items": {
+                        "type": "number"
+                      },
                       "minItems": 2,
                       "maxItems": 2
                     }
@@ -121,12 +185,21 @@
                 "type": "object",
                 "title": "Facet plane",
                 "description": "Axis-aligned plane whose facets carry the given tag, used to apply boundary conditions by symbolic contact name.",
-                "required": ["name", "tag", "axis", "value"],
+                "required": [
+                  "name",
+                  "tag",
+                  "axis",
+                  "value"
+                ],
                 "properties": {
                   "name": {
                     "type": "string",
                     "description": "Facet name; referenced by `contacts[*].facet` as a string.",
-                    "examples": ["anode", "cathode", "gate"]
+                    "examples": [
+                      "anode",
+                      "cathode",
+                      "gate"
+                    ]
                   },
                   "tag": {
                     "type": "integer",
@@ -134,7 +207,11 @@
                   },
                   "axis": {
                     "type": "integer",
-                    "enum": [0, 1, 2],
+                    "enum": [
+                      0,
+                      1,
+                      2
+                    ],
                     "description": "Coordinate axis orthogonal to the plane (0 = x, 1 = y, 2 = z)."
                   },
                   "value": {
@@ -145,6 +222,124 @@
               }
             }
           }
+        },
+        {
+          "type": "object",
+          "title": "Builtin axisymmetric mesh",
+          "required": [
+            "source",
+            "extents",
+            "layers",
+            "facets"
+          ],
+          "properties": {
+            "source": {
+              "const": "builtin_axi"
+            },
+            "extents": {
+              "type": "object",
+              "required": [
+                "r",
+                "z"
+              ],
+              "properties": {
+                "r": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "z": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              },
+              "description": "Radial and axial extents of the domain."
+            },
+            "layers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "material",
+                  "z_range",
+                  "tag"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "material": {
+                    "type": "string"
+                  },
+                  "z_range": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "tag": {
+                    "type": "integer"
+                  }
+                },
+                "description": "One material layer with z extent and cell tag."
+              }
+            },
+            "facets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "tag",
+                  "where"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "tag": {
+                    "type": "integer"
+                  },
+                  "where": {
+                    "type": "string"
+                  }
+                },
+                "description": "One named boundary facet with tag and location string."
+              }
+            },
+            "resolution": {
+              "type": "object",
+              "properties": {
+                "r": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "z_oxide": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "z_si": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "description": "Number of elements in each direction."
+            },
+            "R_gate": {
+              "type": "number"
+            }
+          },
+          "description": "Builtin axisymmetric mesh in (r, z) for MOSCAP simulation."
         }
       ]
     },
@@ -156,12 +351,17 @@
         "type": "object",
         "title": "Region definition",
         "description": "Per-region material assignment and role (semiconductor or insulator). The material key must exist in the engine's material database.",
-        "required": ["material"],
+        "required": [
+          "material"
+        ],
         "properties": {
           "material": {
             "type": "string",
             "description": "Material name from the engine material database (e.g. Si, SiO2, Ge, GaAs).",
-            "examples": ["Si", "SiO2"]
+            "examples": [
+              "Si",
+              "SiO2"
+            ]
           },
           "tag": {
             "type": "integer",
@@ -169,7 +369,10 @@
           },
           "role": {
             "type": "string",
-            "enum": ["semiconductor", "insulator"],
+            "enum": [
+              "semiconductor",
+              "insulator"
+            ],
             "description": "Material role: `semiconductor` regions carry carriers and space charge; `insulator` regions carry only the dielectric Poisson term."
           }
         }
@@ -183,7 +386,10 @@
         "type": "object",
         "title": "Doping entry",
         "description": "One doping profile applied to one named region.",
-        "required": ["region", "profile"],
+        "required": [
+          "region",
+          "profile"
+        ],
         "properties": {
           "region": {
             "type": "string",
@@ -195,7 +401,11 @@
                 "type": "object",
                 "title": "Uniform doping",
                 "description": "Spatially constant donor and acceptor concentrations throughout the region. Densities in cm^-3.",
-                "required": ["type", "N_D", "N_A"],
+                "required": [
+                  "type",
+                  "N_D",
+                  "N_A"
+                ],
                 "properties": {
                   "type": {
                     "const": "uniform",
@@ -204,12 +414,16 @@
                   "N_D": {
                     "type": "number",
                     "description": "Donor concentration, cm^-3. Zero means no donors.",
-                    "examples": [1.0e17]
+                    "examples": [
+                      1e+17
+                    ]
                   },
                   "N_A": {
                     "type": "number",
                     "description": "Acceptor concentration, cm^-3. Zero means no acceptors.",
-                    "examples": [1.0e17]
+                    "examples": [
+                      1e+17
+                    ]
                   }
                 }
               },
@@ -217,9 +431,15 @@
                 "type": "object",
                 "title": "Step doping",
                 "description": "Piecewise-constant profile along one coordinate axis, with distinct donor/acceptor densities on each side of a metallurgical junction.",
-                "required": ["type", "axis", "location",
-                             "N_D_left", "N_A_left",
-                             "N_D_right", "N_A_right"],
+                "required": [
+                  "type",
+                  "axis",
+                  "location",
+                  "N_D_left",
+                  "N_A_left",
+                  "N_D_right",
+                  "N_A_right"
+                ],
                 "properties": {
                   "type": {
                     "const": "step",
@@ -227,24 +447,46 @@
                   },
                   "axis": {
                     "type": "integer",
-                    "enum": [0, 1, 2],
+                    "enum": [
+                      0,
+                      1,
+                      2
+                    ],
                     "description": "Coordinate axis along which the step is located (0 = x, 1 = y, 2 = z)."
                   },
                   "location": {
                     "type": "number",
                     "description": "Junction position along `axis`, in meters. Cells with coordinate < location are on the left side."
                   },
-                  "N_D_left": {"type": "number", "description": "Donor concentration on the left side, cm^-3."},
-                  "N_A_left": {"type": "number", "description": "Acceptor concentration on the left side, cm^-3."},
-                  "N_D_right": {"type": "number", "description": "Donor concentration on the right side, cm^-3."},
-                  "N_A_right": {"type": "number", "description": "Acceptor concentration on the right side, cm^-3."}
+                  "N_D_left": {
+                    "type": "number",
+                    "description": "Donor concentration on the left side, cm^-3."
+                  },
+                  "N_A_left": {
+                    "type": "number",
+                    "description": "Acceptor concentration on the left side, cm^-3."
+                  },
+                  "N_D_right": {
+                    "type": "number",
+                    "description": "Donor concentration on the right side, cm^-3."
+                  },
+                  "N_A_right": {
+                    "type": "number",
+                    "description": "Acceptor concentration on the right side, cm^-3."
+                  }
                 }
               },
               {
                 "type": "object",
                 "title": "Gaussian doping",
                 "description": "Anisotropic Gaussian bump (donor or acceptor) added on top of a background uniform doping. Useful for implant-style junctions.",
-                "required": ["type", "center", "sigma", "peak", "dopant"],
+                "required": [
+                  "type",
+                  "center",
+                  "sigma",
+                  "peak",
+                  "dopant"
+                ],
                 "properties": {
                   "type": {
                     "const": "gaussian",
@@ -252,12 +494,16 @@
                   },
                   "center": {
                     "type": "array",
-                    "items": {"type": "number"},
+                    "items": {
+                      "type": "number"
+                    },
                     "description": "Gaussian peak center coordinates, in meters; length equals dimension."
                   },
                   "sigma": {
                     "type": "array",
-                    "items": {"type": "number"},
+                    "items": {
+                      "type": "number"
+                    },
                     "description": "Per-axis Gaussian standard deviations, in meters; length equals dimension."
                   },
                   "peak": {
@@ -266,7 +512,10 @@
                   },
                   "dopant": {
                     "type": "string",
-                    "enum": ["donor", "acceptor"],
+                    "enum": [
+                      "donor",
+                      "acceptor"
+                    ],
                     "description": "Whether the Gaussian adds to the donor or the acceptor profile."
                   },
                   "background_N_D": {
@@ -294,36 +543,61 @@
         "type": "object",
         "title": "Contact entry",
         "description": "One contact boundary condition. Ohmic contacts pin the potential and quasi-Fermi levels; gate contacts pin psi with a workfunction offset; insulating contacts contribute no Dirichlet row.",
-        "required": ["name", "facet", "type"],
+        "required": [
+          "name",
+          "facet",
+          "type"
+        ],
         "properties": {
           "name": {
             "type": "string",
             "description": "Human-readable contact name; used in IV output filenames and bias-sweep logs.",
-            "examples": ["anode", "cathode", "gate", "body"]
+            "examples": [
+              "anode",
+              "cathode",
+              "gate",
+              "body"
+            ]
           },
           "facet": {
             "oneOf": [
-              {"type": "string"},
-              {"type": "integer"}
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
             ],
             "description": "Facet reference: either a symbolic name from mesh.facets_by_plane (string) or an integer facet tag from a gmsh physical group."
           },
           "type": {
             "type": "string",
-            "enum": ["ohmic", "gate", "insulating"],
+            "enum": [
+              "ohmic",
+              "gate",
+              "insulating",
+              "mos_gate"
+            ],
             "description": "Contact type. `ohmic` enforces equilibrium majority-carrier concentrations and sets quasi-Fermi potentials to the applied voltage; `gate` is a Dirichlet BC on psi only with a workfunction offset; `insulating` is a no-flux Neumann BC."
           },
           "voltage": {
             "type": "number",
             "description": "Applied DC bias on this contact, in volts. Used when there is no `voltage_sweep` or as the starting point of one.",
             "default": 0.0,
-            "examples": [0.0, 0.6]
+            "examples": [
+              0.0,
+              0.6
+            ]
           },
           "voltage_sweep": {
             "type": "object",
             "title": "Voltage sweep",
             "description": "Continuation ramp on this contact. start -> stop in increments of at most `step`. When a single sweep crosses zero, the engine splits it into two unipolar legs.",
-            "required": ["start", "stop", "step"],
+            "required": [
+              "start",
+              "stop",
+              "step"
+            ],
             "properties": {
               "start": {
                 "type": "number",
@@ -348,6 +622,15 @@
           "oxide_region": {
             "type": "string",
             "description": "For gate contacts on multi-region meshes, the name of the insulator region separating the gate from the semiconductor."
+          },
+          "work_function_eV": {
+            "type": "number",
+            "description": "Gate metal work function in eV. Used by mos_gate contacts.",
+            "default": 4.05
+          },
+          "oxide_thickness_m": {
+            "type": "number",
+            "description": "Oxide thickness in meters. Used by mos_gate contacts."
           }
         }
       }
@@ -361,7 +644,10 @@
           "type": "number",
           "description": "Device temperature in kelvin. Affects the thermal voltage V_t and all temperature-dependent material parameters.",
           "default": 300.0,
-          "examples": [300.0, 77.0]
+          "examples": [
+            300.0,
+            77.0
+          ]
         },
         "recombination": {
           "type": "object",
@@ -376,14 +662,20 @@
             "tau_n": {
               "type": "number",
               "description": "Electron SRH lifetime, seconds.",
-              "default": 1.0e-7,
-              "examples": [1.0e-7, 1.0e-8]
+              "default": 1e-07,
+              "examples": [
+                1e-07,
+                1e-08
+              ]
             },
             "tau_p": {
               "type": "number",
               "description": "Hole SRH lifetime, seconds.",
-              "default": 1.0e-7,
-              "examples": [1.0e-7, 1.0e-8]
+              "default": 1e-07,
+              "examples": [
+                1e-07,
+                1e-08
+              ]
             },
             "E_t": {
               "type": "number",
@@ -404,7 +696,9 @@
           "properties": {
             "model": {
               "type": "string",
-              "enum": ["constant"],
+              "enum": [
+                "constant"
+              ],
               "description": "Mobility model selector.",
               "default": "constant"
             },
@@ -422,7 +716,9 @@
         },
         "statistics": {
           "type": "string",
-          "enum": ["boltzmann"],
+          "enum": [
+            "boltzmann"
+          ],
           "description": "Carrier statistics model. Boltzmann is the only supported option today; Fermi-Dirac is scheduled for M16.",
           "default": "boltzmann"
         }
@@ -443,7 +739,9 @@
             "mos_cv",
             "mos_cap_ac",
             "transient",
-            "ac_sweep"
+            "ac_sweep",
+            "cv_lf",
+            "cv_hf"
           ],
           "description": "Which runner to dispatch. `equilibrium` solves Poisson at zero bias; `drift_diffusion` solves the coupled system at a single bias point; `bias_sweep` ramps a contact voltage; `mos_cv` walks a gate sweep and integrates gate charge by numerical dQ/dV (legacy); `mos_cap_ac` (M14.1) walks a gate sweep and reports analytic differential capacitance from PDE sensitivity (preferred over `mos_cv`); `transient` runs BDF1/BDF2 time integration; `ac_sweep` (M14) runs small-signal AC analysis around a DC operating point; `newton_block` is a legacy alias.",
           "default": "equilibrium"
@@ -452,7 +750,10 @@
           "type": "object",
           "title": "DC operating point for AC sweep",
           "description": "DC operating point around which the small-signal AC linearisation is performed. Required when solver.type is `ac_sweep`. The named contact is also the contact whose terminal admittance is reported.",
-          "required": ["contact", "voltage"],
+          "required": [
+            "contact",
+            "voltage"
+          ],
           "properties": {
             "contact": {
               "type": "string",
@@ -468,7 +769,10 @@
           "type": "object",
           "title": "AC small-signal sweep specification",
           "description": "AC perturbation amplitude and frequency sweep. Required when solver.type is `ac_sweep`. Admittance is reported per unit perturbation voltage; the amplitude is informational only because the response is linearised.",
-          "required": ["contact", "frequencies"],
+          "required": [
+            "contact",
+            "frequencies"
+          ],
           "properties": {
             "contact": {
               "type": "string",
@@ -489,12 +793,20 @@
                   "type": "object",
                   "title": "Explicit frequency list",
                   "description": "Use a fully specified array of frequencies (Hz). The runner evaluates Y(omega) at each entry verbatim; useful for benchmarks and for replicating a measurement instrument's preset frequency list.",
-                  "required": ["type", "values"],
+                  "required": [
+                    "type",
+                    "values"
+                  ],
                   "properties": {
-                    "type": {"const": "list"},
+                    "type": {
+                      "const": "list"
+                    },
                     "values": {
                       "type": "array",
-                      "items": {"type": "number", "minimum": 0.0},
+                      "items": {
+                        "type": "number",
+                        "minimum": 0.0
+                      },
                       "minItems": 1,
                       "description": "Frequencies in Hz. f=0 is permitted (DC limit; capacitance reported as 0)."
                     }
@@ -504,24 +816,62 @@
                   "type": "object",
                   "title": "Logarithmic frequency sweep",
                   "description": "Generate `n_points` log-spaced frequencies between `start` and `stop` (both Hz, both strictly positive). Standard for AC characterisation since admittance varies over many decades of frequency.",
-                  "required": ["type", "start", "stop", "n_points"],
+                  "required": [
+                    "type",
+                    "start",
+                    "stop",
+                    "n_points"
+                  ],
                   "properties": {
-                    "type": {"const": "logspace"},
-                    "start": {"type": "number", "exclusiveMinimum": 0.0, "description": "Smallest frequency, Hz."},
-                    "stop": {"type": "number", "exclusiveMinimum": 0.0, "description": "Largest frequency, Hz."},
-                    "n_points": {"type": "integer", "minimum": 2, "description": "Number of log-spaced frequency points."}
+                    "type": {
+                      "const": "logspace"
+                    },
+                    "start": {
+                      "type": "number",
+                      "exclusiveMinimum": 0.0,
+                      "description": "Smallest frequency, Hz."
+                    },
+                    "stop": {
+                      "type": "number",
+                      "exclusiveMinimum": 0.0,
+                      "description": "Largest frequency, Hz."
+                    },
+                    "n_points": {
+                      "type": "integer",
+                      "minimum": 2,
+                      "description": "Number of log-spaced frequency points."
+                    }
                   }
                 },
                 {
                   "type": "object",
                   "title": "Linear frequency sweep",
                   "description": "Generate `n_points` linearly spaced frequencies between `start` (Hz, may be 0) and `stop` (Hz, strictly positive). Useful for narrow-band sweeps where the response shape is known to be smooth.",
-                  "required": ["type", "start", "stop", "n_points"],
+                  "required": [
+                    "type",
+                    "start",
+                    "stop",
+                    "n_points"
+                  ],
                   "properties": {
-                    "type": {"const": "linspace"},
-                    "start": {"type": "number", "minimum": 0.0, "description": "Smallest frequency, Hz."},
-                    "stop": {"type": "number", "exclusiveMinimum": 0.0, "description": "Largest frequency, Hz."},
-                    "n_points": {"type": "integer", "minimum": 2, "description": "Number of linearly spaced frequency points."}
+                    "type": {
+                      "const": "linspace"
+                    },
+                    "start": {
+                      "type": "number",
+                      "minimum": 0.0,
+                      "description": "Smallest frequency, Hz."
+                    },
+                    "stop": {
+                      "type": "number",
+                      "exclusiveMinimum": 0.0,
+                      "description": "Largest frequency, Hz."
+                    },
+                    "n_points": {
+                      "type": "integer",
+                      "minimum": 2,
+                      "description": "Number of linearly spaced frequency points."
+                    }
                   }
                 }
               ]
@@ -532,17 +882,24 @@
           "type": "number",
           "exclusiveMinimum": 0.0,
           "description": "Simulation end time in seconds. Only used when solver.type is `transient`.",
-          "examples": [1.0e-9]
+          "examples": [
+            1e-09
+          ]
         },
         "dt": {
           "type": "number",
           "exclusiveMinimum": 0.0,
           "description": "Fixed time step size in seconds. Only used when solver.type is `transient`. Adaptive stepping is not supported in M13.",
-          "examples": [1.0e-12]
+          "examples": [
+            1e-12
+          ]
         },
         "order": {
           "type": "integer",
-          "enum": [1, 2],
+          "enum": [
+            1,
+            2
+          ],
           "description": "BDF time integration order. 1 = backward Euler (BDF1); 2 = BDF2. Only used when solver.type is `transient`.",
           "default": 2
         },
@@ -572,12 +929,12 @@
         "atol": {
           "type": "number",
           "description": "Absolute residual tolerance for SNES convergence.",
-          "default": 1.0e-10
+          "default": 1e-10
         },
         "rtol": {
           "type": "number",
           "description": "Relative residual tolerance for SNES convergence.",
-          "default": 1.0e-8
+          "default": 1e-08
         },
         "damping": {
           "type": "number",
@@ -615,19 +972,19 @@
               "type": "number",
               "exclusiveMinimum": 0.0,
               "description": "SNES relative residual tolerance.",
-              "default": 1.0e-10
+              "default": 1e-10
             },
             "atol": {
               "type": "number",
               "exclusiveMinimum": 0.0,
               "description": "SNES absolute residual tolerance.",
-              "default": 1.0e-7
+              "default": 1e-07
             },
             "stol": {
               "type": "number",
               "exclusiveMinimum": 0.0,
               "description": "SNES step-size tolerance.",
-              "default": 1.0e-14
+              "default": 1e-14
             },
             "max_it": {
               "type": "integer",
@@ -656,7 +1013,7 @@
               "type": "number",
               "exclusiveMinimum": 0.0,
               "description": "Lower clamp on the continuation step, in volts. Halving is aborted once step < min_step.",
-              "default": 1.0e-4
+              "default": 0.0001
             },
             "max_halvings": {
               "type": "integer",
@@ -696,7 +1053,9 @@
         },
         "values": {
           "type": "array",
-          "items": {"type": "number"},
+          "items": {
+            "type": "number"
+          },
           "description": "Explicit list of voltage values to solve at, in volts."
         }
       }
@@ -710,14 +1069,31 @@
           "type": "string",
           "description": "Output directory (created if missing), resolved relative to the current working directory.",
           "default": "./results",
-          "examples": ["./results/pn_1d"]
+          "examples": [
+            "./results/pn_1d"
+          ]
         },
         "fields": {
           "type": "array",
-          "items": {"type": "string"},
+          "items": {
+            "type": "string"
+          },
           "description": "Names of scalar fields to include in the artifact (e.g. potential, n, p, phi_n, phi_p).",
-          "default": ["potential", "n", "p"],
-          "examples": [["potential", "n", "p", "phi_n", "phi_p", "iv"]]
+          "default": [
+            "potential",
+            "n",
+            "p"
+          ],
+          "examples": [
+            [
+              "potential",
+              "n",
+              "p",
+              "phi_n",
+              "phi_p",
+              "iv"
+            ]
+          ]
         },
         "write_xdmf": {
           "type": "boolean",

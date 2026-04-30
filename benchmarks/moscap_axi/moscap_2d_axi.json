@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.2.0",
+  "name": "moscap_2d_axi",
+  "description": "Axisymmetric 2D MOS capacitor. P-Si (1 um, Na=1e17 cm^-3) + SiO2 (5 nm). LF and HF C-V sweep.",
+  "dimension": "axisymmetric_2d",
+  "mesh": {
+    "source": "builtin_axi",
+    "extents": {"r": [0.0, 10.0e-6], "z": [0.0, 1.005e-6]},
+    "layers": [
+      {"name": "oxide",   "material": "SiO2", "z_range": [1.000e-6, 1.005e-6], "tag": 2},
+      {"name": "silicon", "material": "Si",   "z_range": [0.0,       1.000e-6], "tag": 1}
+    ],
+    "resolution": {"r": 20, "z_oxide": 10, "z_si": 80},
+    "facets": [
+      {"name": "axis",        "tag": 10, "where": "r=0"},
+      {"name": "outer",       "tag": 11, "where": "r=R_outer"},
+      {"name": "body",        "tag": 12, "where": "z=z_bot"},
+      {"name": "gate",        "tag": 13, "where": "z=z_top,r<=R_gate"},
+      {"name": "field_oxide", "tag": 14, "where": "z=z_top,r>R_gate"}
+    ],
+    "R_gate": 5.0e-6
+  },
+  "regions": {
+    "silicon": {"material": "Si",   "tag": 1, "role": "semiconductor"},
+    "oxide":   {"material": "SiO2", "tag": 2, "role": "insulator"}
+  },
+  "doping": [
+    {"region": "silicon", "profile": {"type": "uniform", "N_D": 0.0, "N_A": 1.0e17}}
+  ],
+  "contacts": [
+    {"name": "body", "facet": "body", "type": "ohmic", "voltage": 0.0},
+    {"name": "gate", "facet": "gate", "type": "mos_gate", "work_function_eV": 4.05, "voltage": 0.0}
+  ],
+  "physics": {
+    "temperature": 300.0,
+    "statistics": "boltzmann",
+    "mobility": {"mu_n": 1400.0, "mu_p": 450.0},
+    "recombination": {"srh": false, "tau_n": 1.0e-7, "tau_p": 1.0e-7, "E_t": 0.0}
+  },
+  "solver": {"type": "cv_lf"},
+  "output": {"directory": "./results/moscap_axi", "fields": ["potential", "n", "p", "cv"]}
+}

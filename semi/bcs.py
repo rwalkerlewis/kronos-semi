@@ -31,7 +31,7 @@ import numpy as np
 # Schema-allowed contact kinds that produce a Dirichlet BC. "insulating"
 # is a natural (Neumann) boundary and is therefore skipped during
 # resolution; it never produces a ContactBC.
-_VALID_DIRICHLET_KINDS = frozenset({"ohmic", "gate", "schottky"})
+_VALID_DIRICHLET_KINDS = frozenset({"ohmic", "gate", "mos_gate", "schottky"})
 
 
 @dataclass
@@ -88,10 +88,11 @@ def resolve_contacts(
         under `mesh.facets_by_plane`, or if the resolved tag has no
         facets in `facet_tags` (when `facet_tags` is not None).
     """
-    tag_by_name = {
-        p["name"]: int(p["tag"])
-        for p in cfg["mesh"].get("facets_by_plane", [])
-    }
+    tag_by_name = {}
+    for p in cfg["mesh"].get("facets_by_plane", []):
+        tag_by_name[p["name"]] = int(p["tag"])
+    for p in cfg["mesh"].get("facets", []):
+        tag_by_name[p["name"]] = int(p["tag"])
 
     out: list[ContactBC] = []
     for contact in cfg["contacts"]:
@@ -112,7 +113,7 @@ def resolve_contacts(
                 raise RuntimeError(
                     f"Contact {name!r} references facet name "
                     f"{facet_ref!r}, which is not declared under "
-                    f"mesh.facets_by_plane."
+                    f"mesh.facets_by_plane or mesh.facets."
                 )
             tag = tag_by_name[facet_ref]
         else:
@@ -132,6 +133,8 @@ def resolve_contacts(
             V_applied = float(contact.get("voltage", 0.0))
 
         wf = contact.get("workfunction")
+        if wf is None and kind == "mos_gate":
+            wf = contact.get("work_function_eV")
         out.append(ContactBC(
             name=name,
             kind=kind,
@@ -187,6 +190,10 @@ def build_psi_dirichlet_bcs(
             phi_ms = float(c.work_function) if c.work_function is not None else 0.0
             psi_bc = (c.V_applied - phi_ms) / sc.V0
             bcs.append(fem.dirichletbc(PETSc.ScalarType(psi_bc), dofs, V_psi))
+        elif c.kind == "mos_gate":
+            phi_ms = float(c.work_function) if c.work_function is not None else 0.0
+            psi_bc = (c.V_applied - phi_ms) / sc.V0
+            bcs.append(fem.dirichletbc(PETSc.ScalarType(psi_bc), dofs, V_psi))
         elif c.kind == "schottky":
             raise NotImplementedError(
                 f"Schottky contact {c.name!r}: physics not yet wired."
@@ -229,7 +236,7 @@ def build_dd_dirichlet_bcs(
         # assemble only on the semiconductor submesh, so gate facets carry
         # no (phi_n, phi_p) DOFs. We do still apply the psi Dirichlet
         # through build_psi_dirichlet_bcs.
-        if c.kind == "gate":
+        if c.kind in ("gate", "mos_gate"):
             continue
         if c.kind != "ohmic":
             continue

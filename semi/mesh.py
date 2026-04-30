@@ -44,6 +44,8 @@ def build_mesh(cfg: dict[str, Any]):
         cell_tags = _tag_regions(msh, mesh_cfg.get("regions_by_box", []))
         facet_tags = _tag_facets(msh, mesh_cfg.get("facets_by_plane", []))
         return msh, cell_tags, facet_tags
+    if source == "builtin_axi":
+        return build_axisymmetric_mesh(mesh_cfg)
     if source == "file":
         return _build_from_file(
             mesh_cfg,
@@ -337,3 +339,169 @@ def build_eps_r_function(msh, cell_tags, regions_cfg: dict):
             eps_r_fn.x.array[dof] = PETSc.ScalarType(eps)
     eps_r_fn.x.scatter_forward()
     return eps_r_fn
+
+
+def is_axisymmetric(cfg: dict) -> bool:
+    """Return True if the config describes an axisymmetric 2D geometry."""
+    return cfg.get("dimension") == "axisymmetric_2d"
+
+
+def build_axisymmetric_mesh(mesh_cfg: dict):
+    """
+    Build a graded 2D triangular mesh in (r, z) for axisymmetric MOSCAP.
+
+    Returns (msh, cell_tags, facet_tags) matching the convention of build_mesh.
+    """
+    import basix.ufl
+    import ufl
+    from dolfinx import mesh as dmesh
+    from dolfinx.mesh import create_mesh
+    from mpi4py import MPI
+
+    extents = mesh_cfg["extents"]
+    r_min = float(extents["r"][0])
+    r_max = float(extents["r"][1])
+    z_bot = float(extents["z"][0])
+    z_top = float(extents["z"][1])
+
+    res = mesh_cfg.get("resolution", {})
+    nr = int(res.get("r", 20))
+    nz_si = int(res.get("z_si", 80))
+    nz_ox = int(res.get("z_oxide", 10))
+
+    # Identify Si/SiO2 interface from layers
+    layers = mesh_cfg["layers"]
+    z_si_top = z_bot  # default fallback
+    for layer in layers:
+        mat = layer.get("material", "")
+        if mat.lower() in ("si", "silicon", "ge", "gaas"):
+            z_si_top = max(z_si_top, float(layer["z_range"][1]))
+
+    # Graded z in silicon: cosine spacing, fine near top (Si/SiO2 interface)
+    t_si = 0.5 * (1.0 - np.cos(np.linspace(0.0, np.pi, nz_si + 1)))
+    z_si_coords = z_bot + t_si * (z_si_top - z_bot)
+
+    # Uniform z in oxide
+    z_ox_coords = np.linspace(z_si_top, z_top, nz_ox + 1)[1:]  # skip duplicate
+
+    z_coords = np.concatenate([z_si_coords, z_ox_coords])
+    nz_total = len(z_coords) - 1
+
+    r_coords = np.linspace(r_min, r_max, nr + 1)
+
+    # Build point array: indices (i, j) -> point i*(nz_total+1)+j
+    RR, ZZ = np.meshgrid(r_coords, z_coords, indexing="ij")
+    pts_2d = np.column_stack([RR.ravel(), ZZ.ravel()])
+
+    def idx(i, j):
+        return i * (nz_total + 1) + j
+
+    cells_list = []
+    for i in range(nr):
+        for j in range(nz_total):
+            # Two triangles per quad (lower-left / upper-right split)
+            cells_list.append([idx(i, j), idx(i + 1, j), idx(i + 1, j + 1)])
+            cells_list.append([idx(i, j), idx(i + 1, j + 1), idx(i, j + 1)])
+    cells = np.array(cells_list, dtype=np.int64)
+
+    domain = ufl.Mesh(basix.ufl.element("Lagrange", "triangle", 1, shape=(2,)))
+    comm = MPI.COMM_WORLD
+    msh = create_mesh(comm, cells, pts_2d, domain)
+
+    # --- Cell tags ---
+    tdim = msh.topology.dim
+    msh.topology.create_entities(tdim)
+    num_cells = (msh.topology.index_map(tdim).size_local
+                 + msh.topology.index_map(tdim).num_ghosts)
+    all_cells = np.arange(num_cells, dtype=np.int32)
+    centroids = _cell_centroids(msh, all_cells)
+
+    values = np.zeros(num_cells, dtype=np.int32)
+    for layer in layers:
+        tag = int(layer["tag"])
+        z_lo = float(layer["z_range"][0])
+        z_hi = float(layer["z_range"][1])
+        inside = (centroids[:, 1] >= z_lo - 1.0e-15) & (centroids[:, 1] <= z_hi + 1.0e-15)
+        values[inside] = tag
+
+    tagged_cells = np.where(values != 0)[0].astype(np.int32)
+    cell_vals = values[tagged_cells]
+    order = np.argsort(tagged_cells)
+    tagged_cells = tagged_cells[order]
+    cell_vals = cell_vals[order]
+    cell_tags = dmesh.meshtags(msh, tdim, tagged_cells, cell_vals)
+
+    # --- Facet tags ---
+    facet_specs = mesh_cfg.get("facets", [])
+    R_gate = float(mesh_cfg.get("R_gate", r_max))
+    facet_tags = _tag_axi_facets(msh, facet_specs, r_min, r_max, z_bot, z_top, R_gate)
+
+    return msh, cell_tags, facet_tags
+
+
+def _tag_axi_facets(msh, facet_specs, r_min, r_max, z_bot, z_top, R_gate):
+    """Tag facets for the axisymmetric mesh from `where` string specs."""
+    from dolfinx import mesh as dmesh
+
+    fdim = msh.topology.dim - 1
+    tol = 1.0e-12
+
+    all_facets = []
+    all_tags = []
+
+    for spec in facet_specs:
+        tag = int(spec["tag"])
+        where = spec["where"].strip().replace(" ", "")
+
+        if where == "r=0":
+            facets = dmesh.locate_entities_boundary(
+                msh, fdim,
+                lambda x, _r=r_min, _t=tol: np.isclose(x[0], _r, atol=_t),
+            )
+        elif where == "r=R_outer":
+            facets = dmesh.locate_entities_boundary(
+                msh, fdim,
+                lambda x, _r=r_max, _t=tol: np.isclose(x[0], _r, atol=_t),
+            )
+        elif where == "z=z_bot":
+            facets = dmesh.locate_entities_boundary(
+                msh, fdim,
+                lambda x, _z=z_bot, _t=tol: np.isclose(x[1], _z, atol=_t),
+            )
+        elif where in ("z=z_top", "z=z_top,r<=R_gate"):
+            facets = dmesh.locate_entities_boundary(
+                msh, fdim,
+                lambda x, _z=z_top, _rg=R_gate, _t=tol: (
+                    np.isclose(x[1], _z, atol=_t) & (x[0] <= _rg + _t)
+                ),
+            )
+        elif where == "z=z_top,r>R_gate":
+            facets = dmesh.locate_entities_boundary(
+                msh, fdim,
+                lambda x, _z=z_top, _rg=R_gate, _t=tol: (
+                    np.isclose(x[1], _z, atol=_t) & (x[0] > _rg - _t)
+                ),
+            )
+        else:
+            # Unknown where spec — skip
+            continue
+
+        all_facets.append(facets)
+        all_tags.append(np.full(len(facets), tag, dtype=np.int32))
+
+    if not all_facets:
+        return None
+
+    facets = np.concatenate(all_facets).astype(np.int32)
+    tags = np.concatenate(all_tags).astype(np.int32)
+
+    order = np.argsort(facets)
+    facets = facets[order]
+    tags = tags[order]
+
+    _, first = np.unique(facets, return_index=True)
+    facets = facets[first]
+    tags = tags[first]
+
+    return dmesh.meshtags(msh, fdim, facets, tags)
+

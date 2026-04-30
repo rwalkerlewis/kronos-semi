@@ -1,5 +1,34 @@
 # Changelog
 
+## [Unreleased] - Day 5b
+
+### Added
+- Axisymmetric 2D MOSCAP with LF and HF C-V curves.
+- `schemas/input.v1.json`: `dimension` field now accepts `"axisymmetric_2d"`;
+  `mesh.source` accepts `"builtin_axi"` with r/z extents, layers, and facet
+  specs; contact type enum extended with `"mos_gate"`; solver type enum
+  extended with `"cv_lf"` and `"cv_hf"`.
+- `semi/mesh.py`: `build_axisymmetric_mesh` builds a graded 2D triangular
+  mesh in (r, z) with cosine-spaced silicon and uniform oxide layers;
+  `_tag_axi_facets` tags boundary facets by `where` string specs;
+  `is_axisymmetric` predicate.
+- `semi/bcs.py`: `mos_gate` contact kind; `mesh.facets` lookup in
+  `resolve_contacts`; `work_function_eV` fallback for `mos_gate`.
+- `semi/scaling.py`: `_infer_length` handles `builtin_axi` extents.
+- `semi/physics/poisson.py`: `build_equilibrium_poisson_form_mr_axi`
+  r-weighted axisymmetric multi-region Poisson form.
+- `semi/physics/drift_diffusion.py`: `build_dd_block_residual_mr_axi`
+  r-weighted axisymmetric block residual.
+- `semi/physics/cv.py`: `compute_cv_curve` for LF (equilibrium Poisson
+  sweep) and HF (frozen minority carrier) C-V; central-difference
+  capacitance calculation.
+- `semi/runners/moscap_axi_cv.py`: `run_moscap_axi_cv` dispatcher for
+  `cv_lf` and `cv_hf` solver types.
+- `semi/run.py`: dispatches `cv_lf` and `cv_hf` to `run_moscap_axi_cv`.
+- `benchmarks/moscap_axi/`: benchmark config and sweep parameters.
+- `tests/check_moscap_axi_math.py`: pure-Python analytical checks.
+- `tests/test_moscap_axi_cv.py`: schema and mesh unit tests.
+
 ## [0.14.1] - 2026-04-27
 
 ### Added

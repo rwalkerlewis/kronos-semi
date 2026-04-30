@@ -108,6 +108,11 @@ def _infer_length(cfg: dict) -> float:
     if mesh["source"] == "builtin":
         extents = mesh["extents"]
         return max(b[1] - b[0] for b in extents)
+    if mesh["source"] == "builtin_axi":
+        extents = mesh["extents"]
+        r_range = extents["r"][1] - extents["r"][0]
+        z_range = extents["z"][1] - extents["z"][0]
+        return max(r_range, z_range)
     return 1.0e-6  # fallback for file-based meshes
 
 

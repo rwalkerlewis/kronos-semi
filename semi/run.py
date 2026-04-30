@@ -74,6 +74,9 @@ def run(cfg: dict[str, Any]):
         return run_transient(cfg)
     if stype == "ac_sweep":
         return run_ac_sweep(cfg)
+    if stype in ("cv_lf", "cv_hf"):
+        from .runners.moscap_axi_cv import run_moscap_axi_cv
+        return run_moscap_axi_cv(cfg)
     raise ValueError(f"Unknown solver.type {stype!r}")
 
 
