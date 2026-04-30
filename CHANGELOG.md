@@ -1,9 +1,21 @@
 # Changelog
 
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+Version sections below track the **package** version. The JSON input
+**schema** version is tracked separately in
+[`schemas/input.v1.json`](schemas/input.v1.json) and in the
+[schema reference](docs/schema/reference.md); the most recent schema
+bump is **1.3.0** (added `coordinate_system`), shipped with the
+M14.2 axisymmetric-MOSCAP work in the `[Unreleased]` section below.
+
 ## [Unreleased]
 
 ### Added
-- Axisymmetric (cylindrical) coordinate system support (schema 1.3.0).
+- Axisymmetric (cylindrical) coordinate system support (**schema 1.3.0**).
   New top-level `coordinate_system` field accepts `"cartesian"`
   (default, unchanged) or `"axisymmetric"`. Cross-field validation
   enforces dimension == 2, non-negative radial extent, and rejects
@@ -25,6 +37,52 @@
   `tests/test_coordinate_system.py`: pure-Python analytical and
   schema-validation tests. `tests/test_moscap_axisym_cv.py` adds
   a dolfinx-gated FEM smoke test.
+- **Post-merge documentation refresh.**
+  - `docs/` tree (theory, schema, benchmarks, tasks) and
+    `docs/index.md` as a navigable table of contents.
+  - Theory notes extracted from the README:
+    [`theory/scaling.md`](docs/theory/scaling.md),
+    [`theory/slotboom.md`](docs/theory/slotboom.md),
+    [`theory/dolfinx_choice.md`](docs/theory/dolfinx_choice.md).
+    New notes: [`theory/axisymmetric.md`](docs/theory/axisymmetric.md)
+    and [`theory/moscap_cv.md`](docs/theory/moscap_cv.md).
+  - [`docs/schema/reference.md`](docs/schema/reference.md): full
+    JSON input contract reference (field-by-field, version history,
+    known caveats), replacing the README's long inline example.
+  - Per-benchmark landing pages
+    [`docs/benchmarks/pn_junction_1d.md`](docs/benchmarks/pn_junction_1d.md)
+    and
+    [`docs/benchmarks/moscap_axisym_2d.md`](docs/benchmarks/moscap_axisym_2d.md).
+  - [`tests/test_moscap_axisym_cv_fem.py`](tests/test_moscap_axisym_cv_fem.py):
+    FEM C-V regression test that loads `fem_cv.csv` against
+    `reference_cv.csv` and checks `C_HF_min`, accumulation /
+    inversion plateaus, and LF-HF coincidence in depletion. Skips
+    cleanly when `fem_cv.csv` is absent so contributors without
+    dolfinx are not blocked.
+
+### Changed
+- README: added CI / license / Python and a second Colab badge;
+  status section bumped to v0.14.1 with M14.2 marked done;
+  replaced the long Design-notes subsections with a one-paragraph
+  summary that links into [`docs/theory/`](docs/theory/); replaced
+  the inline JSON schema example with a shorter snippet and a link
+  to [`docs/schema/reference.md`](docs/schema/reference.md); updated
+  the Verification section with current pytest counts (237 passed,
+  22 skipped pure-Python; 15/15 MOSCAP analytical anchors green) and
+  the headline MOSCAP numbers (V_fb = -0.950 V, V_t = +0.181 V,
+  |phi_B| = 0.399 V, W_dmax = 144 nm, C_min/C_ox = 0.173).
+- CHANGELOG reformatted to the standard
+  [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) layout
+  with preamble, header, and unreleased / version sections. All
+  existing entries preserved verbatim.
+- CONTRIBUTING.md: added sections for axisymmetric benchmarks, the
+  gmsh `.geo` template convention, the pure-Python-vs-FEM test
+  split, and how to add a new benchmark; refreshed pytest counts.
+- `prompts/axisymmetric_moscap_cv.md` moved to
+  [`docs/tasks/2026-04-axisymmetric-moscap.md`](docs/tasks/2026-04-axisymmetric-moscap.md).
+- `.gitignore`: ignore generated gmsh `.msh` files outside committed
+  benchmark fixtures and notebook checkpoints under
+  `notebooks/figures/`.
 
 ## [0.14.1] - 2026-04-27
 
