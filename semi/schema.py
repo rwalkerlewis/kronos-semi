@@ -49,7 +49,10 @@ ENGINE_SUPPORTED_SCHEMA_MAJOR = 1
 #   M13 (1.1.0): added the `transient` solver type.
 #   M14 (1.2.0): added the `ac_sweep` solver type plus solver.dc_bias and
 #                solver.ac sub-objects (frequency sweep specification).
-SCHEMA_SUPPORTED_MINOR = 2
+#   M15 (1.3.0): added the top-level `coordinate_system` field with the
+#                `axisymmetric` option for cylindrical 2D MOSCAP and similar
+#                rotationally-symmetric devices.
+SCHEMA_SUPPORTED_MINOR = 3
 
 
 @lru_cache(maxsize=1)
@@ -111,8 +114,66 @@ def validate(cfg: dict[str, Any]) -> dict[str, Any]:
     return _fill_defaults(cfg)
 
 
+def _validate_coordinate_system(cfg: dict[str, Any]) -> None:
+    """
+    Cross-field validation for the `coordinate_system` setting.
+
+    `axisymmetric` requires:
+      - dimension == 2 (the meridian half-plane is a 2D domain),
+      - all radial coordinates non-negative (mesh extents r >= 0 if builtin),
+      - no Dirichlet (ohmic or gate) contact pinned at r = 0; the symmetry
+        axis is a natural no-flux boundary.
+
+    These checks happen after JSON-schema structural validation so the
+    error messages can reference resolved values. Failures raise
+    SchemaError with a clear message.
+    """
+    cs = cfg.get("coordinate_system", "cartesian")
+    if cs == "cartesian":
+        return
+    if cs != "axisymmetric":
+        raise SchemaError(
+            f"coordinate_system={cs!r} is not supported; "
+            f"expected 'cartesian' or 'axisymmetric'"
+        )
+
+    dim = int(cfg["dimension"])
+    if dim != 2:
+        raise SchemaError(
+            f"coordinate_system='axisymmetric' requires dimension=2 "
+            f"(meridian half-plane); got dimension={dim}"
+        )
+
+    mesh = cfg.get("mesh", {})
+    if mesh.get("source") == "builtin":
+        extents = mesh.get("extents", [])
+        if extents and float(extents[0][0]) < 0.0:
+            raise SchemaError(
+                "coordinate_system='axisymmetric': radial extent extents[0] "
+                f"must satisfy r_min >= 0; got r_min={extents[0][0]}"
+            )
+
+    # Forbid Dirichlet contacts on the symmetry axis. We detect axis facets
+    # by looking for facets_by_plane entries with axis=0 and value=0 in
+    # builtin meshes; for file meshes the user is responsible for not
+    # tagging the axis as a contact (documented in the schema description).
+    axis_facet_names: set[str] = set()
+    for plane in mesh.get("facets_by_plane", []) if mesh.get("source") == "builtin" else []:
+        if int(plane.get("axis", -1)) == 0 and abs(float(plane.get("value", 1.0))) < 1.0e-15:
+            axis_facet_names.add(plane["name"])
+    for c in cfg.get("contacts", []):
+        if c.get("type") in ("ohmic", "gate") and c.get("facet") in axis_facet_names:
+            raise SchemaError(
+                f"coordinate_system='axisymmetric': contact {c.get('name')!r} "
+                f"is pinned at r=0 on facet {c.get('facet')!r}; the symmetry "
+                f"axis must remain a natural (Neumann) boundary"
+            )
+
+
 def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     """Fill in sensible defaults for optional sections."""
+    cfg.setdefault("coordinate_system", "cartesian")
+    _validate_coordinate_system(cfg)
     phys = cfg.setdefault("physics", {})
     phys.setdefault("temperature", 300.0)
     rec = phys.setdefault("recombination", {})
