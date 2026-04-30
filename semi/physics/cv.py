@@ -41,7 +41,8 @@ def compute_cv_curve(
         'LF' for quasi-static (equilibrium Poisson) or 'HF' for frozen
         minority carrier (minority n is frozen at each Vg).
     Vg_sweep : list of float
-        Gate voltages to evaluate. If None, uses [-1.5, -1.0, ..., 1.5].
+        Gate voltages to evaluate. If None, uses np.arange(-1.5, 1.55, 0.1)
+        giving voltages at 0.1 V intervals from -1.5 V to +1.5 V.
     dV : float
         Half-step for central-difference capacitance calculation.
 
@@ -199,47 +200,23 @@ def compute_cv_curve(
             Q_list.append(Q_total)
             Vg_list.append(Vg)
 
-            # 2. Freeze minority carrier density (n_hat = ni * exp(psi_lf))
-            #    Create a DG0 function on the parent mesh holding n_hat_frozen
+            # 2. Freeze minority carrier density using dolfinx Expression
+            #    n_hat_frozen = ni_hat * exp(psi_lf)  evaluated via DG0 interpolation
+            import ufl as _ufl
             V_DG0 = fem.functionspace(msh, ("DG", 0))
             n_hat_frozen_fn = fem.Function(V_DG0, name="n_hat_frozen")
-            # Interpolate from psi: n_hat = ni_hat * exp(psi)
-            psi_frozen_array = psi.x.array.copy()
-
-            # We need n_hat_frozen as a cellwise DG0 function on the parent mesh.
-            # Use interpolation of ni_hat * exp(psi) evaluated at cell centroids.
             ni_hat_val = sc.n_i / sc.C0
-
-            def _n_hat_frozen(x):
-                # x shape (3, npoints); evaluate psi at those points
-                # For DG0, x contains cell centroids
-                # We need to call psi.eval at these points
-                pts = x[:2, :].T  # shape (npoints, 2)
-                n_pts = pts.shape[0]
-                psi_vals = np.zeros(n_pts)
-                for ip in range(n_pts):
-                    # Use a bounding box tree to evaluate
-                    try:
-                        val = psi.eval(pts[ip], [0])[0]
-                        psi_vals[ip] = float(val)
-                    except Exception:
-                        psi_vals[ip] = 0.0
-                return ni_hat_val * np.exp(psi_vals)
-
-            n_hat_frozen_fn.interpolate(_n_hat_frozen)
+            n_expr = fem.Expression(
+                fem.Constant(msh, PETSc.ScalarType(ni_hat_val)) * _ufl.exp(psi),
+                V_DG0.element.interpolation_points(),
+            )
+            n_hat_frozen_fn.interpolate(n_expr)
             n_hat_frozen_fn.x.scatter_forward()
 
             # 3. Build HF frozen Poisson form
-            #    rho_HF = p_hat - n_hat_frozen + N_hat
-            #           = ni*exp(-psi) - n_hat_frozen + N_hat
             psi_hf = fem.Function(V, name=f"psi_hf_{tag}")
             psi_hf.x.array[:] = psi.x.array.copy()
             psi_hf.x.scatter_forward()
-
-            F_hf = _build_frozen_n_poisson_axi(
-                V, psi_hf, n_hat_frozen_fn, N_hat_fn, sc, eps_r_fn,
-                cell_tags, semi_tag
-            )
 
             def _solve_hf_frozen(psi_fn, Vg_val, ptag):
                 voltages = {gate_name: Vg_val}
@@ -274,9 +251,8 @@ def compute_cv_curve(
 
             def _q_hf(psi_fn):
                 """Integrate HF charge: rho_HF = p - n_frozen + N."""
-                n_hat_frz_expr = n_hat_frozen_fn
                 p_hat_expr = ni_hat_const * ufl.exp(-psi_fn)
-                rho_hf = p_hat_expr - n_hat_frz_expr + N_hat_fn
+                rho_hf = p_hat_expr - n_hat_frozen_fn + N_hat_fn
                 cf = fem.form(rho_hf * r_coord * dx_semi)
                 local = float(fem.assemble_scalar(cf))
                 total = msh.comm.allreduce(local, op=MPI.SUM)

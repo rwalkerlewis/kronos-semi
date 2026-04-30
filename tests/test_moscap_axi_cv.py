@@ -93,10 +93,10 @@ def test_schema_accepts_integer_dimensions():
 def test_axisymmetric_mesh_builds():
     """Build the axisymmetric mesh and check basic properties."""
     try:
-        import basix  # noqa: F401
+        import dolfinx.mesh  # noqa: F401
         from semi.mesh import build_mesh
     except ImportError:
-        pytest.skip("dolfinx/basix not available")
+        pytest.skip("dolfinx not available")
 
     cfg = load_cfg()
     msh, cell_tags, facet_tags = build_mesh(cfg)
