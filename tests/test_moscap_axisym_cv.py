@@ -84,7 +84,7 @@ def test_axisym_poisson_single_region_form():
     sc = _make_scaling()
 
     F = build_equilibrium_poisson_form_axisym(V, psi, N_hat, sc, eps_r=11.7)
-    assert F.ufl_domain().ufl_cargo() is msh
+    assert F.ufl_domain() is msh.ufl_domain()
     assert F.arguments()
 
 
@@ -102,7 +102,7 @@ def test_axisym_poisson_multiregion_form():
     F = build_equilibrium_poisson_form_axisym_mr(
         V, psi, N_hat, sc, eps_r_fn, cell_tags, semi_tag=1,
     )
-    assert F.ufl_domain().ufl_cargo() is msh
+    assert F.ufl_domain() is msh.ufl_domain()
     assert F.arguments()
 
 
@@ -126,7 +126,7 @@ def test_axisym_dd_block_residual_three_forms():
     )
     assert len(forms) == 3
     for F in forms:
-        assert F.ufl_domain().ufl_cargo() is msh
+        assert F.ufl_domain() is msh.ufl_domain()
         assert F.arguments()
     f_psi, f_n, f_p = forms
     assert f_psi.arguments()[0].ufl_function_space() is spaces.V_psi
