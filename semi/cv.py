@@ -33,7 +33,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .constants import EPS0, Q, thermal_voltage, cm3_to_m3
+from .constants import EPS0, Q, cm3_to_m3, thermal_voltage
 
 EPS_R_SI = 11.7
 EPS_R_SIO2 = 3.9

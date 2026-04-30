@@ -25,14 +25,13 @@ dolfinx = pytest.importorskip("dolfinx")
 gmshio = pytest.importorskip("dolfinx.io.gmshio")
 ufl = pytest.importorskip("ufl")
 
-from mpi4py import MPI
+from mpi4py import MPI  # noqa: E402
 
-from semi.schema import validate
-from semi.physics.axisymmetric import (
+from semi.physics.axisymmetric import (  # noqa: E402
     build_equilibrium_poisson_form_axisym_mr,
 )
-from semi.scaling import ScalingContext
-
+from semi.scaling import ScalingContext  # noqa: E402
+from semi.schema import validate  # noqa: E402
 
 BENCH_DIR = Path(__file__).resolve().parent.parent / "benchmarks" / "moscap_axisym_2d"
 CFG_PATH = BENCH_DIR / "moscap_axisym.json"

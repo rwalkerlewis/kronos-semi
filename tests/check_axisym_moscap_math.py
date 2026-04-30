@@ -17,6 +17,7 @@ import sys
 
 import numpy as np
 
+from semi.constants import EPS0, Q
 from semi.cv import (
     EPS_R_SI,
     EPS_R_SIO2,
@@ -26,8 +27,6 @@ from semi.cv import (
     hf_cv_depletion_approximation,
     lf_cv_quasistatic,
 )
-from semi.constants import EPS0, Q
-
 
 # ---- reference parameters (match benchmarks/moscap_axisym_2d) ----
 N_A = 5.0e16          # cm^-3 p-Si body
