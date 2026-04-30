@@ -45,6 +45,11 @@ test = [
     # Bernoulli-function unit tests in tests/fem/test_scharfetter_gummel.py
     # (M13.1 / ADR 0012). Pure Python, no compiled deps.
     "mpmath>=1.3",
+    # scipy.optimize.brentq is used by semi.cv.lf_cv_quasistatic to
+    # invert the surface-potential equation for the analytical LF C-V
+    # baseline. Only needed at test time; the FEM runners do not depend
+    # on scipy.
+    "scipy>=1.10",
 ]
 dev = [
     "pytest>=7.0",
@@ -53,6 +58,7 @@ dev = [
     "nbformat>=5.0",
     "ruff>=0.1",
     "mpmath>=1.3",
+    "scipy>=1.10",
 ]
 server = [
     "fastapi>=0.115,<0.120",

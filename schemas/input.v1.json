@@ -8,8 +8,15 @@
     "schema_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.2.0.",
-      "examples": ["1.0.0", "1.1.0", "1.2.0"]
+      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.3.0.",
+      "examples": ["1.0.0", "1.1.0", "1.2.0", "1.3.0"]
+    },
+    "coordinate_system": {
+      "type": "string",
+      "enum": ["cartesian", "axisymmetric"],
+      "default": "cartesian",
+      "title": "Coordinate system",
+      "description": "Coordinate convention for the weak forms. `cartesian` (default) uses standard Euclidean integration. `axisymmetric` solves on the meridian half-plane (r, z) with rotational symmetry about z, multiplying every volume integrand by r so dV = 2*pi*r*dr*dz. Axisymmetric requires dimension=2 and the first mesh coordinate is interpreted as the radial axis r >= 0; the symmetry axis r=0 is a natural (no-flux) boundary and must not carry a Dirichlet contact. Added in schema 1.3.0."
     },
     "name": {
       "type": "string",

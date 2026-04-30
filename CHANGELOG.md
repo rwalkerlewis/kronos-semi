@@ -1,5 +1,31 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Axisymmetric (cylindrical) coordinate system support (schema 1.3.0).
+  New top-level `coordinate_system` field accepts `"cartesian"`
+  (default, unchanged) or `"axisymmetric"`. Cross-field validation
+  enforces dimension == 2, non-negative radial extent, and rejects
+  Dirichlet contacts on the symmetry axis r = 0.
+- `semi/physics/axisymmetric.py`: r-weighted Poisson and
+  Slotboom drift-diffusion weak forms for the meridian half-plane.
+- `semi/cv.py`: pure-Python (no dolfinx) MOSCAP analytical
+  reference (V_fb, V_t, |phi_B|, W_dmax, C_ox, C_min) plus LF
+  (quasi-static) and HF (depletion-clamp) C-V helpers; FEM
+  postprocessors `compute_lf_cv_fem` and
+  `compute_hf_cv_depletion_clamp`.
+- `benchmarks/moscap_axisym_2d/`: gmsh `.geo` for the meridian
+  mesh, `moscap_axisym.json` config (Hu Fig. 5-18 parameters),
+  and `reference_cv.csv` analytical baseline.
+- `notebooks/05_moscap_axisym_cv.ipynb`: scaffold notebook
+  reproducing the LF/HF C-V split (analytical reference renders
+  locally; FEM cells require dolfinx and are deferred to CI).
+- `tests/check_axisym_moscap_math.py` and
+  `tests/test_coordinate_system.py`: pure-Python analytical and
+  schema-validation tests. `tests/test_moscap_axisym_cv.py` adds
+  a dolfinx-gated FEM smoke test.
+
 ## [0.14.1] - 2026-04-27
 
 ### Added
