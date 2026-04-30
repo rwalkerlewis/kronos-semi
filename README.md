@@ -75,10 +75,19 @@ live in [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md).
 | Milestone | Summary                                                              | Status              |
 |-----------|----------------------------------------------------------------------|---------------------|
 | M13.1     | Scharfetter-Gummel edge-flux discretisation for transient continuity | In flight (issue #34) |
+| M15       | 2D-axisymmetric MOSCAP C-V (LF + HF, Hu Fig 5-18)                    | In flight           |
 | M15       | GPU linear solver path                                               | Planned             |
 | M16       | Physics completeness (Caughey-Thomas, Auger, FD, Schottky, tunneling) | Planned             |
 | M17       | Heterojunctions / position-dependent band structure                  | Planned             |
 | M18       | UI: first cut (separate repo)                                        | Out of scope here   |
+
+The original "Day 5 -- 2D MOS capacitor" line item is **superseded by the
+2D-axisymmetric MOSCAP** above. Axisymmetric exploits the body-of-revolution
+symmetry of a circular gate: instead of meshing a full 3D disc, we mesh
+the (r, z) half-plane and integrate against `2 pi r dr dz`. For the same
+fringing-field fidelity this is `O(N^2)` DOFs instead of `O(N^3)`, and the
+geometry is naturally a disc-shaped device rather than the rectangular
+infinite-stripe of a 2D Cartesian model.
 
 ## Orientation
 
@@ -387,6 +396,30 @@ junction.
 python tests/check_day1_math.py    # runs offline, no dolfinx required
 pytest tests/                       # 256 tests + 1 xfail under Docker
 python scripts/run_verification.py  # V&V suite
+```
+
+### Axisymmetric MOSCAP (M15, in flight)
+
+`tests/check_moscap_axi_math.py` runs the closed-form Hu-Ch.5 reference
+formulas for the n+poly / SiO2 / p-Si stack at the benchmark defaults
+(`t_ox = 5 nm, N_A = 1e17 cm^-3, T = 300 K`):
+
+- `phi_F = V_t ln(N_A / n_i)` and `2 phi_F` (~ 0.83 V at N_A = 1e17)
+- `V_FB = phi_m - (chi_Si + Eg/2 + phi_F)` for n+ poly (~ -0.95 V)
+- `W_dep,max = sqrt(2 eps_Si 2 phi_F / (q N_A))` (~ 104 nm)
+- `C_ox = eps_ox / t_ox` and `C_dep,min = eps_Si / W_dep,max`
+- `C_min/C_ox = 1 / (1 + eps_ox W_dep,max / (eps_Si t_ox))`
+- `V_T = V_FB + 2 phi_F + sqrt(2 eps_Si q N_A 2 phi_F) / C_ox`
+
+Wired into `pytest` at `tests/test_moscap_axi_math.py` and exercised by
+the CV sweep in the notebook (Slice 3+). FEM acceptance criteria from
+the problem statement: LF and HF curves coincide for V_g < V_T to within
+1%, the HF curve floor matches `C_min/C_ox` to within 5%, and the LF
+curve climbs back to >= 0.95 C_ox at `V_g = V_T + 1 V`.
+
+```bash
+python tests/check_moscap_axi_math.py            # standalone sanity
+pytest tests/test_moscap_axi_math.py -v          # 13 closed-form assertions
 ```
 
 ## Planning documents (read order for contributors)

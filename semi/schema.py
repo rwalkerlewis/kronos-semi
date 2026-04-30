@@ -49,7 +49,11 @@ ENGINE_SUPPORTED_SCHEMA_MAJOR = 1
 #   M13 (1.1.0): added the `transient` solver type.
 #   M14 (1.2.0): added the `ac_sweep` solver type plus solver.dc_bias and
 #                solver.ac sub-objects (frequency sweep specification).
-SCHEMA_SUPPORTED_MINOR = 2
+#   M15 (1.3.0): added top-level `coordinate_system` ("cartesian" |
+#                "axisymmetric"); added `oxide_thickness` and
+#                `gate_workfunction_eV` to `gate` contacts; added top-level
+#                `cv_sweep` block (Vg_min, Vg_max, n_points, frequency_mode).
+SCHEMA_SUPPORTED_MINOR = 3
 
 
 @lru_cache(maxsize=1)
@@ -108,11 +112,75 @@ def validate(cfg: dict[str, Any]) -> dict[str, Any]:
             f"engine supports major {ENGINE_SUPPORTED_SCHEMA_MAJOR}"
         )
 
-    return _fill_defaults(cfg)
+    cfg = _fill_defaults(cfg)
+    # Cross-field invariants run AFTER defaults so the checks see the
+    # final cfg state (e.g. coordinate_system populated to "cartesian").
+    _check_cross_field_invariants(cfg)
+
+    return cfg
+
+
+def _check_cross_field_invariants(cfg: dict[str, Any]) -> None:
+    """Validate constraints that the JSON schema cannot express directly.
+
+    These checks live here because Draft-07 has no clean way to express
+    "field A is required *only when* field B equals X". They run after
+    the structural JSON-schema validation, so by this point we know the
+    types are right; we are only enforcing semantic constraints.
+
+    Raises ``SchemaError`` on the first violation found.
+    """
+    coord = cfg.get("coordinate_system", "cartesian")
+    dim = cfg.get("dimension")
+    if coord == "axisymmetric":
+        if dim != 2:
+            raise SchemaError(
+                "coordinate_system='axisymmetric' requires dimension == 2 "
+                f"(got dimension={dim}); the (r, z) half-plane is two-dimensional."
+            )
+        mesh = cfg.get("mesh", {})
+        if mesh.get("source") == "builtin":
+            extents = mesh.get("extents", [])
+            # Axis 0 is r; r must start at exactly 0.0 so that the symmetry
+            # axis is a mesh facet and the r-weighted weak form behaves
+            # correctly (no Dirichlet on r=0; the r factor handles it).
+            if extents and extents[0][0] != 0.0:
+                raise SchemaError(
+                    "coordinate_system='axisymmetric' requires "
+                    f"mesh.extents[0][0] == 0.0 (the symmetry axis), "
+                    f"got {extents[0][0]!r}."
+                )
+
+    # `gate` contacts must declare an oxide thickness; the C-V orchestrator
+    # and the verifier need C_ox = eps_ox / t_ox.
+    for c in cfg.get("contacts", []):
+        if c.get("type") == "gate" and "oxide_thickness" not in c:
+            raise SchemaError(
+                f"contact {c.get('name', '<unnamed>')!r} has type='gate' but "
+                f"is missing the required 'oxide_thickness' field."
+            )
+
+    # cv_sweep requires exactly one gate contact.
+    if "cv_sweep" in cfg:
+        n_gates = sum(1 for c in cfg.get("contacts", []) if c.get("type") == "gate")
+        if n_gates != 1:
+            raise SchemaError(
+                f"cv_sweep requires exactly one contact with type='gate'; "
+                f"found {n_gates}."
+            )
+        sw = cfg["cv_sweep"]
+        if "Vg_min" in sw and "Vg_max" in sw and sw["Vg_min"] >= sw["Vg_max"]:
+            raise SchemaError(
+                f"cv_sweep.Vg_min ({sw['Vg_min']}) must be strictly less than "
+                f"cv_sweep.Vg_max ({sw['Vg_max']}); a single-point sweep is "
+                f"not meaningful for dQ/dV finite differences."
+            )
 
 
 def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     """Fill in sensible defaults for optional sections."""
+    cfg.setdefault("coordinate_system", "cartesian")
+
     phys = cfg.setdefault("physics", {})
     phys.setdefault("temperature", 300.0)
     rec = phys.setdefault("recombination", {})
@@ -150,6 +218,9 @@ def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     out.setdefault("fields", ["potential", "n", "p"])
     out.setdefault("write_xdmf", True)
     out.setdefault("write_iv", True)
+
+    if "cv_sweep" in cfg:
+        cfg["cv_sweep"].setdefault("frequency_mode", "both")
 
     return cfg
 

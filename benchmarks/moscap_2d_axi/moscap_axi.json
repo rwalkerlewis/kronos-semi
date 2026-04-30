@@ -1,0 +1,105 @@
+{
+  "schema_version": "1.3.0",
+  "name": "moscap_2d_axi_cv",
+  "description": "2D-axisymmetric n+poly / SiO2 / p-Si MOS capacitor C-V benchmark. Solved on the (r, z) half-plane with r in [0, R_sub] and z in [0, t_Si + t_ox]. Reproduces Hu Ch.5 Fig 5-18: low-frequency (quasi-static) and high-frequency capacitance vs gate voltage. The two curves coincide in accumulation and depletion; in strong inversion C_LF returns to C_ox while C_HF saturates at C_min = C_ox C_dep,max / (C_ox + C_dep,max). Stack: t_ox = 5 nm, t_Si = 2 um, R_gate = 10 um, R_sub = 15 um, N_A = 1e17 cm^-3, n+ poly gate (phi_m = 4.05 eV, V_FB ~ -0.95 V at 300 K). At these defaults the closed-form figures of merit are 2 phi_F = 0.833 V, W_dep,max = 104 nm, C_ox = 6.91 mF/m^2, C_min/C_ox = 0.126, V_T = +0.10 V; see tests/check_moscap_axi_math.py.",
+  "dimension": 2,
+  "coordinate_system": "axisymmetric",
+  "mesh": {
+    "source": "builtin",
+    "extents": [
+      [0.0, 15.0e-6],
+      [0.0, 2.005e-6]
+    ],
+    "resolution": [80, 220],
+    "regions_by_box": [
+      {
+        "name": "silicon",
+        "tag": 1,
+        "bounds": [[0.0, 15.0e-6], [0.0, 2.0e-6]]
+      },
+      {
+        "name": "oxide",
+        "tag": 2,
+        "bounds": [[0.0, 15.0e-6], [2.0e-6, 2.005e-6]]
+      }
+    ],
+    "facets_by_plane": [
+      {
+        "name": "body",
+        "tag": 1,
+        "axis": 1,
+        "value": 0.0
+      },
+      {
+        "name": "gate_top",
+        "tag": 2,
+        "axis": 1,
+        "value": 2.005e-6,
+        "bounds_in_plane": [[0.0, 10.0e-6], [0.0, 0.0]]
+      },
+      {
+        "name": "oxide_top_free",
+        "tag": 3,
+        "axis": 1,
+        "value": 2.005e-6,
+        "bounds_in_plane": [[10.0e-6, 15.0e-6], [0.0, 0.0]]
+      },
+      {
+        "name": "outer",
+        "tag": 4,
+        "axis": 0,
+        "value": 15.0e-6
+      },
+      {
+        "name": "axis",
+        "tag": 5,
+        "axis": 0,
+        "value": 0.0
+      }
+    ]
+  },
+  "regions": {
+    "silicon": {"material": "Si",   "tag": 1, "role": "semiconductor"},
+    "oxide":   {"material": "SiO2", "tag": 2, "role": "insulator"}
+  },
+  "doping": [
+    {
+      "region": "silicon",
+      "profile": {"type": "uniform", "N_D": 0.0, "N_A": 1.0e17}
+    }
+  ],
+  "contacts": [
+    {
+      "name": "body",
+      "facet": "body",
+      "type": "ohmic",
+      "voltage": 0.0
+    },
+    {
+      "name": "gate",
+      "facet": "gate_top",
+      "type": "gate",
+      "voltage": 0.0,
+      "oxide_thickness": 5.0e-9,
+      "gate_workfunction_eV": 4.05,
+      "oxide_region": "oxide"
+    }
+  ],
+  "physics": {
+    "temperature": 300.0,
+    "statistics": "boltzmann"
+  },
+  "solver": {
+    "type": "equilibrium"
+  },
+  "cv_sweep": {
+    "Vg_min": -2.0,
+    "Vg_max": 2.0,
+    "n_points": 161,
+    "frequency_mode": "both"
+  },
+  "output": {
+    "directory": "./results/moscap_2d_axi_cv",
+    "fields": ["potential", "n", "p"]
+  }
+}
