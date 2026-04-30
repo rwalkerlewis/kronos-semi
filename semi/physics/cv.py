@@ -23,8 +23,9 @@ from typing import Any
 
 import numpy as np
 
-# Guard against division-by-zero in central-difference denominator
-_MIN_VOLTAGE_STEP = 1.0e-30
+# Guard against division-by-zero in central-difference denominator.
+# Use a threshold safely above float64 machine epsilon (~2.2e-16).
+_MIN_VOLTAGE_STEP = 1.0e-12
 
 
 def compute_cv_curve(
@@ -360,7 +361,7 @@ def _find_contact_name_by_type(cfg, kinds) -> str:
     for c in cfg["contacts"]:
         if c["type"] in kinds:
             return c["name"]
-    raise ValueError(f"No contact of type {kinds} found in config.")
+    raise ValueError(f"No contact of type {', '.join(kinds)} found in config.")
 
 
 def _vg_tag(v: float) -> str:

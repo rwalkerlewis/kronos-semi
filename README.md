@@ -74,6 +74,7 @@ live in [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md).
 
 | Milestone | Summary                                                              | Status              |
 |-----------|----------------------------------------------------------------------|---------------------|
+| Day 5b    | Axisymmetric 2D MOSCAP, LF/HF C–V — [notebook 05](notebooks/05_moscap_2d_axi_cv.ipynb) | ✅ Merged |
 | M13.1     | Scharfetter-Gummel edge-flux discretisation for transient continuity | In flight (issue #34) |
 | M15       | GPU linear solver path                                               | Planned             |
 | M16       | Physics completeness (Caughey-Thomas, Auger, FD, Schottky, tunneling) | Planned             |

@@ -91,6 +91,8 @@ def resolve_contacts(
     tag_by_name = {}
     for p in cfg["mesh"].get("facets_by_plane", []):
         tag_by_name[p["name"]] = int(p["tag"])
+    # `facets` entries (axisymmetric meshes) override `facets_by_plane` entries
+    # with the same name so that configs can mix both sources without conflict.
     for p in cfg["mesh"].get("facets", []):
         tag_by_name[p["name"]] = int(p["tag"])
 

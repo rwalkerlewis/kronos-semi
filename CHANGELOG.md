@@ -25,9 +25,10 @@
 - `semi/runners/moscap_axi_cv.py`: `run_moscap_axi_cv` dispatcher for
   `cv_lf` and `cv_hf` solver types.
 - `semi/run.py`: dispatches `cv_lf` and `cv_hf` to `run_moscap_axi_cv`.
-- `benchmarks/moscap_axi/`: benchmark config and sweep parameters.
+- `benchmarks/moscap_axi/moscap_2d_axi.json`: benchmark config (sweep params inline in notebook).
 - `tests/check_moscap_axi_math.py`: pure-Python analytical checks.
 - `tests/test_moscap_axi_cv.py`: schema and mesh unit tests.
+- `notebooks/05_moscap_2d_axi_cv.ipynb`: Colab-runnable notebook reproducing Hu Fig. 5-18.
 
 ## [0.14.1] - 2026-04-27
 
