@@ -1,5 +1,38 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **M14.2 axisymmetric MOSCAP with LF/HF C–V (schema 1.3.0).**
+  Adds an axisymmetric (r, z) finite-element variant of the 2D MOS
+  capacitor that reproduces Hu Fig. 5-18 (low-frequency vs high-
+  frequency C–V). Schema gains `mesh.axisymmetric` (bool),
+  `mesh.axisymmetric_axis` (0 or 1), the `moscap_lf_hf` value of
+  `solver.type`, and a top-level `cv_analysis` block (`modes`,
+  `delta_V_small_signal`, `majority_carrier`, `gate_radius`).
+  New module `semi/physics/cv.py` provides the LF and HF Jacobian
+  / sensitivity forms plus an `analytical_moscap_metrics` reference
+  (Cox, W_dmax, Cmin, V_FB, V_T) used by the FEM acceptance test.
+  New runner `semi/runners/moscap_lf_hf.py` performs the full bias
+  sweep, two PDE-sensitivity solves per bias, and emits per-bias
+  C_LF and C_HF on the `iv` rows. New benchmark
+  `benchmarks/moscap_axisym/` (NA = 1e17 cm⁻³ p-body, 5 nm SiO₂,
+  R = 1 µm, V_g sweep -2 .. 2.5 V). Tests: `test_schema_axisym`,
+  `test_axisym_scaling`, `tests/fem/test_cv_against_analytical`
+  (curve match: |LF/Cox − 1| < 5 % in accumulation and inversion,
+  |HF/Cmin − 1| < 10 % in inversion). New CLI entry point
+  `python -m semi.run <input.json>` for end-to-end JSON → manifest.
+
+### Fixed
+- `build_equilibrium_poisson_form_mr`: in axisymmetric mode the
+  radial weight is now `r / L0` rather than bare `r`. The raw
+  metres-scale coordinate scaled the residual down by 10⁻⁷ for
+  sub-µm devices and silently fooled SNES absolute-tolerance
+  checks (the initial guess registered as "converged" while the
+  gate Dirichlet BC had not propagated). The `L0` factor is folded
+  back into the gate-area normalisation in
+  `semi/runners/moscap_lf_hf.py`.
+
 ## [0.14.1] - 2026-04-27
 
 ### Added

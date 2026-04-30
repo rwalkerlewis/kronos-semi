@@ -81,6 +81,7 @@ def build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, eps_r):
 
 def build_equilibrium_poisson_form_mr(
     V, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
+    *, axisymmetric_axis: int | None = None,
 ):
     """
     Build the UFL residual for multi-region equilibrium Poisson (MOS).
@@ -93,6 +94,13 @@ def build_equilibrium_poisson_form_mr(
     eps_r_Si grad psi . n = eps_r_ox grad psi . n
     is enforced automatically by the piecewise eps_r in the bilinear
     form (docs/mos_derivation.md section 3.1).
+
+    When ``axisymmetric_axis`` is not None, the volume integrand is
+    multiplied by the radial coordinate ``x[axisymmetric_axis]``,
+    promoting the planar (r, z) form to the cylindrical 2-pi-r-weighted
+    form used by axisymmetric (r, z) MOSCAP models. The 2-pi factor
+    cancels in the residual and is reintroduced in post-processing
+    when total charges are extracted (see semi/physics/cv.py).
     """
     import ufl
     from dolfinx import fem
@@ -111,8 +119,25 @@ def build_equilibrium_poisson_form_mr(
 
     rho_hat = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
 
+    if axisymmetric_axis is None:
+        weight = 1
+    else:
+        # Use r / L0 (dimensionless) instead of bare r (meters). The raw
+        # radial coordinate is ~1e-7 m for sub-um devices, which scales
+        # the weak-form residual down by 1e-7 and silently fools SNES
+        # absolute-tolerance checks (the initial guess can read as
+        # "converged" while the gate BC has not propagated). Dividing
+        # by L0 keeps the residual at the same numerical magnitude as
+        # the planar (weight=1) form. The L0 factor is folded back in
+        # downstream when total charges per gate area are extracted
+        # (see semi/runners/moscap_lf_hf.py).
+        x = ufl.SpatialCoordinate(msh)
+        weight = x[int(axisymmetric_axis)] / fem.Constant(
+            msh, PETSc.ScalarType(sc.L0)
+        )
+
     F = (
-        L_D2 * eps_r_fn * ufl.inner(ufl.grad(psi), ufl.grad(v)) * dx_full
-        - rho_hat * v * dx_semi
+        L_D2 * eps_r_fn * ufl.inner(ufl.grad(psi), ufl.grad(v)) * weight * dx_full
+        - rho_hat * v * weight * dx_semi
     )
     return F

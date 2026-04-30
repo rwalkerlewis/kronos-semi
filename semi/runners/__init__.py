@@ -30,9 +30,10 @@ from .bias_sweep import run_bias_sweep
 from .equilibrium import run_equilibrium
 from .mos_cap_ac import run_mos_cap_ac
 from .mos_cv import run_mos_cv
+from .moscap_lf_hf import run_moscap_lf_hf
 from .transient import run_transient
 
 __all__ = [
     "run_equilibrium", "run_bias_sweep", "run_mos_cv", "run_transient",
-    "run_ac_sweep", "run_mos_cap_ac",
+    "run_ac_sweep", "run_mos_cap_ac", "run_moscap_lf_hf",
 ]

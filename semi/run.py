@@ -58,6 +58,7 @@ def run(cfg: dict[str, Any]):
         run_equilibrium,
         run_mos_cap_ac,
         run_mos_cv,
+        run_moscap_lf_hf,
         run_transient,
     )
 
@@ -70,6 +71,8 @@ def run(cfg: dict[str, Any]):
         return run_mos_cv(cfg)
     if stype == "mos_cap_ac":
         return run_mos_cap_ac(cfg)
+    if stype == "moscap_lf_hf":
+        return run_moscap_lf_hf(cfg)
     if stype == "transient":
         return run_transient(cfg)
     if stype == "ac_sweep":
@@ -98,6 +101,9 @@ def __getattr__(name: str):
     if name == "run_mos_cap_ac":
         from .runners.mos_cap_ac import run_mos_cap_ac
         return run_mos_cap_ac
+    if name == "run_moscap_lf_hf":
+        from .runners.moscap_lf_hf import run_moscap_lf_hf
+        return run_moscap_lf_hf
     if name == "run_transient":
         from .runners.transient import run_transient
         return run_transient
@@ -105,3 +111,52 @@ def __getattr__(name: str):
         from .runners.ac_sweep import run_ac_sweep
         return run_ac_sweep
     raise AttributeError(f"module 'semi.run' has no attribute {name!r}")
+
+
+def _cli(argv: list[str] | None = None) -> int:
+    """
+    ``python -m semi.run <input.json> [-o results_dir]``
+
+    Loads and validates the JSON config, dispatches the appropriate
+    runner, and writes a manifest + iv.csv (when applicable) to the
+    output directory. The manifest path is printed to stdout on
+    success. This is a deliberately thin entry point so the engine
+    invariant "JSON in, manifest out" is preserved end-to-end.
+    """
+    import argparse
+    import json
+    from pathlib import Path
+
+    from . import schema as _schema
+    from .io.artifact import write_artifact
+
+    parser = argparse.ArgumentParser(
+        prog="python -m semi.run",
+        description="Run a kronos-semi simulation from a JSON config.",
+    )
+    parser.add_argument("input", type=str, help="path to *.json config")
+    parser.add_argument(
+        "-o", "--output", type=str, default=None,
+        help="override output directory (defaults to cfg.output.directory)",
+    )
+    args = parser.parse_args(argv)
+
+    in_path = Path(args.input).resolve()
+    with in_path.open("r") as fh:
+        cfg = json.load(fh)
+    cfg = _schema.validate(cfg)
+
+    if args.output is not None:
+        cfg.setdefault("output", {})["directory"] = args.output
+
+    result = run(cfg)
+    out_dir = Path(cfg.get("output", {}).get("directory", "./results"))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    artifact_path = write_artifact(result, out_dir, input_json_path=in_path)
+    print(str(artifact_path))
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(_cli())

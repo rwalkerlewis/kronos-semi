@@ -39,6 +39,12 @@ What the engine does today, in plain terms:
   each gate bias to return dQ/dV directly in F/m^2, replacing the
   noisier `numpy.gradient(Q, V)` of `mos_cv`. Worst error 6.79% vs the
   depletion-approximation reference in the verifier window.
+- **Axisymmetric 2D MOSCAP with LF/HF C–V** (M14.2): cylindrical
+  (r, z) finite elements via `mesh.axisymmetric: true`, dual LF
+  (quasi-static) and HF sensitivity solves per bias, and a closed-form
+  `analytical_moscap_metrics` reference. Reproduces Hu Fig. 5-18:
+  LF returns to Cox in inversion, HF saturates at Cmin. Acceptance
+  test: `tests/fem/test_cv_against_analytical.py`.
 - **Small-signal AC sweep** for two-terminal pn diodes (M14):
   `(J + jωM) δu = -dF/dV δV` solved via real 2x2 block reformulation;
   the `rc_ac_sweep` benchmark matches analytical depletion C within

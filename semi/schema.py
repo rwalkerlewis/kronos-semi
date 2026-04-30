@@ -49,7 +49,10 @@ ENGINE_SUPPORTED_SCHEMA_MAJOR = 1
 #   M13 (1.1.0): added the `transient` solver type.
 #   M14 (1.2.0): added the `ac_sweep` solver type plus solver.dc_bias and
 #                solver.ac sub-objects (frequency sweep specification).
-SCHEMA_SUPPORTED_MINOR = 2
+#   M14.2 (1.3.0): added `mesh.axisymmetric` flag for cylindrical (r,z)
+#                  models and `cv_analysis` block + `moscap_lf_hf` solver
+#                  type for LF + HF MOSCAP small-signal capacitance.
+SCHEMA_SUPPORTED_MINOR = 3
 
 
 @lru_cache(maxsize=1)
