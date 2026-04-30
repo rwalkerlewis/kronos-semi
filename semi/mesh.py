@@ -377,7 +377,8 @@ def build_axisymmetric_mesh(mesh_cfg: dict):
         if mat.lower() in ("si", "silicon", "ge", "gaas"):
             z_si_top = max(z_si_top, float(layer["z_range"][1]))
 
-    # Graded z in silicon: cosine spacing, fine near top (Si/SiO2 interface)
+    # Graded z in silicon: cosine spacing clusters cells near z_si_top (Si/SiO2
+    # interface) where the potential gradient is steepest (inversion layer).
     t_si = 0.5 * (1.0 - np.cos(np.linspace(0.0, np.pi, nz_si + 1)))
     z_si_coords = z_bot + t_si * (z_si_top - z_bot)
 

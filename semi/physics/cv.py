@@ -18,9 +18,13 @@ Q_sub has units of Coulombs per gate area in C/m^2 after division by A_gate).
 from __future__ import annotations
 
 import math
+import ufl
 from typing import Any
 
 import numpy as np
+
+# Guard against division-by-zero in central-difference denominator
+_MIN_VOLTAGE_STEP = 1.0e-30
 
 
 def compute_cv_curve(
@@ -202,12 +206,11 @@ def compute_cv_curve(
 
             # 2. Freeze minority carrier density using dolfinx Expression
             #    n_hat_frozen = ni_hat * exp(psi_lf)  evaluated via DG0 interpolation
-            import ufl as _ufl
             V_DG0 = fem.functionspace(msh, ("DG", 0))
             n_hat_frozen_fn = fem.Function(V_DG0, name="n_hat_frozen")
             ni_hat_val = sc.n_i / sc.C0
             n_expr = fem.Expression(
-                fem.Constant(msh, PETSc.ScalarType(ni_hat_val)) * _ufl.exp(psi),
+                fem.Constant(msh, PETSc.ScalarType(ni_hat_val)) * ufl.exp(psi),
                 V_DG0.element.interpolation_points(),
             )
             n_hat_frozen_fn.interpolate(n_expr)
@@ -245,7 +248,7 @@ def compute_cv_curve(
                 if not info_h["converged"]:
                     import warnings
                     warnings.warn(
-                        f"HF frozen Poisson failed at Vg={Vg_val:.4f}", stacklevel=4
+                        f"HF frozen Poisson failed at Vg={Vg_val:.4f}", stacklevel=2
                     )
                 return psi_fn
 
@@ -338,7 +341,7 @@ def _central_diff_C(Vg_list, Q_list, A_gate):
         else:
             dQ = Q_list[i + 1] - Q_list[i - 1]
             dv = Vg_list[i + 1] - Vg_list[i - 1]
-        C_list.append(-dQ / dv / A_gate if abs(dv) > 1.0e-30 else 0.0)
+        C_list.append(-dQ / dv / A_gate if abs(dv) > _MIN_VOLTAGE_STEP else 0.0)
     return C_list
 
 
