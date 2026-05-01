@@ -54,13 +54,31 @@ class CapabilitiesBackends(BaseModel):
     gpu_hypre: bool
 
 
+class CapabilitiesDeviceInfo(BaseModel):
+    """Runtime probe of the linked PETSc build (M15 Phase C).
+
+    Mirrors :func:`semi.compute.device_info`. Reported by
+    ``GET /capabilities`` so a UI can decide whether to expose GPU
+    backend choices.
+    """
+    engine_version: str
+    petsc_version: str | None
+    petsc_complex: bool
+    petsc_int64: bool
+    backends_available: list[str]
+    device_count: int | None
+    device_name: str | None
+
+
 class CapabilitiesResponse(BaseModel):
     engine: CapabilitiesEngine
+    schema_version: str
     solver_types: list[str]
     dimensions: list[int]
     physics: CapabilitiesPhysics
     mesh_sources: list[str]
     backends: CapabilitiesBackends
+    device_info: CapabilitiesDeviceInfo
 
 
 class ErrorResponse(BaseModel):
