@@ -2,6 +2,12 @@
 
 Symmetric abrupt pn junction, silicon, $N_A = N_D = 10^{17}$ cm⁻³, junction at 1 µm.
 
+See also:
+[`docs/benchmarks/pn_junction_1d.md`](../../docs/benchmarks/pn_junction_1d.md)
+(landing page) and
+[`notebooks/01_pn_junction_1d.ipynb`](../../notebooks/01_pn_junction_1d.ipynb)
+(Colab driver).
+
 ## Purpose
 
 Equilibrium-Poisson verification. The depletion approximation gives analytical expressions for:

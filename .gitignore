@@ -41,8 +41,14 @@ scratch/
 # Mesh files (keep benchmark-defining ones via git-lfs later if needed)
 *.msh
 *.geo.bak
-# Whitelist committed gmsh fixtures (Day 7 resistor loader tests).
+# Whitelist committed gmsh fixtures (e.g. Day 7 resistor loader tests).
+# Per-benchmark `.msh` files are not committed by default; regenerate
+# with `gmsh -2 <name>.geo -o <name>.msh` from the committed `.geo`.
 !benchmarks/**/fixtures/*.msh
+
+# Notebook output figures that are part of the deliverable get
+# committed; transient checkpoint dirs do not.
+notebooks/figures/**/.ipynb_checkpoints/
 
 # Local config overrides
 *.local.json

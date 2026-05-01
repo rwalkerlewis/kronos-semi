@@ -30,45 +30,53 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `dev/final-housekeeping` (M9: Result artifact writer
-  in flight; M8 merged via PRs #10/#11)
+- Active dev branch: `docs/post-merge-cleanup` (PR #65: post-merge
+  documentation refresh, scipy promoted to base deps, notebook 05
+  Colab self-contained, axisymmetric runner dispatch in
+  `semi/runners/mos_cap_ac.py`)
 
 ## Current state
 
-M1 through M14.1 are merged into `main`, with M13.1 closed in
-v0.14.1: the 1D transient runner uses Slotboom primary unknowns
-(ADR 0014, supersedes ADR 0009) and matches bias_sweep at deep
-steady state. SG flux primitives ship in semi/fem/ for use by
-future work but are not the active CD path in the transient
-runner. ADRs 0012 (SG flux) and 0013 (BC-ramp continuation)
-remain in force. The xfailed test_transient_steady_state_limit
-and BDF rate tests are now active and passing.
+M1 through M14.2 are merged into `main`. Current package version is
+`0.14.1`; M14.2 (axisymmetric MOSCAP, schema 1.3.0) merged via PR #64
+(`a4649be`) and is being tagged together with the post-merge cleanup
+in the next release. M13.1 closed in v0.14.1: the 1D transient runner
+uses Slotboom primary unknowns (ADR 0014, supersedes ADR 0009) and
+matches bias_sweep at deep steady state. SG flux primitives ship in
+`semi/fem/` but are not the active CD path. ADRs 0012 (SG flux) and
+0013 (BC-ramp continuation) remain in force. The xfailed
+`test_transient_steady_state_limit` and BDF rate tests are now active
+and passing.
 
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
 
 ### What works (verified in Docker on current `main`)
 
-- Everything from M1–M13 (see CHANGELOG.md for details).
-- **M14 deliverables (new in v0.14.0):**
-  - `semi/runners/ac_sweep.py` — `run_ac_sweep(cfg)` in (ψ, n, p) primary
-    density form. Real 2x2 block reformulation of the complex linear
-    system, MUMPS direct LU per frequency. Includes both linearised
-    conduction and displacement current at the swept contact.
-  - `semi/results.py` — `AcSweepResult` dataclass with frequencies, Y,
-    Z, C, G, dc_bias, and meta.
-  - `schemas/input.v1.json` — `solver.type` extended with `"ac_sweep"`,
-    plus `solver.dc_bias` and `solver.ac` (frequency sweep spec).
-  - `semi/schema.py` — `SCHEMA_SUPPORTED_MINOR = 2`; schema_version 1.2.0.
-  - `benchmarks/rc_ac_sweep/` — 1D pn diode at V_DC = -1 V, AC sweep
-    1 Hz to 1 GHz, 41 logspace; verifier matches analytical depletion C
-    within 0.4 % over [1 Hz, 1 MHz].
-  - `tests/mms/test_ac_consistency.py` — three MMS-style AC consistency
-    invariants (Y(0) real, Re(Y) stable at low ω, C(f) ω-independent).
-  - `tests/fem/test_ac_dc_limit.py` — depletion-C agreement within 5 %
-    at three reverse biases.
-  - `docs/adr/0011-ac-small-signal.md` — formulation, primary-variable
-    choice, real 2x2 block reformulation rationale, sign convention.
+- Everything from M1–M13.1 (see `CHANGELOG.md` for per-version detail).
+- **M14 — small-signal AC sweep** (v0.14.0): `semi/runners/ac_sweep.py`
+  in Slotboom primary form, real 2x2 block reformulation, displacement
+  + conduction current at the contact, schema 1.2.0 (`solver.type =
+  "ac_sweep"`, `solver.dc_bias`, `solver.ac`); `benchmarks/rc_ac_sweep`
+  matches analytical depletion C within 0.4% over [1 Hz, 1 MHz];
+  `tests/fem/test_ac_dc_limit.py` and `tests/mms/test_ac_consistency.py`
+  green; ADR 0011 (with errata for the sign-convention fix).
+- **M14.1 — differential capacitance via AC admittance** (PR #38):
+  `semi/runners/mos_cap_ac.py` returns `dQ/dV` from `Im(Y)/(2πf)` so
+  the `mos_2d` C-V benchmark is verified by both the dQ/dV (`mos_cv`)
+  and AC paths; byte-identical Q_gate confirmed in audit case 03.
+- **M14.2 — axisymmetric (cylindrical) 2D MOSCAP** (PR #64, schema
+  1.3.0): top-level `coordinate_system` field accepts `"cartesian"`
+  (default) or `"axisymmetric"`; cross-field validation enforces
+  `dimension == 2`, non-negative radial extent, and rejects Dirichlet
+  contacts on r = 0. r-weighted Poisson and Slotboom forms in
+  `semi/physics/axisymmetric.py`. `semi/cv.py` provides pure-Python
+  MOSCAP analytical helpers (V_fb, V_t, |phi_B|, W_dmax, C_ox, C_min)
+  and LF/HF C-V curves. `benchmarks/moscap_axisym_2d/` reproduces Hu
+  Fig. 5-18; `notebooks/05_moscap_axisym_cv.ipynb` runs end-to-end on
+  Colab. Axisymmetric dispatch in `mos_cap_ac.py` (PR #65) replaces
+  `W_lat` with `L_gate = ∫_gate r ds` and r-weights the charge and
+  sensitivity forms.
 
 ### What does not work / not yet built
 
@@ -79,23 +87,31 @@ M15 through M18. Summary:
 
 - **Linear solver is CPU-LU only.** Unusable above ~200k DOFs. M15.
 - **Physics gaps:** no field-dependent mobility, Auger, Fermi-Dirac,
-  Schottky contacts, tunneling, heterojunctions. M16, M17.
+  Schottky contacts, tunneling. M16.
 - **Heterojunctions:** position-dependent χ and Eg not yet supported.
   M17.
-- **Open M14.1:** the `mos_2d` C-V benchmark still uses `mos_cv`
-  numerical dQ/dV; switching it to AC admittance is listed as M14
-  deliverable in IMPROVEMENT_GUIDE but is left to M14.1.
+- **Cartesian-2D MOSCAP variant** and a rigorous AC small-signal HF
+  C-V method (driving the gate at high f) are tracked as M14.2.x open
+  items in `docs/ROADMAP.md`.
 
 ## Next task
 
-**Phase 2 of physics validation suite — external validation against
-Sze and Nicollian-Brews.** Phase 1 is complete: cases 01-04 pass
-internal-consistency checks; case 05 has a tracked 12% magnitude
-disagreement (issue #<NUMBER>); case 06 deferred. Audit suite is now
-CI-gated via `docker-fem-audit` job.
+**Tag `v0.14.2` and merge PR #65 (`docs/post-merge-cleanup`).** The
+post-merge documentation refresh, scipy base-dependency promotion,
+and axisymmetric dispatch in `semi/runners/mos_cap_ac.py` need to land
+on `main` together with the M14.2 axisymmetric MOSCAP work, and the
+package version bumped from 0.14.1 → 0.14.2.
 
-Phase 3 (adversarial robustness) follows. M15 (GPU backend) is
-deferred until the full validation suite has run.
+After that, the next two open work streams are:
+
+1. **Physics validation suite, Phase 2** — external validation against
+   Sze and Nicollian-Brews. Phase 1 is complete: cases 01-04 pass
+   internal-consistency checks (audit case 03 confirms `mos_cv` and
+   `mos_cap_ac` byte-identity); case 02/05 sign-convention findings
+   were resolved in PR #62 (M14 sign fix); case 06 deferred. Audit
+   suite is CI-gated via the `docker-fem-audit` job.
+2. **M15 — GPU linear solver path.** Deferred until the validation
+   suite has fully run.
 
 ## Roadmap
 
@@ -114,7 +130,10 @@ deferred until the full validation suite has run.
 | M11: Schema versioning | UI-facing schema companion, form-builder annotations | Done |
 | M12: MOSFET n+ + SNES amendment | Gaussian implants, relaxed SNES tols, ADR 0008 | Done |
 | M13: Transient solver | Backward-Euler + BDF2, diode turn-on benchmark | Done |
+| M13.1: Slotboom transient | Slotboom primary unknowns (ADR 0014); xfails closed; v0.14.1 | Done |
 | M14: AC small-signal | Linearised (J + jωM) δu = -dF/dV δV; rc_ac_sweep verifier within 0.4% of analytical C_dep; ADR 0011 | Done |
+| M14.1: AC differential C-V | `mos_cap_ac` runner returns dQ/dV via Im(Y)/(2πf); audit case 03 byte-identity | Done |
+| M14.2: Axisymmetric MOSCAP | Cylindrical 2D path; schema 1.3.0 `coordinate_system`; Hu Fig. 5-18 benchmark | Done |
 | M15: GPU linear solver | PETSc CUDA/HIP, AMGX preconditioner, 500k-DOF 3D benchmark | Planned |
 | M16: Physics completeness | Caughey-Thomas, Lombardi, Auger, FD, Schottky, tunneling | Planned |
 | M17: Heterojunctions | Position-dependent chi, Eg; HEMT or HBT benchmark | Planned |
@@ -161,9 +180,9 @@ under `docs/adr/`.
 
 ## Non-goals
 
-The following are explicitly out of scope for the evaluation submission.
-They may be added after submission as stretch goals (see
-`docs/ROADMAP.md`, "Post-submission" section).
+The following are explicitly out of scope for the current release. They
+are tracked as stretch milestones (M16/M17) in
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md):
 
 - Field-dependent mobility (Caughey-Thomas, Canali, saturation velocity).
 - Auger and radiative recombination.
@@ -171,46 +190,70 @@ They may be added after submission as stretch goals (see
 - Heterojunctions (multiple semiconductor materials with different band
   alignments in the same device).
 - Incomplete ionization of dopants.
-- AC small-signal analysis.
 - Band-to-band or trap-assisted tunneling.
-- Transient (time-dependent) solver.
-- Full MOSFET with source/drain/gate/body contacts. **Post-submission stretch goal only.**
-- FinFET or any 3D transistor geometry. **Post-submission stretch goal only.**
-- GUI or web frontend.
+- Schottky contacts.
+- Full MOSFET with source/drain/gate/body contacts beyond the M12
+  benchmark (M16+).
+- FinFET or any 3D transistor geometry (M16+).
+- GUI or web frontend (M18, separate repo).
 
-## Post-submission cleanups
+Capabilities previously listed here that have since shipped:
+**transient solver** (M13/M13.1), **AC small-signal analysis** (M14),
+**axisymmetric (cylindrical) 2D devices** (M14.2).
 
-Pre-existing doc/code inconsistencies discovered during the M8: Submission polish
-polish pass and deferred per the M8 anti-pattern rule against
-expanding scope on the final submission PR. None of these affect any
-verifier or benchmark result; they are all surface-level alignment
-items.
+## Post-merge follow-ups
+
+Small alignment items deferred from the M8 / M14.2 polish passes; none
+affect any verifier or benchmark result.
 
 - **`docs/mos_derivation.md` §6 ψ-reference convention.** Section 6
-  derives `psi_s = psi(x, y_int) - psi(x, y_bulk)` (psi referenced to
-  the bulk Fermi level), but the shipped MOS code uses the project-
-  wide `psi = 0` at the intrinsic Fermi level convention enforced by
-  the ohmic-contact equilibrium BC. Both conventions yield the same
-  C(V) curve once V_FB is computed against the matching reference;
-  the M6 verifier uses the shipped code's convention and passes
-  at 9.25 percent worst-case in [V_FB + 0.2, V_T - 0.1] V. Action:
-  rewrite §6 in the intrinsic-reference convention so the derivation
-  reads against the same baseline as the code, and add a short
-  appendix mapping between the two conventions for readers who learn
-  MOS from textbooks (Sze, Pierret) that use the bulk reference.
-- **`semi/__init__.py::__version__` still reads `"0.1.0"`.** This was
-  the M1 placeholder and never bumped through M2 through M7.
-  Action: bump to `"0.8.0"` as part of Phase 9 (CHANGELOG `[0.8.0] -
-  M8: Submission polish` entry) so the package version, the changelog header, and
-  the eventual `v0.2.0` tag (post-merge per the M8 prompt's
-  Phase 11) are internally consistent. Note the discrepancy between
-  package SemVer `0.8.0` and release tag `v0.2.0`: the tag tracks
-  the *submission* version (v0.1.0 = M1 baseline, v0.2.0 = M8
-  submission), the package SemVer tracks days-of-work shipped.
+  derives `psi_s = psi(x, y_int) - psi(x, y_bulk)` (bulk-Fermi
+  reference), but the shipped MOS code uses the project-wide
+  intrinsic-Fermi convention `psi = 0` enforced by the ohmic-contact
+  equilibrium BC. Both yield the same C(V) once V_FB matches the
+  reference; the M6 verifier passes at 9.25% worst-case. Action:
+  rewrite §6 in the intrinsic-reference convention with a short
+  appendix mapping the two conventions for textbook (Sze, Pierret)
+  readers.
 
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M14.2 axisymmetric (cylindrical) 2D MOSCAP (2026-04-30):** Merged
+  via PR #64 (`a4649be`). Schema 1.3.0 introduces a top-level
+  `coordinate_system` field (`"cartesian"` default, `"axisymmetric"`)
+  with cross-field validation: dimension must equal 2, radial extent
+  is non-negative, Dirichlet contacts on the symmetry axis r = 0 are
+  rejected. New `semi/physics/axisymmetric.py` provides r-weighted
+  Poisson and Slotboom drift-diffusion forms on the meridian half-
+  plane. New `semi/cv.py` provides pure-Python (no dolfinx) MOSCAP
+  analytical helpers (`analytical_moscap_params`, `lf_cv_quasistatic`,
+  `hf_cv_depletion_approximation`, FEM postprocessors
+  `compute_lf_cv_fem`, `compute_hf_cv_depletion_clamp`). New
+  `benchmarks/moscap_axisym_2d/` (gmsh `.geo` for the meridian mesh,
+  `moscap_axisym.json` config, analytical `reference_cv.csv`)
+  reproduces Hu Fig. 5-18. New `notebooks/05_moscap_axisym_cv.ipynb`
+  runs end-to-end on Colab. New tests:
+  `tests/check_axisym_moscap_math.py`,
+  `tests/test_coordinate_system.py`,
+  `tests/test_moscap_axisym_cv.py`,
+  `tests/test_moscap_axisym_cv_fem.py`. PR #65 followed up with the
+  axisymmetric runner dispatch in `semi/runners/mos_cap_ac.py`
+  (replaces `W_lat = extents[0][1] - extents[0][0]` with
+  `L_gate = ∫_gate r ds_meridian`, r-weights `charge_form` and
+  `sensitivity_form`), promoted scipy from `[test]` to base
+  dependencies (used by `semi.cv` and `semi.runners.ac_sweep` at
+  runtime), and made the Colab path self-contained.
+
+- **M14.1 differential capacitance via AC admittance (2026-04-26):**
+  PR #38. New `semi/runners/mos_cap_ac.py` returns dQ/dV directly
+  from `Im(Y) / (2π f)` at low frequency, replacing the noisier
+  `numpy.gradient(Q, V)` of `mos_cv` for the `mos_2d` C-V verifier.
+  Worst error 6.79% vs the depletion-approximation reference in the
+  verifier window. Audit case 03 (`tests/audit/`) confirms `mos_cv`
+  and `mos_cap_ac` agree on Q_gate to machine precision (rel_err =
+  0.000 at all 42 gate voltages).
 
 - **M14 sign-convention fix (2026-04-28):** Resolved Phase 1 audit
   Cases 02 and 05 (Class C). `run_ac_sweep` was reporting terminal

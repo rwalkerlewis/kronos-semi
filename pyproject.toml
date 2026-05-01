@@ -26,6 +26,9 @@ dependencies = [
     "numpy>=1.24",
     "matplotlib>=3.7",
     "jsonschema>=4.0",
+    # scipy is a runtime dep: semi.cv.lf_cv_quasistatic uses
+    # scipy.optimize.brentq, and semi.runners.ac_sweep uses scipy.sparse.
+    "scipy>=1.10",
 ]
 
 [project.optional-dependencies]

@@ -4,6 +4,16 @@ Axisymmetric (cylindrical) 2D MOS capacitor reproducing Hu chapter 5
 Fig. 5-18: low-frequency (quasi-static) and high-frequency C-V curves
 on the same axes.
 
+See also:
+[`docs/benchmarks/moscap_axisym_2d.md`](../../docs/benchmarks/moscap_axisym_2d.md)
+(landing page),
+[`docs/theory/axisymmetric.md`](../../docs/theory/axisymmetric.md)
+(weak-form derivation),
+[`docs/theory/moscap_cv.md`](../../docs/theory/moscap_cv.md)
+(LF/HF C-V derivation), and
+[`notebooks/05_moscap_axisym_cv.ipynb`](../../notebooks/05_moscap_axisym_cv.ipynb)
+(end-to-end demonstration).
+
 ## Files
 
 - `moscap_axisym.geo`: gmsh geometry for the meridian half-plane
