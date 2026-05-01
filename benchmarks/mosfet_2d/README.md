@@ -4,8 +4,13 @@ A 2D n-channel MOSFET on a uniform 50 x 21 builtin mesh. P-type Si body
 (N_A = 1e16 cm^-3) with a 5 nm SiO2 gate stack; n+ source and drain
 implants are Gaussian (peak 5e19 cm^-3, sigma = (0.4 um, 0.15 um)).
 
-The bias_sweep runner sweeps V_GS from 0 to 1.5 V in 0.1 V steps with
-V_DS held at 0.05 V (drain ohmic, static). The verifier compares the
+The bias_sweep runner sweeps V_GS from 0 to 1.5 V in 0.05 V steps with
+V_DS held at 0.05 V (drain ohmic, static). The smaller step size is
+needed because the surface-potential transition through onset of
+strong depletion (V_GS ~ 0.2 to 0.3 V) is sharp enough to defeat
+Newton with a 0.1 V step; the JSON's `solver.continuation` block
+also widens `max_halvings` from the default 6 to 10 and tightens
+`min_step` to 1e-5 V for the same reason. The verifier compares the
 2D-simulated drain current against the Pao-Sah long-channel linear
 formula in the depletion-to-strong-inversion transition region.
 
