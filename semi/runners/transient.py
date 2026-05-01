@@ -460,6 +460,7 @@ def run_transient(
             prefix=f"{cfg['name']}_tr_{tag}_s{step_count}_",
             petsc_options=snes_petsc_options,
             jacobian_shift=transient_jacobian_shift,
+            cfg=cfg,
         )
 
         if not info["converged"]:

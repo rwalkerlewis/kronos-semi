@@ -14,6 +14,7 @@ fieldsplit preconditioning, but that's a M6+ concern.
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
 DEFAULT_PETSC_OPTIONS = {
@@ -148,9 +149,44 @@ def _install_jacobian_shift(snes, epsilon: float) -> None:
     snes.setJacobian(shifted_jacobian, J_mat, P_mat)
 
 
+def _resolve_backend_options(
+    cfg: dict[str, Any] | None,
+    user_petsc_options: dict[str, Any] | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Combine backend-derived PETSc options with the runner's per-call
+    overrides, and return ``(merged_options, backend_meta)``.
+
+    ``backend_meta`` carries the resolved backend identity for the
+    manifest. When ``cfg`` is None (legacy callers, in-process tests),
+    the function falls back to the cpu-mumps defaults and an empty
+    backend_meta dict so behavior is unchanged.
+    """
+    base = dict(DEFAULT_PETSC_OPTIONS)
+    backend_meta: dict[str, Any] = {}
+    if cfg is not None:
+        from .compute import backend_settings_from_cfg
+        info = backend_settings_from_cfg(cfg)
+        backend_meta = {
+            "backend_requested": info["requested"],
+            "backend_resolved": info["resolved"],
+            "device": info["device"],
+            "preconditioner": info["preconditioner"],
+            "linear_solver": info["linear_solver"],
+        }
+        for k, v in info["petsc_options"].items():
+            if v is None:
+                base.pop(k, None)
+            else:
+                base[k] = v
+    if user_petsc_options:
+        base.update(user_petsc_options)
+    return base, backend_meta
+
+
 def solve_nonlinear(F, u, bcs: list, prefix: str,
                     petsc_options: dict[str, Any] | None = None,
-                    jacobian_shift: float = 0.0):
+                    jacobian_shift: float = 0.0,
+                    cfg: dict[str, Any] | None = None):
     """
     Solve a nonlinear variational problem F(u; v) = 0.
 
@@ -180,9 +216,7 @@ def solve_nonlinear(F, u, bcs: list, prefix: str,
     """
     from dolfinx.fem.petsc import NonlinearProblem
 
-    opts = dict(DEFAULT_PETSC_OPTIONS)
-    if petsc_options:
-        opts.update(petsc_options)
+    opts, backend_meta = _resolve_backend_options(cfg, petsc_options)
     rest, factor_opts = _split_factor_options(opts)
 
     problem = NonlinearProblem(
@@ -193,16 +227,26 @@ def solve_nonlinear(F, u, bcs: list, prefix: str,
     )
     _apply_factor_options(problem.solver, factor_opts)
     _install_jacobian_shift(problem.solver, jacobian_shift)
+    _t0 = time.monotonic()
     problem.solve()
+    linear_solve_wall_s = time.monotonic() - _t0
     reason = problem.solver.getConvergedReason()
     n_iter = problem.solver.getIterationNumber()
+    try:
+        ksp_iters = int(problem.solver.getKSP().getIterationNumber())
+    except Exception:
+        ksp_iters = 0
     converged = reason > 0
-    return {
+    out = {
         "iterations": int(n_iter),
         "reason": int(reason),
         "converged": bool(converged),
+        "ksp_iters": ksp_iters,
+        "linear_solve_wall_s": float(linear_solve_wall_s),
         "problem": problem,  # kept so caller can inspect further
     }
+    out.update(backend_meta)
+    return out
 
 
 def solve_nonlinear_block(
@@ -214,6 +258,7 @@ def solve_nonlinear_block(
     kind: str | None = None,
     entity_maps: list | None = None,
     jacobian_shift: float = 0.0,
+    cfg: dict[str, Any] | None = None,
 ):
     """
     Solve a coupled block nonlinear problem via SNES.
@@ -258,9 +303,7 @@ def solve_nonlinear_block(
     """
     from dolfinx.fem.petsc import NonlinearProblem
 
-    opts = dict(DEFAULT_PETSC_OPTIONS)
-    if petsc_options:
-        opts.update(petsc_options)
+    opts, backend_meta = _resolve_backend_options(cfg, petsc_options)
     rest, factor_opts = _split_factor_options(opts)
 
     np_kwargs: dict[str, Any] = dict(
@@ -278,13 +321,23 @@ def solve_nonlinear_block(
     )
     _apply_factor_options(problem.solver, factor_opts)
     _install_jacobian_shift(problem.solver, jacobian_shift)
+    _t0 = time.monotonic()
     problem.solve()
+    linear_solve_wall_s = time.monotonic() - _t0
     reason = problem.solver.getConvergedReason()
     n_iter = problem.solver.getIterationNumber()
+    try:
+        ksp_iters = int(problem.solver.getKSP().getIterationNumber())
+    except Exception:
+        ksp_iters = 0
     converged = reason > 0
-    return {
+    out = {
         "iterations": int(n_iter),
         "reason": int(reason),
         "converged": bool(converged),
+        "ksp_iters": ksp_iters,
+        "linear_solve_wall_s": float(linear_solve_wall_s),
         "problem": problem,
     }
+    out.update(backend_meta)
+    return out

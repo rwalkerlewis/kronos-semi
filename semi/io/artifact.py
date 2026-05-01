@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 from .reader import read_manifest  # re-export
 
-_SCHEMA_VERSION = "1.0.0"
+_SCHEMA_VERSION = "1.1.0"
 
 __all__ = ["write_artifact", "read_manifest"]
 
@@ -118,6 +118,16 @@ def write_artifact(
     converged = bool((result.solver_info or {}).get("converged", True))
     n_dofs = int(result.V.dofmap.index_map.size_global)
 
+    # M15 backend metadata (optional; populated when the runner ran a
+    # solve through semi.solver.solve_nonlinear[_block]). Falls back to
+    # the pre-M15 "petsc-cpu-mumps" string when absent so old reader
+    # paths still find a sensible value in `solver.backend`.
+    info = result.solver_info or {}
+    backend_resolved = info.get("backend_resolved", "cpu-mumps")
+    backend_requested = info.get("backend_requested", backend_resolved)
+    device = info.get("device", "cpu" if backend_resolved == "cpu-mumps" else "auto")
+    backend_str = f"petsc-{backend_resolved}"
+
     dim = result.mesh.topology.dim
     n_cells = int(result.mesh.topology.index_map(dim).size_global)
     n_vertices = int(result.mesh.topology.index_map(0).size_global)
@@ -142,7 +152,14 @@ def write_artifact(
         "input_sha256": input_sha256,
         "solver": {
             "type": stype,
-            "backend": "petsc-cpu-mumps",
+            "backend": backend_str,
+            "backend_requested": backend_requested,
+            "backend_resolved": backend_resolved,
+            "device": device,
+            "linear_solver": info.get("linear_solver", "auto"),
+            "preconditioner": info.get("preconditioner", "auto"),
+            "ksp_iters": int(info.get("ksp_iters", 0)),
+            "linear_solve_wall_s": float(info.get("linear_solve_wall_s", 0.0)),
             "n_dofs": n_dofs,
             "n_steps": n_steps,
             "converged": converged,

@@ -1,7 +1,7 @@
 """
 Analytical sanity checks for the axisymmetric MOSCAP benchmark.
 
-This script mirrors the style of `tests/check_day1_math.py`: pure
+This script mirrors the style of `tests/check_analytical_math.py`: pure
 Python (numpy + scipy), no dolfinx. It verifies that the closed-form
 parameters in ``semi.cv`` match Hu chapter 5 worked examples, that the
 HF and LF C-V curves obey the textbook structural properties, and

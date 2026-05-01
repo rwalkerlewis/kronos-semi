@@ -52,7 +52,11 @@ ENGINE_SUPPORTED_SCHEMA_MAJOR = 1
 #   M15 (1.3.0): added the top-level `coordinate_system` field with the
 #                `axisymmetric` option for cylindrical 2D MOSCAP and similar
 #                rotationally-symmetric devices.
-SCHEMA_SUPPORTED_MINOR = 3
+#   M15 (1.4.0): added solver.backend (cpu-mumps | gpu-amgx | gpu-hypre |
+#                auto) and solver.compute (device, precision, preconditioner,
+#                linear_solver). Defaults preserve byte-equivalent CPU-MUMPS
+#                behavior; resolution of `auto` happens at solve time.
+SCHEMA_SUPPORTED_MINOR = 4
 
 
 @lru_cache(maxsize=1)
@@ -170,6 +174,51 @@ def _validate_coordinate_system(cfg: dict[str, Any]) -> None:
             )
 
 
+def _validate_compute(cfg: dict[str, Any]) -> None:
+    """
+    Cross-field validation for `solver.backend` against `solver.compute.device`.
+
+    Mirrors the cross-field pattern used for `coordinate_system`. Rules:
+      - `backend == "cpu-mumps"` requires `compute.device in {"auto", "cpu"}`.
+      - `backend in {"gpu-amgx", "gpu-hypre"}` requires
+        `compute.device in {"auto", "cuda", "hip"}`.
+      - `backend == "auto"` is always accepted at validation time; the
+        actual device is resolved at solve time by `semi.compute`
+        (introduced in Phase C of M15).
+
+    No-op when neither `backend` nor `compute` is present (default-fill
+    sets `backend="cpu-mumps"` and leaves `compute` absent, which is the
+    byte-equivalent legacy path).
+    """
+    solver = cfg.get("solver", {})
+    backend = solver.get("backend")
+    compute = solver.get("compute")
+    if backend is None and compute is None:
+        return
+    backend = backend or "cpu-mumps"
+    device = (compute or {}).get("device", "cpu" if backend == "cpu-mumps" else "auto")
+
+    if backend == "cpu-mumps":
+        if device not in ("auto", "cpu"):
+            raise SchemaError(
+                f"solver.backend='cpu-mumps' requires solver.compute.device "
+                f"in {{'auto', 'cpu'}}; got {device!r}"
+            )
+    elif backend in ("gpu-amgx", "gpu-hypre"):
+        if device not in ("auto", "cuda", "hip"):
+            raise SchemaError(
+                f"solver.backend={backend!r} requires solver.compute.device "
+                f"in {{'auto', 'cuda', 'hip'}}; got {device!r}"
+            )
+    elif backend == "auto":
+        return
+    else:
+        raise SchemaError(
+            f"solver.backend={backend!r} is not a recognised backend; "
+            f"expected one of {{'cpu-mumps', 'gpu-amgx', 'gpu-hypre', 'auto'}}"
+        )
+
+
 def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     """Fill in sensible defaults for optional sections."""
     cfg.setdefault("coordinate_system", "cartesian")
@@ -190,6 +239,7 @@ def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
 
     solver = cfg.setdefault("solver", {})
     solver.setdefault("type", "equilibrium")
+    solver.setdefault("backend", "cpu-mumps")
     solver.setdefault("max_iterations", 50)
     solver.setdefault("atol", 1.0e-10)
     solver.setdefault("rtol", 1.0e-8)
@@ -205,6 +255,8 @@ def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     cont.setdefault("max_halvings", 6)
     cont.setdefault("easy_iter_threshold", 4)
     cont.setdefault("grow_factor", 1.5)
+
+    _validate_compute(cfg)
 
     out = cfg.setdefault("output", {})
     out.setdefault("directory", "./results")

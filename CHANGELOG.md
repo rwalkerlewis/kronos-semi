@@ -9,8 +9,57 @@ Version sections below track the **package** version. The JSON input
 **schema** version is tracked separately in
 [`schemas/input.v1.json`](schemas/input.v1.json) and in the
 [schema reference](docs/schema/reference.md); the most recent schema
-bump is **1.3.0** (added `coordinate_system`), shipped with the
-M14.2 axisymmetric-MOSCAP work in the `[Unreleased]` section below.
+bump is **1.4.0** (added `solver.backend` and `solver.compute`),
+shipped with the M15 GPU linear-solver work in v0.15.0 below.
+
+## [0.15.0] - 2026-05-15
+
+### Added
+- **M15 GPU linear-solver path.** Schema 1.4.0 introduces
+  `solver.backend` (`cpu-mumps` default; `gpu-amgx`, `gpu-hypre`,
+  or `auto`) and `solver.compute` (`device`, `precision`,
+  `linear_solver`, `preconditioner`). When the requested backend is
+  GPU and PETSc was built with the matching CUDA/HIP support, the
+  linear solve runs on the device with AMGX or hypre BoomerAMG; the
+  CPU-MUMPS path is bit-identical to v0.14.1.
+- `semi/compute.py` runtime probe: `available_backends()`,
+  `device_info()`, `resolve_backend()`,
+  `petsc_options_for_backend()`, `backend_settings_from_cfg()`, plus
+  the `KRONOS_BACKEND` environment override.
+- Dynamic `GET /capabilities` endpoint reports the host's available
+  backends and devices for UI gating.
+- Manifest 1.1.0 adds optional fields `backend_requested`,
+  `backend_resolved`, `device`, `linear_solver`, `preconditioner`,
+  `ksp_iters`, `linear_solve_wall_s`. Pre-M15 readers continue to
+  find `solver.backend = "petsc-<resolved>"`.
+- `benchmarks/poisson_3d_gpu/`: 3D Poisson box (~531k DOFs) used as
+  the M15 A2 5x speedup acceptance test.
+- `tests/fem/test_gpu_backend.py`: A1 correctness test (pn_1d psi
+  matches CPU-MUMPS to 1e-8 relative L2 on every available GPU
+  backend; skips on CPU-only PETSc).
+- `tests/test_solver_backend_options.py`: 16 unit tests covering
+  the options translation and the cfg-resolution path, including
+  acceptance test A3 (no silent fallback when an explicit GPU
+  backend is unavailable).
+- `.github/workflows/gpu-nightly.yml`: nightly self-hosted runner
+  workflow gated on `vars.GPU_RUNNER_AVAILABLE == 'true'`.
+- `docs/gpu.md`: install recipes (PETSc + CUDA / HIP, AMGX, hypre)
+  and known limits.
+
+### Changed
+- `semi/solver.py`: `solve_nonlinear` and `solve_nonlinear_block`
+  accept `cfg=cfg`; the returned info dict now reports `ksp_iters`
+  and `linear_solve_wall_s` and (when `cfg` is provided) the
+  resolved backend metadata.
+- All six runners (equilibrium, bias_sweep, mos_cv, mos_cap_ac,
+  transient, ac_sweep) pass `cfg` through to the solver layer so
+  the manifest is populated with backend metadata.
+
+### Notes
+- Five-layer architecture invariants preserved: no PETSc types in
+  the kronos_server public API, no GPU types in physics / bcs /
+  scaling.
+- Folds in the v0.14.2 administrative items deferred from PR #65.
 
 ## [Unreleased]
 

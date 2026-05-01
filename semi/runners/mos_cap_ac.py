@@ -223,6 +223,7 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
                 "snes_atol": 1.0e-14,
                 "snes_max_it": 50,
             },
+            cfg=cfg,
         )
 
     def _build_sensitivity_bcs(V_gate_dummy: float) -> list:

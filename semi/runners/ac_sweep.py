@@ -120,6 +120,13 @@ def _build_dc_subcfg(cfg: dict, contact_name: str, voltage: float) -> dict:
         "type": "bias_sweep",
         "continuation": cont,
     }
+    # Propagate the user's backend selection into the DC sub-solve so
+    # the GPU path applies to the AC operating-point computation too.
+    src_solver = cfg.get("solver", {}) or {}
+    if "backend" in src_solver:
+        sub["solver"]["backend"] = src_solver["backend"]
+    if "compute" in src_solver:
+        sub["solver"]["compute"] = copy.deepcopy(src_solver["compute"])
     if snes_overrides:
         sub["solver"]["snes"] = dict(snes_overrides)
     found = False

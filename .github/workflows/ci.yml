@@ -37,7 +37,7 @@ jobs:
         run: pytest tests/ -v --tb=short
 
       - name: Run offline math sanity check
-        run: python tests/check_day1_math.py
+        run: python tests/check_analytical_math.py
 
   lint:
     runs-on: ubuntu-latest

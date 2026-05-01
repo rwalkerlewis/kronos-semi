@@ -182,6 +182,7 @@ def run_bias_sweep(
             F_list, [spaces.psi, spaces.phi_n, spaces.phi_p],
             bcs, prefix=f"{cfg['name']}_dd_{tag}_",
             petsc_options=snes_petsc_options,
+            cfg=cfg,
         )
 
     sweep_facet_info = None

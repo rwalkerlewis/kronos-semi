@@ -61,18 +61,48 @@
       "pattern": "^[0-9a-f]{64}$"
     },
     "solver": {
-      "description": "Summary of the solver configuration and convergence outcome.",
+      "description": "Summary of the solver configuration and convergence outcome. Backend metadata fields (backend_requested, backend_resolved, device, linear_solver, preconditioner, ksp_iters, linear_solve_wall_s) were added in manifest 1.1.0 (M15) and are optional so older readers do not break.",
       "type": "object",
       "additionalProperties": false,
       "required": ["type", "backend", "n_dofs", "n_steps", "converged"],
       "properties": {
         "type": {
-          "description": "Solver type (e.g. 'equilibrium', 'drift_diffusion', 'bias_sweep', 'mos_cv').",
+          "description": "Solver type (e.g. 'equilibrium', 'drift_diffusion', 'bias_sweep', 'mos_cv', 'mos_cap_ac', 'transient', 'ac_sweep').",
           "type": "string"
         },
         "backend": {
-          "description": "PETSc backend and linear solver descriptor (e.g. 'petsc-cpu-mumps').",
+          "description": "PETSc backend and linear solver descriptor (e.g. 'petsc-cpu-mumps', 'petsc-gpu-amgx', 'petsc-gpu-hypre').",
           "type": "string"
+        },
+        "backend_requested": {
+          "description": "User-supplied solver.backend value at submission (cpu-mumps, gpu-amgx, gpu-hypre, or auto). Added in manifest 1.1.0 (M15).",
+          "type": "string"
+        },
+        "backend_resolved": {
+          "description": "Concrete backend resolved at solve time after considering this build's PETSc capabilities. Added in manifest 1.1.0 (M15).",
+          "type": "string"
+        },
+        "device": {
+          "description": "Compute device used for the linear solve (cpu, cuda, hip). Added in manifest 1.1.0 (M15).",
+          "type": "string"
+        },
+        "linear_solver": {
+          "description": "User-supplied solver.compute.linear_solver value (auto, gmres, bcgs, cg). Added in manifest 1.1.0 (M15).",
+          "type": "string"
+        },
+        "preconditioner": {
+          "description": "User-supplied solver.compute.preconditioner value (auto, amgx, hypre-boomeramg, gamg). Added in manifest 1.1.0 (M15).",
+          "type": "string"
+        },
+        "ksp_iters": {
+          "description": "KSP iteration count from the final Newton step's linear solve. Added in manifest 1.1.0 (M15).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "linear_solve_wall_s": {
+          "description": "Wall-clock seconds spent inside the most recent SNES.solve() call (covers Newton outer + linear inner). Added in manifest 1.1.0 (M15).",
+          "type": "number",
+          "minimum": 0
         },
         "n_dofs": {
           "description": "Total number of global degrees of freedom in the primary function space.",

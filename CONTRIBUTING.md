@@ -37,7 +37,7 @@ pip install -e ".[dev]"
 ```bash
 pytest tests/ -v               # ~237 pure-Python tests; FEM-backed tests skip without dolfinx
 ruff check semi/ tests/
-python tests/check_day1_math.py
+python tests/check_analytical_math.py
 ```
 
 If you added FEM code, also run:

@@ -97,25 +97,34 @@ def test_capabilities(client):
     assert r.status_code == 200
     body = r.json()
     assert body["engine"]["name"] == "kronos-semi"
-    assert body["solver_types"] == ["equilibrium", "drift_diffusion", "bias_sweep", "mos_cv"]
+    # M13 (transient) and M14 (ac_sweep) are shipped as of v0.14.x.
+    assert "equilibrium" in body["solver_types"]
+    assert "transient" in body["solver_types"]
+    assert "ac_sweep" in body["solver_types"]
     assert body["dimensions"] == [1, 2, 3]
     assert body["mesh_sources"] == ["builtin", "gmsh"]
+    # M15 Phase B/C: schema_version and the device_info probe are now
+    # part of the response.
+    assert isinstance(body["schema_version"], str)
+    info = body["device_info"]
+    assert info["engine_version"] == body["engine"]["version"]
+    assert "cpu-mumps" in info["backends_available"]
     phys = body["physics"]
-    # Hard-coded booleans for the v0.10.0 build:
+    # Hard-coded booleans reflecting the current build:
     assert phys["boltzmann"] is True
     assert phys["srh_recombination"] is True
+    assert phys["transient"] is True
+    assert phys["ac_small_signal"] is True
     assert phys["fermi_dirac"] is False
     assert phys["auger_recombination"] is False
     assert phys["field_dependent_mobility"] is False
-    assert phys["transient"] is False
-    assert phys["ac_small_signal"] is False
     assert phys["schottky_contacts"] is False
     assert phys["heterojunctions"] is False
     assert phys["tunneling"] is False
     backends = body["backends"]
+    # cpu-mumps must be reported true; GPU flags are set from the
+    # runtime probe and are typically False on a CPU-only CI.
     assert backends["cpu_mumps"] is True
-    assert backends["gpu_amgx"] is False
-    assert backends["gpu_hypre"] is False
 
 
 def test_schema(client):

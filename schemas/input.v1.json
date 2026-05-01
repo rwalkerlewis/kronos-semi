@@ -8,8 +8,8 @@
     "schema_version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.3.0.",
-      "examples": ["1.0.0", "1.1.0", "1.2.0", "1.3.0"]
+      "description": "Schema version in semver form. The engine refuses inputs whose major version does not match the engine's supported major. Minor/patch skew is allowed but logged. Current schema: 1.4.0.",
+      "examples": ["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0"]
     },
     "coordinate_system": {
       "type": "string",
@@ -440,6 +440,44 @@
       "title": "Solver configuration",
       "description": "Newton solver tolerances, linear-solver backend, continuation controls, and top-level solver type dispatch.",
       "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["cpu-mumps", "gpu-amgx", "gpu-hypre", "auto"],
+          "default": "cpu-mumps",
+          "description": "Linear-solver backend. cpu-mumps is the V&V reference. auto picks the best available device at runtime. Added in schema 1.4.0 (M15); see docs/IMPROVEMENT_GUIDE.md §4 M15."
+        },
+        "compute": {
+          "type": "object",
+          "title": "Compute device options",
+          "description": "Device and precision controls for the linear solver. Cross-validated against `solver.backend`: cpu-mumps requires device in {auto, cpu}; gpu-amgx and gpu-hypre require device in {auto, cuda, hip}. Added in schema 1.4.0 (M15).",
+          "additionalProperties": false,
+          "properties": {
+            "device": {
+              "type": "string",
+              "enum": ["auto", "cpu", "cuda", "hip"],
+              "default": "cpu",
+              "description": "Compute device for the linear solve. auto resolves at solve time based on what PETSc was built with."
+            },
+            "precision": {
+              "type": "string",
+              "enum": ["float64"],
+              "default": "float64",
+              "description": "Floating-point precision for assembled operators and the linear solve. Single precision is reserved for future M16+ work; only double is allowed today."
+            },
+            "preconditioner": {
+              "type": "string",
+              "enum": ["auto", "amgx", "hypre-boomeramg", "gamg"],
+              "default": "auto",
+              "description": "Preconditioner type. auto picks a reasonable default for the chosen backend (e.g. lu/mumps for cpu-mumps; AMGX or BoomerAMG on GPU backends)."
+            },
+            "linear_solver": {
+              "type": "string",
+              "enum": ["auto", "gmres", "bcgs", "cg"],
+              "default": "auto",
+              "description": "Krylov method for iterative GPU backends. Ignored when backend is cpu-mumps (which uses a direct LU). auto picks a sensible default (gmres for non-symmetric DD operators)."
+            }
+          }
+        },
         "type": {
           "type": "string",
           "enum": [
