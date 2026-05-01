@@ -291,11 +291,24 @@ def test_build_psi_dirichlet_bcs_gate_honors_workfunction():
     assert _bc_value(gate_bc) == pytest.approx(expected, rel=1e-12)
 
 
-def test_build_dd_dirichlet_bcs_skips_gate_contact():
-    """Gate contact is on the oxide side, so DD assembly must skip it."""
+def test_build_dd_dirichlet_bcs_includes_gate_psi_only():
+    """Gate contact contributes a psi-only Dirichlet (phi_n / phi_p skipped).
+
+    Pre-M14.3, build_dd_dirichlet_bcs skipped gate contacts entirely on
+    the rationale that gates sit on the oxide side and the Slotboom
+    continuity blocks live on the semiconductor submesh. That left
+    bias_sweep with no way to apply a gate BC during a sweep, which
+    broke the M14.3 mosfet_2d Pao-Sah verifier (every step reported
+    SNES iterations=0 because the BCs were unchanged across V_gate
+    values). Fix: gate contacts now contribute a single psi
+    Dirichlet here (phi_n / phi_p remain skipped). The expected
+    BC count for a body-ohmic + gate config is therefore 3 (body
+    psi/phi_n/phi_p) + 1 (gate psi) = 4.
+    """
     from semi.physics.drift_diffusion import make_dd_block_spaces
 
-    cfg = _mos_like_cfg(V_gate=0.5, phi_ms=0.0)
+    V_gate = 0.5
+    cfg = _mos_like_cfg(V_gate=V_gate, phi_ms=0.0)
     ref_mat = get_material("Si")
     sc = make_scaling_from_config(cfg, ref_mat)
     msh, _cell_tags, facet_tags = build_mesh(cfg)
@@ -305,10 +318,41 @@ def test_build_dd_dirichlet_bcs_skips_gate_contact():
     contacts = resolve_contacts(cfg, facet_tags=facet_tags)
     bcs = build_dd_dirichlet_bcs(spaces, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
 
-    # Only the body ohmic contact contributes (psi, phi_n, phi_p) = 3 BCs.
-    # The gate is on the oxide side; DD assembles on the semiconductor submesh
-    # only, so a gate BC there is meaningless and must be skipped.
-    assert len(bcs) == 3
+    assert len(bcs) == 4
+
+    # The fourth BC is on V_psi (the gate psi Dirichlet); its value
+    # in scaled units is V_gate / V_t (phi_ms = 0).
+    psi_bcs = [bc for bc in bcs if bc.function_space is spaces.V_psi]
+    assert len(psi_bcs) == 2
+    gate_bc_value = max(_bc_value(bc) for bc in psi_bcs)
+    expected = V_gate / sc.V0
+    assert gate_bc_value == pytest.approx(expected, rel=1e-12)
+
+
+def test_build_dd_dirichlet_bcs_gate_voltage_overrides_via_resolve():
+    """When `voltages={gate_name: V_new}` is passed to resolve_contacts,
+    the gate psi Dirichlet must reflect V_new (regression test for the
+    M14.3 mosfet_2d failure where gate BC was never updated mid-sweep).
+    """
+    from semi.physics.drift_diffusion import make_dd_block_spaces
+
+    cfg = _mos_like_cfg(V_gate=0.0, phi_ms=0.0)
+    ref_mat = get_material("Si")
+    sc = make_scaling_from_config(cfg, ref_mat)
+    msh, _cell_tags, facet_tags = build_mesh(cfg)
+    spaces = make_dd_block_spaces(msh)
+    N_raw_fn = build_profile(cfg["doping"])
+
+    V_swept = 0.7
+    contacts = resolve_contacts(
+        cfg, facet_tags=facet_tags, voltages={"gate": V_swept},
+    )
+    bcs = build_dd_dirichlet_bcs(spaces, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
+
+    psi_bcs = [bc for bc in bcs if bc.function_space is spaces.V_psi]
+    gate_bc_value = max(_bc_value(bc) for bc in psi_bcs)
+    expected = V_swept / sc.V0
+    assert gate_bc_value == pytest.approx(expected, rel=1e-12)
 
 
 def test_build_dd_dirichlet_bcs_matches_legacy_at_bias_step():
