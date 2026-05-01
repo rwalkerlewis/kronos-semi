@@ -16,8 +16,9 @@
     "schema_version": {
       "type": "string",
       "pattern": "^2\\.\\d+\\.\\d+$",
-      "description": "Schema version in semver form. v2 enforces additionalProperties:false on every object node (typos in input keys fail validation rather than being silently ignored). Engine refuses inputs whose major does not match the engine's supported major. Current schema: 2.0.0.",
+      "description": "Schema version in semver form. v2 enforces additionalProperties:false on every object node (typos in input keys fail validation rather than being silently ignored). Engine refuses inputs whose major does not match the engine's supported major. Current schema: 2.1.0; v2.0.0 inputs continue to validate (additive minor for the M16.1 caughey_thomas mobility dispatch).",
       "examples": [
+        "2.1.0",
         "2.0.0"
       ]
     },
@@ -579,25 +580,46 @@
         "mobility": {
           "type": "object",
           "title": "Mobility model",
-          "description": "Carrier mobility model. Currently only constant mobilities are supported; field-dependent models are scheduled for M16.",
+          "description": "Carrier mobility model. The constant branch is the V&V reference and is bit-identical to v0.16.1; the caughey_thomas branch adds closed-form velocity saturation (M16.1).",
           "properties": {
             "model": {
               "type": "string",
               "enum": [
-                "constant"
+                "constant",
+                "caughey_thomas"
               ],
-              "description": "Mobility model selector.",
-              "default": "constant"
+              "default": "constant",
+              "description": "Mobility model selector. constant: mu(F) = mu_{n,p} (no field dependence). caughey_thomas: mu(F) = mu0 / (1 + (mu0 * F_par / vsat)^beta)^(1/beta), where mu0 is mu_{n,p} and F_par is the magnitude of the gradient of the carrier-specific quasi-Fermi potential."
             },
             "mu_n": {
               "type": "number",
-              "description": "Electron mobility in cm^2/(V s).",
-              "default": 1400.0
+              "default": 1400.0,
+              "description": "Electron low-field mobility in cm^2/(V s); identical role under constant and caughey_thomas dispatch."
             },
             "mu_p": {
               "type": "number",
-              "description": "Hole mobility in cm^2/(V s).",
-              "default": 450.0
+              "default": 450.0,
+              "description": "Hole low-field mobility in cm^2/(V s); identical role under constant and caughey_thomas dispatch."
+            },
+            "vsat_n": {
+              "type": "number",
+              "default": 1.0e7,
+              "description": "Electron saturation velocity (cm/s); ignored when model is constant. Default is the standard Si value."
+            },
+            "vsat_p": {
+              "type": "number",
+              "default": 8.0e6,
+              "description": "Hole saturation velocity (cm/s); ignored when model is constant."
+            },
+            "beta_n": {
+              "type": "number",
+              "default": 2.0,
+              "description": "Electron Caughey-Thomas exponent; ignored when model is constant."
+            },
+            "beta_p": {
+              "type": "number",
+              "default": 1.0,
+              "description": "Hole Caughey-Thomas exponent; ignored when model is constant."
             }
           },
           "additionalProperties": false

@@ -26,7 +26,8 @@ the full annotated source of truth is the JSON file.
   contact / mesh / solver fields fail validation rather than being
   silently dropped).
 - Minor/patch skew is accepted silently within a major.
-- Current schema version: **2.0.0** (M14.3 strict-mode major bump).
+- Current schema version: **2.1.0** (M16.1 caughey_thomas mobility dispatch);
+  v2.0.0 inputs continue to validate (additive minor).
 
 Schemas are published to
 `https://rwalkerlewis.github.io/kronos-semi/schemas/` on every release
@@ -50,6 +51,8 @@ History:
 - **1.4.0** (M15) — `solver.backend` and `solver.compute`.
 - **2.0.0** (M14.3) — strict mode (`additionalProperties: false` on every
   object node); v1 deprecated.
+- **2.1.0** (M16.1) — added `physics.mobility.model: caughey_thomas` plus
+  `vsat_n`, `vsat_p`, `beta_n`, `beta_p`. v2.0.0 inputs continue to validate.
 
 ## Top-level fields
 
