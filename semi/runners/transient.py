@@ -114,7 +114,7 @@ def run_transient(
 
     from dolfinx import fem
 
-    from ..bcs import build_dd_dirichlet_bcs, resolve_contacts, seed_dirichlet_dofs
+    from ..bcs import build_dd_dirichlet_bcs, resolve_contacts
     from ..doping import build_profile
     from ..mesh import build_mesh
     from ..physics.drift_diffusion import make_dd_block_spaces
@@ -326,16 +326,23 @@ def run_transient(
     # BCs at ohmic contacts. Identical to bias_sweep (Slotboom Shockley
     # boundary) -- delegate to build_dd_dirichlet_bcs.
     # ------------------------------------------------------------------
-    def _build_transient_bcs(voltages: dict[str, float]) -> tuple[list, list]:
+    def _build_transient_bcs(voltages: dict[str, float]) -> list:
         contacts = resolve_contacts(cfg, facet_tags=facet_tags,
                                     voltages=voltages)
-        bcs = build_dd_dirichlet_bcs(
+        return build_dd_dirichlet_bcs(
             spaces, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn,
         )
-        return contacts, bcs
 
-    def _apply_bc_values(contacts, bcs: list):
-        seed_dirichlet_dofs(contacts, bcs, psi, phi_n, phi_p)
+    def _apply_bc_values(bcs: list):
+        space_to_fn = {
+            id(V_psi): psi,
+            id(V_phi_n): phi_n,
+            id(V_phi_p): phi_p,
+        }
+        for bc in bcs:
+            fn = space_to_fn.get(id(bc.function_space))
+            if fn is not None:
+                bc.set(fn.x.array)
         for fn in (psi, phi_n, phi_p):
             fn.x.scatter_forward()
 
@@ -438,8 +445,8 @@ def run_transient(
         # Build BCs (Slotboom Shockley boundary) and seed unknowns
         # with the BC values at the contacts (so SNES starts close to
         # the solution at each step).
-        contacts_t, bcs = _build_transient_bcs(static_voltages)
-        _apply_bc_values(contacts_t, bcs)
+        bcs = _build_transient_bcs(static_voltages)
+        _apply_bc_values(bcs)
 
         tag = fmt_tag(t_next)
         # `fmt_tag` rounds to 4 decimal places (sub-microvolt

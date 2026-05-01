@@ -39,7 +39,7 @@ def run_bias_sweep(
     """
     from dolfinx import fem
 
-    from ..bcs import build_dd_dirichlet_bcs, resolve_contacts, seed_dirichlet_dofs
+    from ..bcs import build_dd_dirichlet_bcs, resolve_contacts
     from ..continuation import AdaptiveStepController, StepTooSmall
     from ..doping import build_profile
     from ..mesh import build_mesh
@@ -173,7 +173,15 @@ def run_bias_sweep(
         bcs = build_dd_dirichlet_bcs(
             spaces, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn,
         )
-        seed_dirichlet_dofs(contacts, bcs, spaces.psi, spaces.phi_n, spaces.phi_p)
+        space_to_fn = {
+            id(spaces.V_psi): spaces.psi,
+            id(spaces.V_phi_n): spaces.phi_n,
+            id(spaces.V_phi_p): spaces.phi_p,
+        }
+        for bc in bcs:
+            fn = space_to_fn.get(id(bc.function_space))
+            if fn is not None:
+                bc.set(fn.x.array)
         for fn in (spaces.psi, spaces.phi_n, spaces.phi_p):
             fn.x.scatter_forward()
         return solve_nonlinear_block(

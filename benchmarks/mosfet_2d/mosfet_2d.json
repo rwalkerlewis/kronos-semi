@@ -179,8 +179,8 @@
   "solver": {
     "type": "bias_sweep",
     "continuation": {
-      "min_step": 1e-06,
-      "max_halvings": 16,
+      "min_step": 1e-05,
+      "max_halvings": 10,
       "easy_iter_threshold": 4,
       "grow_factor": 1.5
     }
