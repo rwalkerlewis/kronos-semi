@@ -252,15 +252,7 @@ Capabilities previously listed here that have since shipped:
 Small alignment items deferred from the M8 / M14.2 polish passes; none
 affect any verifier or benchmark result.
 
-- **`docs/mos_derivation.md` §6 ψ-reference convention.** Section 6
-  derives `psi_s = psi(x, y_int) - psi(x, y_bulk)` (bulk-Fermi
-  reference), but the shipped MOS code uses the project-wide
-  intrinsic-Fermi convention `psi = 0` enforced by the ohmic-contact
-  equilibrium BC. Both yield the same C(V) once V_FB matches the
-  reference; the M6 verifier passes at 9.25% worst-case. Action:
-  rewrite §6 in the intrinsic-reference convention with a short
-  appendix mapping the two conventions for textbook (Sze, Pierret)
-  readers.
+None as of v0.16.1.
 
 ## Completed work log
 

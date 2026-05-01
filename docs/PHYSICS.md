@@ -707,7 +707,7 @@ The 0.2 V low-edge margin is wider than the nominal 0.1 V because at
 psi_s < ~2 V_t the carrier tail reaches across a significant fraction
 of W_dep and the depletion approximation naturally drifts toward 10%.
 Shrinking the window (not loosening the tolerance) is the intended
-knob per `mos_derivation.md` section 6.9.
+knob per `mos_derivation.md` section 6.10.
 
 ### 6.4 Capacitance extraction and theory
 
