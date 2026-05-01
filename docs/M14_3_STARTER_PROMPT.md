@@ -17,6 +17,12 @@ tests, or the rationale; those live in `docs/IMPROVEMENT_GUIDE.md`
 § M14.3. Read the guide first; this prompt only tells you the order
 in which to execute and which invariants must remain load-bearing.
 
+> **Note:** Phase A was struck after PR #68 landed (the original
+> observation was a cached-render artifact in the external
+> reviewer's tooling, not real staleness; see CHANGELOG `[Unreleased]`
+> for the full retraction). The original phase lettering (B, C, D, E)
+> is preserved below for traceability with PR #68's history.
+
 ## Required reading (do not skip; ~30 minutes)
 
 Per `CONTRIBUTING.md` "Before you start", in order:
@@ -75,43 +81,10 @@ Per `CONTRIBUTING.md` "Before you start", in order:
   gate drops below 95, add unit tests rather than relax the
   threshold.
 
-## Five phases, one commit per phase
+## Four phases, one commit per phase
 
 Do not bundle. After each phase, run `ruff check semi/ tests/` and
 `pytest tests/`. Do not advance with red tests.
-
----
-
-### Phase A: GitHub-rendered README (the visible problem)
-
-No code. The `README.md` in this tree is correct; the GitHub landing
-page is stale. Investigate and fix.
-
-1. View the README at `https://github.com/rwalkerlewis/kronos-semi`
-   in a browser (incognito to bypass any local cache). Confirm the
-   landing page does not match `main`.
-2. Diagnose the cause. Three plausible explanations:
-   - A fork is shadowing the repo at the user/org level (rare).
-   - GitHub's render cache is stuck (common after a long-running
-     branch was force-pushed; fixed by editing `README.md` with a
-     trivial whitespace change and pushing).
-   - The displayed README is a `default-branch` mismatch (the
-     `main` branch is the default but the rendered page is reading
-     a different branch).
-3. Apply the smallest fix that closes the visible problem. If a
-   trivial whitespace push refreshes the cache, do that. If the
-   default-branch setting is wrong, fix it via the GitHub web UI
-   and document in the PR description. If a fork shadows the repo,
-   file a GitHub support request and link it from the PR; do not
-   block the rest of M14.3 on it.
-4. Take a screenshot of the corrected landing page; attach it to
-   the PR description as evidence.
-
-**Acceptance test 1**: the GitHub-rendered README at the top of the
-repository page shows v0.15.0 status and the M1-M15 capability
-matrix.
-
-**Commit message:** `docs: refresh GitHub-rendered README landing page (M14.3)`
 
 ---
 
@@ -319,7 +292,7 @@ is 95, and CI is green.
 You are done with this prompt when:
 
 1. The M14.3 PR is opened on branch `dev/m14.3-housekeeping`.
-2. All five acceptance tests in `docs/IMPROVEMENT_GUIDE.md`
+2. All four acceptance tests in `docs/IMPROVEMENT_GUIDE.md`
    § M14.3 are green in CI.
 3. PLAN.md, IMPROVEMENT_GUIDE.md, ROADMAP.md, and CHANGELOG.md
    reflect the close-out.
@@ -336,7 +309,7 @@ You are done with this prompt when:
 ```
 ## Summary
 
-Housekeeping PR (M14.3) closing five small production-hardening
+Housekeeping PR (M14.3) closing four small production-hardening
 gaps before M16 physics work starts. Doc-only effects on PLAN /
 IMPROVEMENT_GUIDE / ROADMAP / CHANGELOG; engine effects bounded
 to the schema dispatch, the XDMF branch in semi/mesh.py, and the
@@ -346,7 +319,6 @@ Schema major bump v1 to v2 (additionalProperties: false). Both
 schemas coexist; v1 inputs log a DeprecationWarning.
 
 Closes:
-- GitHub-rendered README staleness (Phase A)
 - mosfet_2d qualitative verifier (Phase B)
 - semi/mesh.py XDMF NotImplementedError (Phase C)
 - input schema additionalProperties: false enforcement (Phase D)
@@ -354,13 +326,12 @@ Closes:
 
 ## Acceptance tests
 
-(All five are in docs/IMPROVEMENT_GUIDE.md § M14.3.)
+(All four are in docs/IMPROVEMENT_GUIDE.md § M14.3.)
 
-- [x] A1: GitHub-rendered README at v0.15.0
-- [x] A2: scripts/run_benchmark.py mosfet_2d Pao-Sah verifier
-- [x] A3: resistor benchmark from box.xdmf vs box.msh within 1e-12
-- [x] A4: every benchmark JSON validates as v2.0.0; typo rejected
-- [x] A5: SG primitives gone; coverage gate 95; CI green
+- [x] A1: scripts/run_benchmark.py mosfet_2d Pao-Sah verifier
+- [x] A2: resistor benchmark from box.xdmf vs box.msh within 1e-12
+- [x] A3: every benchmark JSON validates as v2.0.0; typo rejected
+- [x] A4: SG primitives gone; coverage gate 95; CI green
 
 ## Test plan
 

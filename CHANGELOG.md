@@ -71,12 +71,12 @@ shipped with the M15 GPU linear-solver work in v0.15.0 below.
   umbrella (Caughey-Thomas, Lombardi, Auger, Fermi-Dirac, Schottky,
   BBT and TAT) now has an explicit acceptance test with a numerical
   threshold or analytical reference. New milestones added:
-  - **M14.3 Housekeeping** (between M14.2 and M15): re-render the
-    GitHub README, tighten the `mosfet_2d` verifier with a Pao-Sah
-    analytical reference, implement XDMF mesh ingest, strict-mode
-    the input schema with an `additionalProperties: false` major
-    bump, and remove the dead-on-active-path Scharfetter-Gummel
-    primitives in `semi/fem/sg_assembly.py`.
+  - **M14.3 Housekeeping** (between M14.2 and M15): tighten the
+    `mosfet_2d` verifier with a Pao-Sah analytical reference,
+    implement XDMF mesh ingest, strict-mode the input schema with
+    an `additionalProperties: false` major bump, and remove the
+    dead-on-active-path Scharfetter-Gummel primitives in
+    `semi/fem/sg_assembly.py`.
   - **M16.1 through M16.7** (physics completeness, one PR each):
     Caughey-Thomas mobility, Lombardi surface mobility, Auger
     recombination, Fermi-Dirac statistics (gated), Schottky
@@ -106,6 +106,11 @@ shipped with the M15 GPU linear-solver work in v0.15.0 below.
   purposes by M16.4 (Fermi-Dirac) and M19 (3D MOSFET).
 - No engine code changed; coverage gate untouched; no version bump
   (the next bump ships with M14.3).
+- Struck the M14.3 GitHub-rendered README re-render deliverable
+  from IMPROVEMENT_GUIDE, the M14.3 starter prompt, and PLAN. The
+  original observation that motivated it was a cached-render
+  artifact in the external reviewer's tooling; on-disk and
+  on-github.com READMEs have matched main since v0.8.0.
 
 ### Added
 - Axisymmetric (cylindrical) coordinate system support (**schema 1.3.0**).

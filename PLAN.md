@@ -53,11 +53,10 @@ and passing.
 The post-M15 roadmap was refreshed in the doc-only PR on branch
 `dev/roadmap-refresh-post-m15` (this PR). The refresh encodes the
 findings of an external code review into PLAN, ROADMAP, and
-IMPROVEMENT_GUIDE: the GitHub-rendered README is stale, the 3D coverage
-is thin, the `mosfet_2d` verifier has no analytical reference, the M16
-and M17 entries were sketches not contracts, and the production-
-hardening items (strict schema, XDMF ingest, dead SG primitives, HTTP
-auth) were uncollected. The backlog now contains an explicit
+IMPROVEMENT_GUIDE: the 3D coverage is thin, the `mosfet_2d` verifier
+has no analytical reference, the M16 and M17 entries were sketches
+not contracts, and the production-hardening items (strict schema,
+XDMF ingest, dead SG primitives, HTTP auth) were uncollected. The backlog now contains an explicit
 acceptance test with a numerical threshold or analytical reference for
 every Tier 1 physics model (Caughey-Thomas, Lombardi, Auger,
 Fermi-Dirac, Schottky, BBT/TAT) plus a 3D MOSFET capstone (M19), an
@@ -118,21 +117,18 @@ M15 through M18. Summary:
 **M14.3 Housekeeping PR** on branch `dev/m14.3-housekeeping`. Picked
 up via [`docs/M14_3_STARTER_PROMPT.md`](docs/M14_3_STARTER_PROMPT.md);
 acceptance tests in [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md)
-§ M14.3. Five-deliverable scope:
+§ M14.3. Four-deliverable scope:
 
-1. Re-render the GitHub `README.md` so the landing page matches `main`
-   (the on-disk copy is correct; the `github.com` cache, fork shadow,
-   or rendered view is stale at v0.1.0 framing).
-2. Tighten the `mosfet_2d` verifier with a Pao-Sah / square-law
+1. Tighten the `mosfet_2d` verifier with a Pao-Sah / square-law
    analytical reference in the linear regime and a documented 20%
    tolerance window.
-3. Implement the XDMF branch in `semi/mesh.py::_build_from_file` and
+2. Implement the XDMF branch in `semi/mesh.py::_build_from_file` and
    round-trip the resistor benchmark from `box.xdmf` within 1e-12
    relative R.
-4. Strict-mode the input schema (`additionalProperties: false`
+3. Strict-mode the input schema (`additionalProperties: false`
    everywhere), bump the schema major to v2.0.0, ship `schemas/input.v2.json`
    alongside v1, and migrate every benchmark JSON.
-5. Delete `semi/fem/sg_assembly.py` (~792 LOC dead-on-active-path)
+4. Delete `semi/fem/sg_assembly.py` (~792 LOC dead-on-active-path)
    and raise the coverage gate from 92 to 95.
 
 After M14.3 lands, M16.1 (Caughey-Thomas field-dependent mobility) is
