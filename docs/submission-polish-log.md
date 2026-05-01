@@ -123,18 +123,24 @@ record but explicitly out of scope for PR #10.
 
 ### MOS C-V ψ-reference convention
 
-`docs/mos_derivation.md` §6 derives surface potential as
-`psi_s = psi(x, y_int) - psi(x, y_bulk)`, i.e. psi referenced to the
-bulk Fermi level (the textbook convention used in Sze and Pierret).
-The shipped MOS code uses the project-wide `psi = 0` at the intrinsic
-Fermi level convention, enforced by the ohmic-contact equilibrium BC
-throughout `semi/bcs.py` and the Poisson residual in
-`semi/physics/poisson.py`. Both conventions are self-consistent and
-produce the same C(V) curve once V_FB is computed against the matching
-reference. The review pass caught the drift between derivation and
-code; reconciling the derivation is deferred to post-submission to avoid
-touching doctrinal physics text under submission-day time pressure.
-The M6 benchmark and the Notebook 03 narrative both use the code's
+**Resolved in M14.4 (2026-05-23):** `docs/mos_derivation.md` §6 has
+been rewritten in the project-wide intrinsic-Fermi convention used by
+the shipped code; the new §6.7 maps the textbook bulk-Fermi reference
+(Sze, Pierret) to the intrinsic frame for readers comfortable with
+the textbook treatment. The historical drift recorded below is closed.
+
+The original M8 review pass caught a drift between the derivation and
+the shipped code: §6 derived the surface potential in the textbook
+bulk-Fermi reference (referencing psi to the bulk Fermi level via
+`phi_F = V_t * ln(N_A / n_i)`), while the shipped MOS code used the
+project-wide `psi = 0` at the intrinsic Fermi level convention,
+enforced by the ohmic-contact equilibrium BC throughout `semi/bcs.py`
+and the Poisson residual in `semi/physics/poisson.py`. Both
+conventions are self-consistent and produce the same C(V) curve once
+V_FB is computed against the matching reference. Reconciling the
+derivation was deferred to post-submission to avoid touching
+doctrinal physics text under submission-day time pressure. The M6
+benchmark and the Notebook 03 narrative both use the code's
 convention, stated explicitly in both places.
 
 ### MOS verifier window V_FB+0.1 -> V_FB+0.2

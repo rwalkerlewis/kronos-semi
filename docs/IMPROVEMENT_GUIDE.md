@@ -11,16 +11,19 @@ input, its acceptance test, and its dependency on prior milestones.
 
 ---
 
-## 1. Honest current state (as of v0.15.0)
+## 1. Honest current state (as of v0.16.0)
 
 What exists and works:
 
 - `semi/` package with a five-layer architecture; Layer 3 (pure-Python
   core) has no dolfinx dependency and is independently testable.
-- JSON schema 1.4.0 (Draft-07, enforced via `jsonschema`) covering
-  mesh, regions, doping, contacts, physics, solver, output, plus the
-  top-level `coordinate_system` field added in M14.2 and the
-  `solver.backend` / `solver.compute` fields added in M15.
+- JSON schemas v1.4.0 (Draft-07, the legacy loose schema retained one
+  minor cycle for v1.x.y inputs) and v2.0.0 (Draft-07, strict,
+  `additionalProperties: false`; the post-M14.3 default), both
+  enforced via `jsonschema`. Schema fields cover mesh, regions,
+  doping, contacts, physics, solver, output, plus the top-level
+  `coordinate_system` field added in M14.2 and the `solver.backend` /
+  `solver.compute` fields added in M15.
 - Builtin meshes in 1D/2D/3D plus gmsh `.msh` loader with physical
   groups.
 - Equilibrium Poisson, coupled drift-diffusion in Slotboom form, SRH
@@ -64,8 +67,9 @@ What exists and works:
   UI-facing annotations, every benchmark validates, the major-version
   gate refuses mismatched majors (M11).
 - 2D MOSFET with Gaussian n+ source/drain implants on the multi-region
-  Poisson + Slotboom DD stack (M12). Verifier is qualitative (M14.3
-  tightens it with a Pao-Sah / square-law analytical reference).
+  Poisson + Slotboom DD stack. Pao-Sah linear-regime analytical
+  verifier in `[V_T + 0.2, V_T + 0.6]` V at `V_DS = 0.05` V with a
+  20% tolerance (M14.3).
 - GPU linear-solver path via PETSc CUDA / HIP, AMGX or hypre BoomerAMG
   preconditioning (M15). Schema 1.4.0 adds `solver.backend` and
   `solver.compute`; manifest 1.1.0 adds KSP iters and linear-solve
@@ -98,23 +102,21 @@ What does *not* exist:
 - **No HTTP server hardening.** `kronos_server/app.py` carries a
   `# TODO(M10+): add auth, rate limiting, API keys before any public
   deployment`. M20.
-- **Five small production-hardening gaps** scattered across the
-  codebase: `additionalProperties: false` is not enforced on the
-  input schema; `semi/mesh.py::_build_from_file` raises
-  `NotImplementedError` for the XDMF branch; the transient runner
-  accepts no `V(t)` (closes audit case 06); ~792 LOC of dead-on-
-  active-path Scharfetter-Gummel primitives in `semi/fem/sg_assembly.py`
-  remain in the tree. M14.3 closes the first three plus the dead-LOC
-  removal in one housekeeping PR before M16 physics work starts.
+- **One small production-hardening gap remaining**: the transient
+  runner accepts no `V(t)` (audit case 06 is `pytest.skip`). M16.7
+  closes it with a per-step contact-voltage callable / table; see
+  the M16.7 entry in §4. The four gaps closed in M14.3 (strict
+  schema, XDMF mesh ingest, Pao-Sah `mosfet_2d` verifier, and the
+  ~792 LOC of dead-on-active-path Scharfetter-Gummel primitives in
+  `semi/fem/sg_assembly.py`) shipped in v0.16.0.
 
 Bottom line: the numerics are sound, the engine is addressable from
 outside Python, results are consumable without a dolfinx install, the
 schema is versioned and richly annotated, and the GPU linear-solve
-lever is in place. The remaining work is closing the housekeeping
-gaps (M14.3), filling out the Tier 1 physics catalogue (M16.1
-through M16.7), shipping a real 3D semiconductor device (M19),
-hardening the HTTP server for multi-tenant deployment (M20), and
-extending to heterojunctions (M17).
+lever is in place. The remaining work is filling out the Tier 1
+physics catalogue (M16.1 through M16.7), shipping a real 3D
+semiconductor device (M19), hardening the HTTP server for
+multi-tenant deployment (M20), and extending to heterojunctions (M17).
 
 ---
 
@@ -870,6 +872,14 @@ The engine is ready for a UI when all of these are green:
   UI integration checklist has the dynamic `additionalProperties:
   false` behavior available to UI form-builders so typos surface
   with clear error messages.
+- **2026-05-23**, M14.4 residual cleanup (v0.16.1): §1 refreshed to
+  v0.16.0 reality post-M14.3 (schema v2.0.0 strict mode added, the
+  four engineering gaps marked closed, audit case 06 surfaced as the
+  lone remaining production-hardening residual); README rewritten
+  without milestone tags or frozen test counts;
+  `docs/mos_derivation.md` §6 rewritten in the intrinsic-Fermi
+  convention; `.github/workflows/publish-schemas.yml` shipped to make
+  the post-M14.3 publish-URL claim true.
 - **2026-05-01**, post-M15 roadmap refresh: §1 updated to v0.15.0,
   M14/M14.1/M14.2 status badges grew CHANGELOG anchors, M14.3
   housekeeping milestone added between M14.2 and M15, M16 umbrella

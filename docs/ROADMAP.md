@@ -4,9 +4,9 @@ kronos-semi is a FEniCSx-based finite-element semiconductor device simulator tha
 
 ## Capability matrix
 
-All milestones M1 through M15 have shipped as of v0.15.0. The table
-below is the current state; see the Delivery history section for
-per-milestone details. Planned milestones (M16, M19, M20)
+All milestones M1 through M15 plus M14.3 have shipped as of v0.16.0.
+The table below is the current state; see the Delivery history
+section for per-milestone details. Planned milestones (M16, M19, M20)
 have explicit acceptance tests in
 [`docs/IMPROVEMENT_GUIDE.md`](IMPROVEMENT_GUIDE.md).
 

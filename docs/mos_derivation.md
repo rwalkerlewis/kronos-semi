@@ -6,14 +6,14 @@ assembly, and C-V verification. The implementation is shipped and all
 four verifier checks pass; this document is the stable reference
 derivation.
 
-Note on psi-reference convention: Section 6 below derives surface
-potential as `psi_s = psi(x, y_int) - psi(x, y_bulk)` (bulk Fermi
-level reference, the textbook convention). The shipped code uses the
-project-wide `psi = 0` at the intrinsic Fermi level convention
-enforced by `semi/bcs.py`. Both conventions produce the same C(V)
-curve once V_FB is computed against the matching reference. A
-reconciliation of this convention drift is tracked in
-`PLAN.md` Post-submission cleanups.
+Note on psi-reference convention: Section 6 below derives the surface
+potential in the project-wide intrinsic-Fermi convention used by the
+shipped code, in which `psi = 0` at the bulk ohmic contact in
+equilibrium is enforced by `semi/bcs.py` per ADR 0007. Section 6.7
+maps this convention to the bulk-Fermi reference used in textbook
+treatments (Sze, Pierret) for readers more comfortable with the
+textbook frame. Both conventions produce the same C(V) curve once
+V_FB is computed against the matching reference.
 
 The scope is:
 
@@ -458,11 +458,27 @@ For the M6 ideal-gate baseline, V_FB = 0.
 
 ### 6.2 Surface potential and Fermi potential
 
-Let psi_s = psi(x, y_int) - psi(x, y_bulk) be the surface potential
-relative to the bulk (defined for the 1D cross-section; in 2D the
-MOS capacitor is translation-invariant away from x = 0 and x = W, so
-psi is effectively a function of y alone in the interior). The bulk
-Fermi potential for p-type substrate is
+The shipped MOS code uses the project-wide intrinsic-Fermi reference
+convention: the electrostatic potential psi is referenced to the
+intrinsic Fermi level inside the bulk semiconductor, and the
+ohmic-contact equilibrium boundary condition enforces psi = 0 at the
+bulk contact (see [docs/PHYSICS.md](PHYSICS.md) Section 2 on the
+BC convention and
+[ADR 0007](adr/0007-bc-interface-design.md) for the BC interface
+design). In this convention the surface potential is
+
+```
+psi_s = psi(y_int)
+```
+
+because the bulk reference psi(y_bulk) = 0 is pinned by the boundary
+condition at the ohmic contact in equilibrium (defined for the 1D
+cross-section; in 2D the MOS capacitor is translation-invariant away
+from x = 0 and x = W, so psi is effectively a function of y alone in
+the interior). Section 6.7 below maps this convention to the bulk-
+Fermi reference used in textbook treatments (Sze, Pierret).
+
+The bulk Fermi potential for p-type substrate is
 
 ```
 phi_F = V_t * ln( N_A / n_i )
@@ -478,14 +494,18 @@ phi_F = 0.02585 * ln(1e7) = 0.02585 * 16.118 = 0.417 V
 
 Under the depletion approximation (mobile carriers fully depleted in
 a layer of width W_dep beneath the oxide; fixed acceptor charge
--q N_A uniformly),
+-q N_A uniformly), with psi_s = psi(y_int) per the intrinsic-Fermi
+convention of section 6.2,
 
 ```
 W_dep(psi_s) = sqrt( 2 eps_s psi_s / (q N_A) )
 Q_dep(psi_s) = -q N_A W_dep(psi_s) = -sqrt( 2 eps_s q N_A psi_s )
 ```
 
-valid for `0 < psi_s < 2 phi_F` (onset of strong inversion).
+valid for `0 < psi_s < 2 phi_F` (onset of strong inversion). The
+formulas are convention-independent in psi_s because both frames
+agree on the band-bending magnitude across the depletion region; only
+the absolute reference differs.
 
 ### 6.4 Oxide capacitance
 
@@ -524,7 +544,26 @@ V_gate - V_FB = psi_s + sqrt( 2 eps_s q N_A psi_s ) / C_ox
 which is solved numerically for psi_s at each V_gate (monotonic in
 psi_s, so one-dimensional root-finding converges quickly).
 
-### 6.7 Threshold voltage
+### 6.7 Convention map for textbook readers
+
+Sze and Pierret reference psi to the bulk Fermi level rather than the
+bulk intrinsic level: their psi_bulk_ref differs from the kronos-semi
+psi by the bulk-Fermi shift,
+
+```
+phi_F = V_t * ln( N_A / n_i )    (p-type substrate, intrinsic n_i)
+```
+
+so the textbook surface potential `psi_s_textbook = psi(y_int) -
+psi(y_bulk)` evaluates to the same numerical band-bending across the
+depletion region as the intrinsic-reference `psi_s = psi(y_int)`,
+shifted by phi_F in absolute reference. The flatband voltage shifts
+correspondingly between the two frames, and once V_FB matches the
+chosen reference, the analytical C(V) curve is identical. The M6
+mos_2d verifier passes at 9.25 percent worst-case in either
+convention.
+
+### 6.8 Threshold voltage
 
 Strong inversion begins at psi_s = 2 phi_F:
 
@@ -550,7 +589,7 @@ comparison (the flatband neighbourhood sees mobile-carrier
 contributions to C that the depletion approximation misses, and the
 threshold neighbourhood sees inversion-layer formation).
 
-### 6.8 Simulated capacitance extraction
+### 6.9 Simulated capacitance extraction
 
 For each bias point `V_gate_i` in the sweep the simulator produces
 scaled fields (psi_hat, phi_n_hat, phi_p_hat) on their respective
@@ -574,7 +613,7 @@ C_sim(V_gate_i) = ( Q_gate(V_gate_{i+1}) - Q_gate(V_gate_{i-1}) )
 centered finite difference, divided by the lateral extent W to reduce
 to per-area units that match C_theory.
 
-### 6.9 Error metric and tolerance
+### 6.10 Error metric and tolerance
 
 ```
 err(V_gate_i) = | C_sim(V_gate_i) - C_theory(V_gate_i) | / C_theory(V_gate_i)
@@ -602,7 +641,7 @@ overshoots the tolerance, the debugging action is to shrink the
 verifier window (push farther from accumulation and inversion) or to
 examine dQ/dV noise, not to loosen the tolerance (anti-pattern).
 
-### 6.10 Regimes explicitly excluded
+### 6.11 Regimes explicitly excluded
 
 **Accumulation** (V_gate < V_FB): holes pile up at the interface,
 forming a surface charge layer that the depletion approximation does

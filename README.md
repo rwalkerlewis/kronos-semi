@@ -9,8 +9,9 @@
 A JSON-driven finite-element semiconductor device simulator built on FEniCSx
 (dolfinx 0.10). Solves Poisson-coupled drift-diffusion with SRH recombination
 on 1D, 2D, and 3D meshes, with an HTTP API for programmatic access.
-Originally delivered as an evaluation task; the project is now a working
-production engine suitable for web UI integration.
+The engine is JSON-in / artifact-out: a single JSON file describes the
+device, the run produces a schema-validated result tree on disk, and an
+HTTP server lets a UI or another tool drive solves remotely.
 
 If you're a contributor or a coding agent, start at the [Orientation](#orientation)
 section.
@@ -26,69 +27,79 @@ Full documentation is in [docs/](docs/index.md). Quick links:
 - [CHANGELOG.md](CHANGELOG.md) — release notes (Keep-a-Changelog).
 - [CONTRIBUTING.md](CONTRIBUTING.md) — setup, conventions, benchmark layout.
 
-## Status (v0.15.0, GPU linear-solver path shipped)
+## Status
 
-Milestones M1 through M15 are merged on `main`. The most recent
-shipped feature is the GPU linear-solver path (PETSc CUDA / HIP via
-AMGX or hypre BoomerAMG, schema 1.4.0), with the CPU-MUMPS path bit-
-identical to v0.14.1. M13.1 was closed; the transient solver now
-uses Slotboom primary unknowns (ADR 0014).
+The current package version is v0.16.0. The engine ships equilibrium
+Poisson, coupled Slotboom drift-diffusion with SRH recombination, a
+2D MOSFET, transient and AC small-signal solvers, an axisymmetric
+2D MOSCAP path, an optional GPU linear-solver backend, and a strict
+JSON input schema (v2.0.0).
 
 What the engine does today, in plain terms:
 
 - **Equilibrium Poisson** in 1D, 2D, 3D, multi-region (Si/SiO2 with
   cellwise eps_r and the natural flux-continuity interface condition).
-- **Coupled Slotboom drift-diffusion bias sweeps** (M2/M3) with adaptive
+- **Coupled Slotboom drift-diffusion bias sweeps** with adaptive
   step-size continuation in `AdaptiveStepController`; SRH recombination
   with configurable trap energy; supports unipolar and zero-spanning
   bipolar sweeps.
-- **2D MOSFET** with Gaussian n+ source/drain implants (M12), built on
-  the multi-region Poisson + Slotboom DD stack.
+- **2D MOSFET** with Gaussian n+ source/drain implants on the
+  multi-region Poisson + Slotboom DD stack. The `mosfet_2d` verifier
+  applies the Pao-Sah linear-regime analytical reference in
+  `[V_T + 0.2, V_T + 0.6]` V at `V_DS = 0.05` V with a 20% tolerance.
 - **Transient solver** with BDF1 (backward Euler) and BDF2 time
-  integration (M13/M13.1), in Slotboom (psi, phi_n, phi_p) primary
-  unknowns; ADRs 0010, 0014 (supersedes 0009). Both
-  `test_transient_steady_state_limit` and the BDF rate tests are
-  active and passing as of v0.14.1; the deep-steady-state runner
-  matches `bias_sweep` within 1e-4 relative error and the
-  `pn_1d_turnon` benchmark is within 5%.
-- **MOS capacitor C-V via analytic AC** (M14.1): the `mos_cap_ac`
-  runner solves the linearised Poisson sensitivity at each gate bias to
+  integration in Slotboom (psi, phi_n, phi_p) primary unknowns
+  (ADRs 0010, 0014). Both `test_transient_steady_state_limit` and the
+  BDF rate tests are active; the deep-steady-state runner matches
+  `bias_sweep` within 1e-4 relative error and the `pn_1d_turnon`
+  benchmark is within 5%.
+- **MOS capacitor C-V via analytic AC**: the `mos_cap_ac` runner
+  solves the linearised Poisson sensitivity at each gate bias to
   return dQ/dV directly in F/m^2, replacing the noisier
   `numpy.gradient(Q, V)` of `mos_cv`. Worst error 6.79% vs the
   depletion-approximation reference in the verifier window; audit case
   03 confirms `mos_cv` and `mos_cap_ac` agree on Q_gate to machine
   precision.
-- **Small-signal AC sweep** for two-terminal pn diodes (M14):
+- **Small-signal AC sweep** for two-terminal pn diodes:
   `(J + jωM) δu = -dF/dV δV` solved via real 2x2 block reformulation;
   the `rc_ac_sweep` benchmark matches analytical depletion C within
-  0.4% over [1 Hz, 1 MHz]; ADR 0011.
+  0.4% over [1 Hz, 1 MHz] (ADR 0011).
 - **3D doped resistor** with V-I linearity within 1%, builtin or
-  gmsh-sourced unstructured meshes (M7).
-- **Axisymmetric (cylindrical) 2D MOSCAP** (M14.2) with r-weighted
-  Poisson and Slotboom drift-diffusion on the meridian half-plane;
-  schema 1.3.0 adds the top-level `coordinate_system` field with
-  `cartesian` (default) and `axisymmetric` options. Cross-field
-  validation enforces dimension == 2 and rejects Dirichlet contacts
-  on the symmetry axis r = 0. Pure-Python MOSCAP analytical helpers
-  (`semi/cv.py`) provide V_fb, V_t, |phi_B|, W_dmax, C_ox, C_min and
-  LF/HF C–V curves; the gmsh `.geo` template under
-  `benchmarks/moscap_axisym_2d/` reproduces Hu Fig. 5-18 parameters.
-  See [docs/theory/axisymmetric.md](docs/theory/axisymmetric.md) and
+  gmsh-sourced unstructured meshes.
+- **Axisymmetric (cylindrical) 2D MOSCAP** with r-weighted Poisson and
+  Slotboom drift-diffusion on the meridian half-plane. The schema
+  exposes a top-level `coordinate_system` field (`"cartesian"`
+  default, `"axisymmetric"` optional). Cross-field validation enforces
+  dimension == 2 and rejects Dirichlet contacts on the symmetry axis
+  r = 0. Pure-Python MOSCAP analytical helpers (`semi/cv.py`) provide
+  V_fb, V_t, |phi_B|, W_dmax, C_ox, C_min and LF/HF C-V curves; the
+  gmsh `.geo` template under `benchmarks/moscap_axisym_2d/` reproduces
+  Hu Fig. 5-18 parameters. See
+  [docs/theory/axisymmetric.md](docs/theory/axisymmetric.md) and
   [docs/theory/moscap_cv.md](docs/theory/moscap_cv.md).
-- **GPU linear-solver path** (M15, v0.15.0): set `solver.backend` to
-  `gpu-amgx`, `gpu-hypre`, or `auto` (default `cpu-mumps`). Each
-  Newton step's linear solve runs on the device with AMGX or hypre
-  BoomerAMG, gated on PETSc-CUDA / PETSc-HIP availability. The
-  `GET /capabilities` endpoint reports the host's available backends
-  for UI gating. See [docs/gpu.md](docs/gpu.md).
-- **On-disk result artifacts** (M9): manifest.json + fields + IV CSVs +
-  convergence logs, schema-validated.
-- **HTTP API** (M10): `POST /solve`, progress over WebSocket, `GET
-  /runs/{id}/manifest`, etc. Server process imports no dolfinx at
-  module scope.
-- **Schema versioning + UI form-builder annotations** (M11):
-  `schemas/input.v1.json` Draft-07, every object node carries a
-  description.
+- **Optional GPU linear-solver path**: set `solver.backend` to
+  `gpu-amgx`, `gpu-hypre`, or `auto` (default `cpu-mumps`, bit-
+  identical to the pre-GPU CPU path). Each Newton step's linear solve
+  runs on the device with AMGX or hypre BoomerAMG, gated on
+  PETSc-CUDA / PETSc-HIP availability. The `GET /capabilities`
+  endpoint reports the host's available backends for UI gating. See
+  [docs/gpu.md](docs/gpu.md).
+- **Mesh ingest** for builtin axis-aligned 1D/2D/3D boxes, gmsh `.msh`
+  via `dolfinx.io.gmsh.read_from_msh`, and XDMF via
+  `dolfinx.io.XDMFFile.read_mesh` / `read_meshtags`. Physical groups
+  propagate verbatim as cell and facet tags.
+- **On-disk result artifacts**: schema-validated `manifest.json`,
+  fields, IV CSVs, and convergence logs under `runs/<run_id>/`.
+- **HTTP API**: `POST /solve`, progress over WebSocket,
+  `GET /runs/{id}/manifest`, `GET /capabilities`, `GET /materials`,
+  `GET /schema`. The server process imports no dolfinx at module
+  scope; FEM work happens in spawned worker subprocesses.
+- **Schema versioning with strict mode and UI annotations**: the
+  active schema is `schemas/input.v2.json` (Draft-07,
+  `additionalProperties: false` so input typos fail validation). The
+  legacy `schemas/input.v1.json` is accepted for one minor cycle and
+  emits a `DeprecationWarning`. Every object node carries a
+  description for UI form generators.
 - **V&V**: MMS for Poisson (1D linear/nonlinear, 2D triangles, 2D
   multi-region), mesh convergence, charge / current conservation, MMS
   for coupled DD across three variants and three grids; finest-pair
@@ -96,25 +107,16 @@ What the engine does today, in plain terms:
 - **CI**: lint + pure-Python on Python 3.10/3.11/3.12 + dolfinx
   benchmarks + V&V on every push, coverage gate at 95%.
 
-The full capability matrix is captured in [docs/ROADMAP.md](docs/ROADMAP.md);
-the per-milestone deliverables are in [CHANGELOG.md](CHANGELOG.md).
+Per-milestone delivery history is in [`docs/ROADMAP.md`](docs/ROADMAP.md);
+per-version detail is in [`CHANGELOG.md`](CHANGELOG.md).
 
-## Where this is going (post-M14.2)
+## Where this is going
 
-M1 through M14.2 produced a numerically sound engine with a versioned,
-UI-facing JSON input contract, an HTTP API, transient and AC solvers,
-a 2D MOSFET benchmark, and an axisymmetric MOSCAP path. Detailed
-deliverables and acceptance tests live in
-[docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md).
-
-| Milestone | Summary                                                                                                | Status   |
-|-----------|--------------------------------------------------------------------------------------------------------|----------|
-| M14.2 ✓   | Axisymmetric 2D MOSCAP, schema 1.3.0, MOSCAP analytical helpers, gmsh `.geo` template                  | Done     |
-| M14.2.x   | Cartesian-2D MOSCAP variant; rigorous AC small-signal HF method; FEM-vs-analytical C–V regression run end-to-end | Open     |
-| M15       | GPU linear solver path                                                                                 | Planned  |
-| M16       | Physics completeness (Caughey-Thomas, Auger, FD, Schottky, tunneling)                                  | Planned  |
-| M17       | Heterojunctions / position-dependent band structure                                                    | Planned  |
-| M18       | UI: first cut (separate repo)                                                                          | Out of scope here |
+The forward-looking milestone backlog (Tier-1 physics in M16, the 3D
+MOSFET capstone in M19, MPI in M19.1, HTTP hardening in M20) lives in
+[`docs/ROADMAP.md`](docs/ROADMAP.md) and
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md).
+[`PLAN.md`](PLAN.md) names the single in-flight task.
 
 ## Orientation
 
@@ -243,7 +245,7 @@ Reproducible dev environment on top of `ghcr.io/fenics/dolfinx/dolfinx:stable`:
 
 ```bash
 docker compose build
-docker compose run --rm test                       # pytest (256 tests + 1 xfail)
+docker compose run --rm test                       # full pytest including FEM tests
 docker compose run --rm benchmark pn_1d            # run a benchmark
 docker compose up -d dev && docker compose exec dev bash
 docker compose up jupyter                          # JupyterLab on :8888
@@ -298,6 +300,7 @@ Minimal 1D pn junction:
 
 ```json
 {
+  "schema_version": "2.0.0",
   "name": "pn_junction_1d",
   "dimension": 1,
   "mesh": {
@@ -330,49 +333,62 @@ Minimal 1D pn junction:
 ```
 
 Doping densities in JSON are in cm⁻³ (device-physics tradition); everything
-else is SI. The full schema lives in `schemas/input.v1.json` (JSON
-Schema Draft-07, every object node annotated with a UI-facing
-description); see [docs/schema/reference.md](docs/schema/reference.md)
-for the field-by-field reference and the axisymmetric extension.
-Every input JSON must declare a top-level `"schema_version"`; the
-engine refuses inputs whose major version does not match
-`ENGINE_SUPPORTED_SCHEMA_MAJOR` in `semi/schema.py` (currently `1`,
-minor `3`).
+else is SI. The strict default schema is `schemas/input.v2.json` (JSON
+Schema Draft-07 with `additionalProperties: false`, every object node
+annotated with a UI-facing description); the legacy
+`schemas/input.v1.json` is accepted but emits a `DeprecationWarning`
+and will be removed after one minor release cycle. See
+[docs/schema/reference.md](docs/schema/reference.md) for the
+field-by-field reference and the axisymmetric extension. Every input
+JSON must declare a top-level `"schema_version"`; the engine accepts
+majors listed in `ENGINE_SUPPORTED_SCHEMA_MAJORS` in `semi/schema.py`
+(currently `(1, 2)`).
 
 ## Scope vs COMSOL Semiconductor Module
 
 kronos-semi covers the **quasi-static, steady-state** subset.
 
-**In scope (shipped, M1 through M14.1):**
+**In scope (shipped):**
 
 - Poisson with multi-region dielectric (Si/SiO2)
 - Drift-diffusion in Slotboom (quasi-Fermi potential) form
 - SRH recombination with configurable mid-gap trap energy
 - Ohmic contacts and ideal gate contacts with work-function offset
-- 1D, 2D, and 3D structured meshes (builtin); 3D unstructured meshes via gmsh
+- 1D, 2D, and 3D structured meshes (builtin); 3D unstructured meshes
+  via gmsh `.msh` and XDMF ingest
 - Bias sweeps with adaptive step-size continuation (unipolar and bipolar)
 - Method-of-Manufactured-Solutions and conservation V&V suite
 - Machine-readable on-disk result artifacts (schema-validated manifests)
 - HTTP API with solve submission, progress streaming, and artifact fetch
-- 2D MOSFET (M12) with Gaussian n+ source/drain implants
-- Transient BDF1/BDF2 (M13); the (n,p) Galerkin discretisation has a
-  known atol-driven divergence (issue #34), tracked by M13.1
-- Small-signal AC sweep (M14) on two-terminal pn devices, plus the
-  M14.1 `mos_cap_ac` runner for analytic differential C(V_gate)
+- 2D MOSFET with Gaussian n+ source/drain implants and a Pao-Sah
+  linear-regime analytical verifier
+- Transient BDF1 / BDF2 in Slotboom primary unknowns
+- Small-signal AC sweep on two-terminal pn devices, plus the
+  `mos_cap_ac` runner for analytic differential C(V_gate)
+- Axisymmetric (cylindrical) 2D MOSCAP with r-weighted Poisson and
+  Slotboom drift-diffusion
+- Optional GPU linear-solver path (PETSc CUDA / HIP via AMGX or
+  hypre BoomerAMG)
+- Strict-mode schema (`additionalProperties: false`) so input typos
+  fail validation rather than being silently dropped
 
-**Out of scope today (planned for M15 through M17, see [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md)):**
+**Out of scope today (see [docs/IMPROVEMENT_GUIDE.md](docs/IMPROVEMENT_GUIDE.md)
+and [docs/ROADMAP.md](docs/ROADMAP.md)):**
 
-- GPU linear solver path; CPU-LU only above ~200k DOFs is a hard wall (M15)
-- Caughey-Thomas / Lombardi field-dependent mobility (M16)
-- Auger and radiative recombination (M16)
-- Fermi-Dirac statistics (M16; Boltzmann throughout today, valid below ~10¹⁹ cm⁻³)
-- Impact ionization and avalanche generation (future)
-- Band-to-band or trap-assisted tunneling (M16)
+- Caughey-Thomas / Lombardi field-dependent mobility (M16.1, M16.2)
+- Auger and radiative recombination (M16.3)
+- Fermi-Dirac statistics (M16.4; Boltzmann throughout today, valid
+  below ~10¹⁹ cm⁻³)
+- Schottky contacts and contact resistance models (M16.5)
+- Band-to-band or trap-assisted tunneling (M16.6)
+- Time-varying transient contact voltage (M16.7)
 - Heterojunctions and position-dependent band structure (M17)
-- Schottky contacts and contact resistance models (M16)
-- Thermal coupling / self-heating (future)
-- Optical generation (future)
-- Full FinFET or 3D transistor geometries (depends on M16 + meshing work)
+- 3D MOSFET / FinFET capstone benchmark (M19); MPI parallel
+  orchestration (M19.1); HTTP server hardening (M20)
+- GUI or web frontend (M18, separate repo)
+- Impact ionization and avalanche generation (unscheduled)
+- Thermal coupling / self-heating (unscheduled)
+- Optical generation (unscheduled)
 
 ## Design notes
 
@@ -406,17 +422,6 @@ analytical-math helper `tests/check_analytical_math.py` covers thermal voltage,
 Debye length, built-in potential, mass-action, charge neutrality,
 and peak |E|.
 
-Current state on `main` (post-M14.2):
-
-- Pure-Python pytest (no dolfinx): **237 passed, 22 skipped** (the
-  skips are FEM-gated tests that require dolfinx).
-- Axisymmetric / schema-validation subset: **8 passed** (7 schema +
-  1 MOSCAP analytical; the analytical test internally exercises
-  **15/15 MOSCAP analytical anchors**).
-- MOSCAP analytical numbers (Hu Fig. 5-18 parameters):
-  V_fb = -0.950 V, V_t = +0.181 V, |phi_B| = 0.399 V,
-  W_dmax = 144 nm, C_min/C_ox = 0.173.
-
 ```bash
 python tests/check_analytical_math.py    # runs offline, no dolfinx required
 pytest tests/                      # full suite under Docker, FEM included
@@ -432,7 +437,7 @@ python scripts/run_verification.py # V&V suite (MMS, conservation)
 5. [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) — end-to-end code trace with file:line anchors.
 6. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — five-layer component design and import rules.
 7. [docs/adr/](docs/adr/) — locked decisions. Open a new ADR before changing any invariant.
-8. [docs/ROADMAP.md](docs/ROADMAP.md) — per-milestone delivery history (M1 through M14.1).
+8. [docs/ROADMAP.md](docs/ROADMAP.md): per-milestone delivery history (M1 through current).
 
 ## License
 
