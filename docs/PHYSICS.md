@@ -742,6 +742,38 @@ qv}.png`. Monotone non-increasing C in the window is also checked
 back toward C_ox in inversion; inside the window it is strictly
 decreasing up to ~1% noise).
 
+### 6.6 MOSFET I-V verifier (M14.3, Pao-Sah linear regime)
+
+The companion `mosfet_2d` benchmark exercises the same multi-region
+infrastructure with a 2D n-channel MOSFET (M12 device geometry, n+
+Gaussian source/drain implants, p-type body, ideal gate). The verifier
+compares the simulated drain current against the long-channel Pao-Sah
+square-law model in the linear / triode regime,
+
+    I_D / W = (mu_n / L_ch) * C_ox * (V_GS - V_T) * V_DS,
+
+valid for V_GS > V_T and V_DS << V_GS - V_T. The 2D simulation reports
+current per unit z-width through the drain facet line, so
+I_D_sim / W = J_drain * L_drain_line where L_drain_line is the vertical
+extent of the drain contact (2.005 um in `mosfet_2d.json`).
+
+The verifier window is V_GS in [V_T + 0.2, V_T + 0.6] V at
+V_DS = 0.05 V; tolerance 20%. The lower edge sits clear of subthreshold
+so the Boltzmann tail is negligible; the upper edge keeps the device
+in the linear regime so saturation and velocity-saturation corrections
+stay small (M16.1 Caughey-Thomas widens the window upward). The 20%
+tolerance also absorbs the long-channel approximation
+(L_ch ~ gate-oxide lateral extent rather than the implant-corrected
+effective channel length), residual ohmic series resistance at
+V_DS = 0.05 V on a 5 um body, and 50 x 21 mesh discretisation error.
+
+V_T is computed via `semi.cv.analytical_moscap_params` and shifted into
+the kronos-semi BC convention (V_FB = phi_ms - phi_F) as documented in
+section 6.3. The bias_sweep runner records `J_<contact_name>` at every
+ohmic contact at every step (added in M14.3 alongside gate-sweep
+support); the verifier reads `iv_row["J_drain"]` directly. See
+`benchmarks/mosfet_2d/README.md` for the per-parameter derivation.
+
 ## 7. 3D doped resistor (M7: 3D doped resistor)
 
 M7: 3D doped resistor is a dimension extension, not a physics extension. Both the

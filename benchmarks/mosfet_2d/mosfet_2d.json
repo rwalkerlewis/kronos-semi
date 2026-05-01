@@ -51,20 +51,14 @@
   "contacts": [
     {"name": "body",   "facet": "body",   "type": "ohmic", "voltage": 0.0},
     {"name": "source", "facet": "source", "type": "ohmic", "voltage": 0.0},
-    {
-      "name": "drain",
-      "facet": "drain",
-      "type": "ohmic",
-      "voltage": 0.05,
-      "voltage_sweep": {"start": 0.05, "stop": 0.05, "step": 0.05}
-    },
+    {"name": "drain",  "facet": "drain",  "type": "ohmic", "voltage": 0.05},
     {
       "name": "gate",
       "facet": "gate",
       "type": "gate",
       "voltage": 0.0,
       "workfunction": 0.0,
-      "voltage_sweep": {"start": 0.0, "stop": 1.5, "step": 0.25}
+      "voltage_sweep": {"start": 0.0, "stop": 1.5, "step": 0.1}
     }
   ],
   "physics": {
