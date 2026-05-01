@@ -35,16 +35,26 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M15 plus M14.3 are merged into `main`. Current package
-version is `0.16.0`; M14.3 (Housekeeping, branch
-`dev/m14.3-housekeeping`) closed four production-hardening gaps
-before M16 physics work starts: a Pao-Sah analytical reference for
-the `mosfet_2d` benchmark, the XDMF branch in
-`semi/mesh.py::_build_from_file`, strict-mode schema v2.0.0
-(`additionalProperties: false` on every object node, with v1
-deprecated for one minor cycle), and removal of the dead-on-active-
-path `semi/fem/sg_assembly.py` (~792 LOC). The coverage gate is
-restored to 95. M15 (GPU linear-solver path, schema 1.4.0, manifest
+M1 through M15 plus M14.3 and M14.4 are merged into `main`. Current
+package version is `0.16.1`; M14.4 (residual cleanup, branch
+`dev/m14.4-residual-cleanup`) shipped four documentation /
+infrastructure deliverables: README rewritten without milestone tags
+or frozen test counts, post-M14.3 staleness sweep across
+`docs/IMPROVEMENT_GUIDE.md` § 1, `docs/ROADMAP.md` banner,
+`CHANGELOG.md` schema banner, and `CONTRIBUTING.md`,
+`docs/mos_derivation.md` § 6 rewritten in the intrinsic-Fermi
+convention with a new § 6.7 textbook-convention map, and
+`.github/workflows/publish-schemas.yml` shipped so the post-M14.3
+publish-URL claim in `semi/schema.py` and `docs/schema/reference.md`
+is now accurate. No engine code or physics changed in M14.4. M14.3
+(Housekeeping, branch `dev/m14.3-housekeeping`) shipped in v0.16.0
+and closed four production-hardening gaps before M16 physics work
+starts: a Pao-Sah analytical reference for the `mosfet_2d` benchmark,
+the XDMF branch in `semi/mesh.py::_build_from_file`, strict-mode
+schema v2.0.0 (`additionalProperties: false` on every object node,
+with v1 deprecated for one minor cycle), and removal of the
+dead-on-active-path `semi/fem/sg_assembly.py` (~792 LOC). The
+coverage gate is restored to 95. M15 (GPU linear-solver path, schema 1.4.0, manifest
 1.1.0) ships in v0.15.0; M14.2 (axisymmetric MOSCAP, schema 1.3.0)
 shipped in PR #64. M13.1 closed in v0.14.1: the 1D transient runner
 uses Slotboom primary unknowns (ADR 0014, supersedes ADR 0009) and
@@ -257,6 +267,62 @@ None as of v0.16.1.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M14.4 Residual cleanup (2026-05-23):** Branch
+  `dev/m14.4-residual-cleanup`, four phase-letter commits closing the
+  carry-over residuals after M14.3 / PR #70. Version bumped 0.16.0
+  to 0.16.1; no engine code or physics changed.
+  - **Phase A (README hygiene).** Origin-story sentence and version-
+    in-heading dropped; capability bullets rewritten without
+    milestone tags; the stale "Where this is going (post-M14.2)"
+    table replaced with a one-paragraph link to `docs/ROADMAP.md`
+    and `docs/IMPROVEMENT_GUIDE.md`; the JSON-input minimal example
+    now declares `"schema_version": "2.0.0"` so it validates against
+    the strict v2 schema; the schema-version paragraph after the
+    example now references both v2.0.0 (strict default) and v1.x.y
+    (deprecated, accepted with a `DeprecationWarning`); the docker-
+    compose comment lost its frozen "256 tests + 1 xfail" count;
+    out-of-scope list refreshed against PLAN.md § Non-goals;
+    Verification block lost its frozen "237 passed, 22 skipped" line
+    and the planning-documents footer now reads "M1 through current".
+    Acceptance test 1 grep clean.
+  - **Phase B (post-M14.3 reference sweep).** `docs/IMPROVEMENT_GUIDE.md`
+    § 1 refreshed to v0.16.0 (header, schema bullet for v2.0.0
+    strict, mosfet_2d Pao-Sah past tense, production-hardening gaps
+    reduced to audit case 06 only). `docs/ROADMAP.md` banner refreshed
+    to "M1 through M15 plus M14.3 have shipped as of v0.16.0".
+    `CHANGELOG.md` schema banner refreshed to mention both v1.4.0
+    (deprecated) and v2.0.0 (strict default). `CONTRIBUTING.md`
+    schema-version reference refreshed from `1.3.0` to `2.0.0` strict
+    with the v1 deprecation note. § 9 grew an entry for the M14.4
+    closeout. Acceptance test 2 grep clean.
+  - **Phase C (mos_derivation §6 rewrite).** § 6.2 / § 6.3 rewritten
+    in the project-wide intrinsic-Fermi convention used by the
+    shipped MOS code: psi_s = psi(y_int), with the bulk reference
+    psi(y_bulk) = 0 pinned by the ohmic-contact equilibrium BC per
+    ADR 0007. New § 6.7 "Convention map for textbook readers"
+    inserted; existing 6.7-6.10 renumbered to 6.8-6.11; PHYSICS.md
+    cross-ref updated 6.9 to 6.10. Preamble note rewritten to lead
+    with the intrinsic-Fermi convention; submission-polish-log.md
+    M8 entry updated to record the M14.4 resolution. PLAN.md
+    Post-merge follow-ups bullet (carried since M8 / M14.2) removed.
+    Acceptance test 3 grep clean.
+  - **Phase D (publish-schemas workflow).** Shipped
+    `.github/workflows/publish-schemas.yml`; on `v*.*.*` tag push or
+    release publish, copies `schemas/input.v1.json`,
+    `schemas/input.v2.json`, and `schemas/manifest.v1.json` into
+    `_site/schemas/{input,manifest}/`, generates an `index.json`
+    with the engine version and resolved URLs, configures and deploys
+    GitHub Pages, and on release publish appends the URLs to the
+    release body via `softprops/action-gh-release@v2`. Permissions
+    are the standard Pages-deploy minimum (`contents: read`,
+    `pages: write`, `id-token: write`). The post-M14.3 publish-URL
+    claim in `semi/schema.py` L55-L57 and `docs/schema/reference.md`
+    L31-L33 is now accurate. Acceptance test 4 (workflow exists and
+    parses as valid YAML) passes.
+  - **Phase E (closeout).** This entry, plus `[Unreleased]` -> `[0.16.1]`
+    in `CHANGELOG.md`, plus `pyproject.toml` and `semi/__init__.py`
+    bumped to `0.16.1`.
 
 - **M14.3 Housekeeping (2026-05-22):** Branch
   `dev/m14.3-housekeeping`, four phase-letter commits per

@@ -67,6 +67,58 @@ accepted with a `DeprecationWarning`) and **2.0.0** (strict,
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-05-23
+
+### Changed
+
+- **M14.4 residual cleanup.** README rewritten as a clean project
+  description (no origin-story sentence, no milestone tags on
+  capability bullets, no frozen test counts, version moved out of
+  the `## Status` heading; the stale "Where this is going
+  (post-M14.2)" matrix replaced with a one-paragraph link to
+  [`docs/ROADMAP.md`](docs/ROADMAP.md) and
+  [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md)). The
+  minimal JSON example now declares `"schema_version": "2.0.0"` so
+  it validates against the M14.3 strict schema.
+- [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) § 1
+  refreshed to v0.16.0 reality (schema v2.0.0 strict-mode bullet
+  added, mosfet_2d Pao-Sah verifier past-tense, the
+  production-hardening gaps list reduced to the lone audit case 06
+  residual that M16.7 closes). [`docs/ROADMAP.md`](docs/ROADMAP.md)
+  capability-matrix banner refreshed; [`CHANGELOG.md`](CHANGELOG.md)
+  schema banner refreshed to call out v2.0.0 in addition to v1.4.0;
+  [`CONTRIBUTING.md`](CONTRIBUTING.md) schema-version reference
+  refreshed from `1.3.0` to `2.0.0` strict with a v1 deprecation note.
+- [`docs/mos_derivation.md`](docs/mos_derivation.md) § 6 rewritten in
+  the project-wide intrinsic-Fermi convention used by the shipped
+  MOS code (closes the lone PLAN.md Post-merge follow-up carried
+  since M8 / M14.2); new § 6.7 "Convention map for textbook readers"
+  maps the bulk-Fermi convention used in Sze and Pierret to the
+  intrinsic frame via `phi_F = V_t * ln(N_A / n_i)`. Existing
+  § 6.7-§ 6.10 renumbered to § 6.8-§ 6.11; `docs/PHYSICS.md`
+  cross-reference updated 6.9 to 6.10.
+
+### Added
+
+- [`.github/workflows/publish-schemas.yml`](.github/workflows/publish-schemas.yml).
+  On a `v*.*.*` tag push or `release: published`, copies the bundled
+  schemas (`schemas/input.v1.json`, `schemas/input.v2.json`,
+  `schemas/manifest.v1.json`) into `_site/schemas/`, generates an
+  `index.json` with the resolved URLs and the engine version from
+  `pyproject.toml`, and deploys to the project's GitHub Pages site
+  at `https://rwalkerlewis.github.io/kronos-semi/schemas/`. The
+  post-M14.3 publish-URL claim in
+  [`semi/schema.py`](semi/schema.py) L55-L57 and
+  [`docs/schema/reference.md`](docs/schema/reference.md) L31-L33,
+  which referenced this workflow before it existed, is now accurate.
+
+### Notes
+
+- No engine code or physics changed. No schema bump (v2.0.0 strict
+  default and v1 deprecation handling stay exactly as M14.3 left
+  them; the publish workflow ships the schemas verbatim). No V&V
+  gate change.
+
 ## [0.16.0] - 2026-05-22
 
 ### Added
