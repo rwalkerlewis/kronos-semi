@@ -26,11 +26,12 @@ Full documentation is in [docs/](docs/index.md). Quick links:
 - [CHANGELOG.md](CHANGELOG.md) — release notes (Keep-a-Changelog).
 - [CONTRIBUTING.md](CONTRIBUTING.md) — setup, conventions, benchmark layout.
 
-## Status (v0.14.1, axisymmetric MOSCAP shipped)
+## Status (v0.15.0, GPU linear-solver path shipped)
 
-Milestones M1 through M14.2 are merged on `main`. The most recent
-shipped feature is the axisymmetric (cylindrical) 2D MOSCAP path with
-schema 1.3.0 (PR #64). M13.1 was closed; the transient solver now
+Milestones M1 through M15 are merged on `main`. The most recent
+shipped feature is the GPU linear-solver path (PETSc CUDA / HIP via
+AMGX or hypre BoomerAMG, schema 1.4.0), with the CPU-MUMPS path bit-
+identical to v0.14.1. M13.1 was closed; the transient solver now
 uses Slotboom primary unknowns (ADR 0014).
 
 What the engine does today, in plain terms:
@@ -74,6 +75,12 @@ What the engine does today, in plain terms:
   `benchmarks/moscap_axisym_2d/` reproduces Hu Fig. 5-18 parameters.
   See [docs/theory/axisymmetric.md](docs/theory/axisymmetric.md) and
   [docs/theory/moscap_cv.md](docs/theory/moscap_cv.md).
+- **GPU linear-solver path** (M15, v0.15.0): set `solver.backend` to
+  `gpu-amgx`, `gpu-hypre`, or `auto` (default `cpu-mumps`). Each
+  Newton step's linear solve runs on the device with AMGX or hypre
+  BoomerAMG, gated on PETSc-CUDA / PETSc-HIP availability. The
+  `GET /capabilities` endpoint reports the host's available backends
+  for UI gating. See [docs/gpu.md](docs/gpu.md).
 - **On-disk result artifacts** (M9): manifest.json + fields + IV CSVs +
   convergence logs, schema-validated.
 - **HTTP API** (M10): `POST /solve`, progress over WebSocket, `GET

@@ -281,6 +281,10 @@ the charge and sensitivity forms (PRs #64, #65).
 
 ### M15 — GPU linear solver path
 
+**Status: Done (v0.15.0).** See PLAN.md §Completed work for the
+ship summary; this section is preserved for the original scoping
+discussion.
+
 **Why:** Above ~200k DOFs the MUMPS LU factorization dominates wall time. 3D
 FinFET-class problems will be in the millions of DOFs and CPU-LU is hopeless.
 GPU-accelerated iterative solvers change the scaling law.
@@ -451,9 +455,10 @@ The engine is ready for a UI when all of these are green:
 - [x] M11 complete: schema is versioned, richly annotated, published.
 - [x] `GET /materials` returns the material DB.
 - [x] `GET /schema` returns the input schema.
-- [ ] `GET /capabilities` returns which physics models this engine build
+- [x] `GET /capabilities` returns which physics models this engine build
       supports (e.g., `{"transient": true, "ac": false, "gpu": true, ...}`).
-      (M15 will close this; GPU availability is a capability.)
+      (Closed in M15: dynamic backend / device discovery via
+      `semi.compute.available_backends` and `device_info`.)
 - [ ] WebSocket stream emits at least one message per SNES iteration with
       `{"residual_norm": ..., "iteration": ..., "bias_step": ...}`.
 - [ ] CORS configured on the HTTP server for the UI's dev origin.
@@ -511,6 +516,9 @@ The engine is ready for a UI when all of these are green:
 - **2026-04-23**, initial version, written post-M8.
 - **2026-04-30**, refresh of §1, §4, §6 to reflect v0.14.x reality
   post-M14.2; introduce §10 shipped-milestone appendix.
+- **2026-05-15**, mark §4 M15 Done (v0.15.0); the GPU linear-solver
+  path landed with schema 1.4.0 (`solver.backend`, `solver.compute`)
+  and manifest 1.1.0 (KSP iters and linear-solve wall time fields).
 
 ---
 

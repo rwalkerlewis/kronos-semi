@@ -35,14 +35,14 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M14.2 are merged into `main`. Current package version is
-`0.14.1`; M14.2 (axisymmetric MOSCAP, schema 1.3.0) merged via PR #64
-(`a4649be`), and the post-merge documentation cleanup, scipy base-
-dependency promotion, and axisymmetric runner dispatch in
-`semi/runners/mos_cap_ac.py` followed in PR #65 (`799934d`). The
-v0.14.2 tag and the corresponding `pyproject.toml` version bump are
-outstanding administrative items, deferred to land alongside the M15
-close-out (which itself bumps the minor to 0.15.0). M13.1 closed in v0.14.1: the 1D transient runner
+M1 through M15 are merged into `main`. Current package version is
+`0.15.0`; M15 (GPU linear-solver path, schema 1.4.0, manifest 1.1.0)
+landed on `dev/m15-phase-a` and supersedes the deferred v0.14.2
+administrative bump from PR #65. M14.2 (axisymmetric MOSCAP, schema
+1.3.0) merged via PR #64 (`a4649be`), and the post-merge
+documentation cleanup, scipy base-dependency promotion, and
+axisymmetric runner dispatch in `semi/runners/mos_cap_ac.py` followed
+in PR #65 (`799934d`). M13.1 closed in v0.14.1: the 1D transient runner
 uses Slotboom primary unknowns (ADR 0014, supersedes ADR 0009) and
 matches bias_sweep at deep steady state. SG flux primitives ship in
 `semi/fem/` but are not the active CD path. ADRs 0012 (SG flux) and
@@ -87,7 +87,9 @@ are enumerated and sequenced in
 [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md), milestones
 M15 through M18. Summary:
 
-- **Linear solver is CPU-LU only.** Unusable above ~200k DOFs. M15.
+- **Linear solver: GPU path now optional.** Default is still CPU-MUMPS
+  (bit-identical to pre-M15); set `solver.backend` to `gpu-amgx`,
+  `gpu-hypre`, or `auto` to opt in to PETSc-CUDA / PETSc-HIP. M16+.
 - **Physics gaps:** no field-dependent mobility, Auger, Fermi-Dirac,
   Schottky contacts, tunneling. M16.
 - **Heterojunctions:** position-dependent χ and Eg not yet supported.
@@ -98,14 +100,12 @@ M15 through M18. Summary:
 
 ## Next task
 
-**M15: GPU linear solver path.** Add a PETSc-CUDA / PETSc-HIP linear
-solver backend behind `solver.backend`, keep the CPU-MUMPS path bit-
-identical, ship a 3D Poisson benchmark at >=500k DOFs, and prove a 5x
-speedup of the linear-solve portion alone. Full deliverable, phased
-plan, and acceptance tests in
-[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §4 M15 and
-§5; ordered work plan in
-[`docs/M15_STARTER_PROMPT.md`](docs/M15_STARTER_PROMPT.md).
+**Owner picks one** of: (a) M14.2.x cartesian-2D MOSCAP / rigorous HF
+C-V follow-ups; (b) Physics validation suite Phase 2 (Sze /
+Nicollian-Brews external comparisons, case 06); (c) M16.1 (first
+physics-completeness slice: Caughey-Thomas mobility). All three are
+tracked in [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md)
+and [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Backlog
 
@@ -118,9 +118,6 @@ binding; the owner picks one explicitly when the next task ships.
   `mos_cap_ac` byte-identity); case 02/05 sign-convention findings
   were resolved in PR #62 (M14 sign fix); case 06 deferred. Audit
   suite is CI-gated via the `docker-fem-audit` job.
-- **v0.14.2 tag and `pyproject.toml` version bump.** Outstanding
-  administrative items from the PR #65 merge; will fold into the M15
-  close-out which bumps to 0.15.0.
 
 ## Roadmap
 
@@ -143,7 +140,7 @@ binding; the owner picks one explicitly when the next task ships.
 | M14: AC small-signal | Linearised (J + jωM) δu = -dF/dV δV; rc_ac_sweep verifier within 0.4% of analytical C_dep; ADR 0011 | Done |
 | M14.1: AC differential C-V | `mos_cap_ac` runner returns dQ/dV via Im(Y)/(2πf); audit case 03 byte-identity | Done |
 | M14.2: Axisymmetric MOSCAP | Cylindrical 2D path; schema 1.3.0 `coordinate_system`; Hu Fig. 5-18 benchmark | Done |
-| M15: GPU linear solver | PETSc CUDA/HIP, AMGX preconditioner, 500k-DOF 3D benchmark | Planned |
+| M15: GPU linear solver | PETSc CUDA/HIP, AMGX/hypre PCs, schema 1.4.0 `solver.backend`/`solver.compute`, manifest 1.1.0, 3D Poisson 500k-DOF benchmark | Done |
 | M16: Physics completeness | Caughey-Thomas, Lombardi, Auger, FD, Schottky, tunneling | Planned |
 | M17: Heterojunctions | Position-dependent chi, Eg; HEMT or HBT benchmark | Planned |
 | M18: UI (separate repo) | React + vtk.js + JSONForms, consumes M9+M10+M11 contracts | Out of scope (this repo) |
@@ -228,6 +225,43 @@ affect any verifier or benchmark result.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M15 GPU linear-solver path (2026-05-15):** Schema 1.4.0 adds
+  `solver.backend` (`cpu-mumps` default, plus `gpu-amgx`, `gpu-hypre`,
+  `auto`) and `solver.compute` (`device`, `precision`, `linear_solver`,
+  `preconditioner`). Manifest 1.1.0 adds optional fields
+  `backend_requested`, `backend_resolved`, `device`, `linear_solver`,
+  `preconditioner`, `ksp_iters`, `linear_solve_wall_s`. Pre-M15
+  byte-equivalence preserved: when `solver.backend == "cpu-mumps"`
+  the runner injects no PETSc overrides, so legacy benchmarks bit-
+  match. New `semi/compute.py` runtime probe (`available_backends`,
+  `device_info`, `resolve_backend`, `petsc_options_for_backend`,
+  `backend_settings_from_cfg`, env override `KRONOS_BACKEND`) drives
+  the dynamic `/capabilities` endpoint and the runner-side options
+  translation. `semi/solver.py` accepts `cfg=cfg` on
+  `solve_nonlinear[_block]`, instruments KSP iters and linear-solve
+  wall time, and stamps the resolved backend metadata onto the
+  returned info dict; the six runners (equilibrium, bias_sweep,
+  mos_cv, mos_cap_ac, transient, ac_sweep) propagate `cfg` so the
+  manifest is correctly populated. Acceptance tests:
+  - **A1** correctness — `tests/fem/test_gpu_backend.py` runs the
+    pn_1d benchmark on every available GPU backend and asserts
+    `||psi_gpu - psi_cpu||_2 / ||psi_cpu||_2 < 1e-8`. Skips cleanly
+    on CPU-only PETSc.
+  - **A2** speedup — `benchmarks/poisson_3d_gpu/` is a 80x80x80
+    uniform-doped 3D Poisson box (~531k DOFs) wired into the new
+    `gpu-nightly.yml` workflow gated on
+    `vars.GPU_RUNNER_AVAILABLE == 'true'`; the post-run gate fails
+    if `t_cpu / t_gpu < 5x`.
+  - **A3** no silent fallback — `backend_settings_from_cfg` raises
+    `ConfigError` when an explicit GPU backend is unavailable; only
+    `backend = "auto"` is allowed to degrade to cpu-mumps. Covered
+    by `tests/test_solver_backend_options.py::test_backend_settings_explicit_gpu_amgx_unavailable_raises`.
+  Five-layer architecture invariants preserved: no PETSc types leak
+  through the kronos_server public API; physics / bcs / scaling
+  remain device-agnostic; `semi/compute.py` only imports
+  `os`, `typing`, `petsc4py`, `__version__`. Test totals 295 passed,
+  26 skipped (was 238 pre-M15). Version bumped 0.14.1 -> 0.15.0.
 
 - **M14.2 axisymmetric (cylindrical) 2D MOSCAP (2026-04-30):** Merged
   via PR #64 (`a4649be`). Schema 1.3.0 introduces a top-level
