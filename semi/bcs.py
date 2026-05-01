@@ -267,6 +267,51 @@ def build_dd_dirichlet_bcs(
     return bcs
 
 
+def seed_dirichlet_dofs(
+    contacts: list[ContactBC],
+    bcs: list,
+    psi: Any,
+    phi_n: Any,
+    phi_p: Any,
+) -> None:
+    """
+    Pre-initialize Dirichlet DOFs in the solution vectors from the BC values.
+
+    Must be called after :func:`build_dd_dirichlet_bcs` returns, using the
+    *same* ``contacts`` list.  The BC ordering mirrors
+    ``build_dd_dirichlet_bcs``:
+
+    * ohmic contact → (psi, phi_n, phi_p) → 3 consecutive BCs
+    * gate contact  → (psi)               → 1 BC
+
+    Seeding gives the Newton / SNES solver a consistent initial guess at
+    the boundary DOFs and avoids relying on
+    ``dolfinx.fem.DirichletBC.function_space`` object identity, which is
+    not guaranteed to be preserved across dolfinx versions.
+
+    Parameters
+    ----------
+    contacts
+        List returned by :func:`resolve_contacts`.
+    bcs
+        List returned by :func:`build_dd_dirichlet_bcs` for the same contacts.
+    psi, phi_n, phi_p
+        ``dolfinx.fem.Function`` objects for the three block unknowns.
+        Their ``.x.array`` arrays are written in-place.  The caller is
+        responsible for calling ``.x.scatter_forward()`` afterwards.
+    """
+    bc_idx = 0
+    for c in contacts:
+        if c.kind == "gate":
+            bcs[bc_idx].set(psi.x.array)
+            bc_idx += 1
+        elif c.kind == "ohmic":
+            bcs[bc_idx].set(psi.x.array)
+            bcs[bc_idx + 1].set(phi_n.x.array)
+            bcs[bc_idx + 2].set(phi_p.x.array)
+            bc_idx += 3
+
+
 def _evaluate_doping_at_facet(msh, facets, fdim, N_raw_fn) -> float:
     """
     Evaluate the (raw, dimensional) net doping at the centroid of the

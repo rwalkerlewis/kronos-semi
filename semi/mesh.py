@@ -240,18 +240,6 @@ def _cell_centroids(msh, cells: np.ndarray) -> np.ndarray:
     return centroids
 
 
-def _semiconductor_tags(regions_cfg: dict) -> set[int]:
-    """Set of cell tags whose region role is 'semiconductor'."""
-    out: set[int] = set()
-    for r in regions_cfg.values():
-        if "tag" not in r:
-            continue
-        role = r.get("role", "semiconductor")
-        if role == "semiconductor":
-            out.add(int(r["tag"]))
-    return out
-
-
 def is_single_region_semiconductor(cell_tags, regions_cfg: dict) -> bool:
     """
     Detect the single-region-semiconductor fast path.

@@ -140,3 +140,38 @@ def test_xdmf_resistor_R_matches_msh_within_1e_minus_12(xdmf_fixture):
         f"XDMF R does not match gmsh R within 1e-12 relative: "
         f"R_msh={R_msh:.6e}, R_xdmf={R_xdmf:.6e}, rel_err={rel_err:.3e}"
     )
+
+
+def test_xdmf_loader_returns_none_tags_when_meshtags_absent(tmp_path):
+    """XDMF file without meshtags yields (msh, None, None).
+
+    Exercises the ``except RuntimeError: ... = None`` branches in
+    ``semi.mesh._build_from_file`` for the XDMF path.
+    """
+    from dolfinx.io import XDMFFile
+    from mpi4py import MPI
+
+    # Write a mesh-only XDMF (no meshtags) from scratch.
+    msh_src, _ct, _ft = build_mesh({
+        "dimension": 1,
+        "mesh": {
+            "source": "builtin",
+            "extents": [[0.0, 1.0e-6]],
+            "resolution": [4],
+        },
+    })
+    xdmf_path = tmp_path / "mesh_only.xdmf"
+    with XDMFFile(MPI.COMM_WORLD, str(xdmf_path), "w") as xf:
+        xf.write_mesh(msh_src)
+    # Read back: cell_tags and facet_tags should be None.
+    msh2, cell_tags, facet_tags = build_mesh({
+        "dimension": 1,
+        "mesh": {
+            "source": "file",
+            "path": str(xdmf_path),
+            "format": "xdmf",
+        },
+    })
+    assert cell_tags is None
+    assert facet_tags is None
+    assert msh2 is not None

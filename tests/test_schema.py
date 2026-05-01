@@ -182,3 +182,50 @@ def test_doping_gaussian_schema():
         "contacts": [{"name": "c", "facet": 1, "type": "ohmic"}],
     }
     schema.validate(cfg)  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# Edge-case coverage tests (semi/schema.py lines not reached by main suite)
+# ---------------------------------------------------------------------------
+
+def test_load_schema_for_major_raises_for_unknown_version():
+    import pytest
+
+    from semi.schema import _load_schema_for_major
+    with pytest.raises(ValueError, match="No schema bundled"):
+        _load_schema_for_major(999)
+
+
+def test_validate_raises_for_non_string_schema_version():
+    import pytest
+
+    from semi.schema import SchemaError, validate
+    with pytest.raises(SchemaError, match="not a valid semver"):
+        validate({"schema_version": ["not", "a", "string"]})
+
+
+def test_validate_coordinate_system_raises_for_unsupported_cs():
+    import pytest
+
+    from semi.schema import SchemaError, _validate_coordinate_system
+    cfg = {"coordinate_system": "cylindrical", "dimension": 2,
+           "mesh": {}, "contacts": []}
+    with pytest.raises(SchemaError, match="not supported"):
+        _validate_coordinate_system(cfg)
+
+
+def test_validate_compute_early_return_when_no_backend_or_compute():
+    from semi.schema import _validate_compute
+    # Both backend and compute absent → function must return None silently.
+    cfg = {"solver": {"type": "equilibrium"}}
+    result = _validate_compute(cfg)
+    assert result is None
+
+
+def test_validate_compute_raises_for_unknown_backend():
+    import pytest
+
+    from semi.schema import SchemaError, _validate_compute
+    cfg = {"solver": {"backend": "quantum-annealer"}}
+    with pytest.raises(SchemaError, match="not a recognised backend"):
+        _validate_compute(cfg)
