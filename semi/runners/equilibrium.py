@@ -56,7 +56,7 @@ def run_equilibrium(cfg: dict[str, Any], *, progress_callback=None):
     F = build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, ref_mat.epsilon_r)
     if progress_callback is not None:
         progress_callback({"type": "step_started", "bias_step": 0, "V_applied": 0.0})
-    info = solve_nonlinear(F, psi, bcs, prefix=f"{cfg['name']}_")
+    info = solve_nonlinear(F, psi, bcs, prefix=f"{cfg['name']}_", cfg=cfg)
     if progress_callback is not None:
         progress_callback({
             "type": "step_done", "bias_step": 0, "V_applied": 0.0,

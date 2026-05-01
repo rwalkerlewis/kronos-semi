@@ -233,3 +233,164 @@ def resolve_backend(requested: str, available: list[str] | None = None) -> str:
         f"solver.backend={requested!r} is not a recognised backend; "
         f"expected one of {list(_KNOWN_BACKENDS) + ['auto']}"
     )
+
+
+# ----- Phase D: backend -> PETSc options translation ----------------------
+
+def petsc_options_for_backend(
+    backend: str,
+    device: str = "cpu",
+    preconditioner: str = "auto",
+    linear_solver: str = "auto",
+) -> dict[str, str | None]:
+    """Translate a resolved backend (plus user knobs from `solver.compute`)
+    into the PETSc options dict the runner merges into its solver call.
+
+    `backend` must be a concrete one returned by :func:`resolve_backend`,
+    not the user string ``"auto"``. The caller is responsible for
+    resolving first; passing ``"auto"`` here raises ``ConfigError``.
+
+    Returns an options dict suitable for merging into
+    :data:`semi.solver.DEFAULT_PETSC_OPTIONS`. The dict contains only
+    keys for the linear solver (KSP / PC / Mat / Vec types and any
+    PC-specific knobs); SNES tolerances and behaviour are owned by
+    the runner.
+
+    The CPU-MUMPS dict is intentionally empty: that is exactly the
+    DEFAULT_PETSC_OPTIONS path (`ksp_type=preonly`, `pc_type=lu`,
+    `pc_factor_mat_solver_type=mumps`), so legacy benchmarks remain
+    byte-equivalent.
+    """
+    if backend == "auto":
+        raise ConfigError(
+            "petsc_options_for_backend requires a concrete backend, "
+            "not 'auto'; call resolve_backend first"
+        )
+    if backend not in _KNOWN_BACKENDS:
+        raise ConfigError(
+            f"unknown backend {backend!r}; expected one of {list(_KNOWN_BACKENDS)}"
+        )
+
+    if backend == "cpu-mumps":
+        # No overrides; the DEFAULT_PETSC_OPTIONS direct LU stays
+        # bit-identical to pre-M15. The user-supplied compute fields
+        # are ignored on this path because there is nothing to tune.
+        return {}
+
+    # GPU backends. Pick mat/vec types from device.
+    if device == "auto":
+        # auto here means the runner could not tell; default to cuda
+        # because every CI GPU runner is CUDA. HIP users must opt in.
+        mat_type = "aijcusparse"
+        vec_type = "cuda"
+    elif device == "cuda":
+        mat_type = "aijcusparse"
+        vec_type = "cuda"
+    elif device == "hip":
+        mat_type = "aijhipsparse"
+        vec_type = "hip"
+    else:
+        raise ConfigError(
+            f"backend={backend!r} requires device in {{'auto','cuda','hip'}}; "
+            f"got {device!r}"
+        )
+
+    if backend == "gpu-amgx":
+        ksp = linear_solver if linear_solver != "auto" else "gmres"
+        pc = preconditioner if preconditioner != "auto" else "amgx"
+        if pc not in ("amgx", "gamg"):
+            # AMGX backend only meaningfully pairs with AMGX or GAMG;
+            # other PCs would silently bypass the GPU advantage.
+            raise ConfigError(
+                f"backend='gpu-amgx' requires preconditioner in "
+                f"{{'auto','amgx','gamg'}}; got {preconditioner!r}"
+            )
+        return {
+            "mat_type": mat_type,
+            "vec_type": vec_type,
+            "ksp_type": ksp,
+            "pc_type": pc,
+            "pc_factor_mat_solver_type": None,  # cancel the MUMPS default
+        }
+
+    if backend == "gpu-hypre":
+        ksp = linear_solver if linear_solver != "auto" else "bcgs"
+        pc = preconditioner if preconditioner != "auto" else "hypre-boomeramg"
+        if pc not in ("hypre-boomeramg", "gamg"):
+            raise ConfigError(
+                f"backend='gpu-hypre' requires preconditioner in "
+                f"{{'auto','hypre-boomeramg','gamg'}}; got {preconditioner!r}"
+            )
+        opts: dict[str, str | None] = {
+            "mat_type": mat_type,
+            "vec_type": vec_type,
+            "ksp_type": ksp,
+            "pc_factor_mat_solver_type": None,  # cancel the MUMPS default
+        }
+        if pc == "hypre-boomeramg":
+            opts["pc_type"] = "hypre"
+            opts["pc_hypre_type"] = "boomeramg"
+            opts["pc_hypre_boomeramg_relax_type_all"] = "Chebyshev"
+            opts["pc_hypre_use_gpu"] = "true"
+        else:
+            opts["pc_type"] = pc
+        return opts
+
+    # Unreachable; resolve_backend would have rejected.
+    raise ConfigError(f"unhandled backend {backend!r}")  # pragma: no cover
+
+
+def backend_settings_from_cfg(cfg: dict[str, Any]) -> dict[str, Any]:
+    """Resolve a config's `solver.backend` and `solver.compute` block
+    into the data the runner needs: the resolved backend name, the
+    device string, and the petsc options dict to merge.
+
+    Returns a dict with keys::
+
+        {
+          "requested":      str,    # what the user asked for
+          "resolved":       str,    # concrete backend (cpu-mumps / gpu-...)
+          "device":         str,    # cpu | cuda | hip (resolved)
+          "preconditioner": str,    # user value (auto if unspecified)
+          "linear_solver":  str,    # user value (auto if unspecified)
+          "petsc_options":  dict,   # to merge into DEFAULT_PETSC_OPTIONS
+        }
+
+    Raises :class:`ConfigError` (a subclass of ``Exception``) if the
+    requested backend is not available in this build. This is the
+    single place where the no-silent-fallback contract (acceptance
+    test A3) is enforced.
+    """
+    solver = cfg.get("solver", {}) or {}
+    requested = solver.get("backend", "cpu-mumps")
+    compute = solver.get("compute", {}) or {}
+    device_req = compute.get("device", "cpu" if requested == "cpu-mumps" else "auto")
+    pc = compute.get("preconditioner", "auto")
+    ksp = compute.get("linear_solver", "auto")
+
+    resolved = resolve_backend(requested)
+    # device after resolve: cpu-mumps always cpu; GPU backends pick the
+    # caller's choice or default to cuda.
+    if resolved == "cpu-mumps":
+        device = "cpu"
+    elif device_req in ("auto", "cuda"):
+        device = "cuda"
+    elif device_req == "hip":
+        device = "hip"
+    else:
+        device = device_req
+
+    opts = petsc_options_for_backend(
+        backend=resolved,
+        device=device,
+        preconditioner=pc,
+        linear_solver=ksp,
+    )
+    return {
+        "requested": requested,
+        "resolved": resolved,
+        "device": device,
+        "preconditioner": pc,
+        "linear_solver": ksp,
+        "petsc_options": opts,
+    }

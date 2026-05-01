@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.4.0",
+  "name": "poisson_3d_gpu",
+  "dimension": 3,
+  "mesh": {
+    "source": "builtin",
+    "extents": [[0.0, 5.0e-6], [0.0, 5.0e-6], [0.0, 5.0e-6]],
+    "resolution": [80, 80, 80],
+    "facets_by_plane": [
+      {"name": "xlo", "tag": 1, "axis": 0, "value": 0.0},
+      {"name": "xhi", "tag": 2, "axis": 0, "value": 5.0e-6},
+      {"name": "ylo", "tag": 3, "axis": 1, "value": 0.0},
+      {"name": "yhi", "tag": 4, "axis": 1, "value": 5.0e-6},
+      {"name": "zlo", "tag": 5, "axis": 2, "value": 0.0},
+      {"name": "zhi", "tag": 6, "axis": 2, "value": 5.0e-6}
+    ]
+  },
+  "regions": {
+    "si": {"material": "Si", "tag": 1, "role": "semiconductor"}
+  },
+  "doping": [
+    {"region": "si", "profile": {"type": "uniform", "N_D": 1.0e17, "N_A": 0.0}}
+  ],
+  "contacts": [
+    {"name": "xlo", "facet": "xlo", "type": "ohmic", "voltage": 0.0},
+    {"name": "xhi", "facet": "xhi", "type": "ohmic", "voltage": 0.0}
+  ],
+  "solver": {
+    "type": "equilibrium",
+    "backend": "gpu-amgx",
+    "compute": {
+      "device": "cuda",
+      "linear_solver": "gmres",
+      "preconditioner": "amgx"
+    }
+  }
+}

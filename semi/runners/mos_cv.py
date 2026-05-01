@@ -134,6 +134,7 @@ def run_mos_cv(cfg: dict[str, Any], *, progress_callback=None):
                 "snes_atol": 1.0e-14,
                 "snes_max_it": 50,
             },
+            cfg=cfg,
         )
 
     for V_gate in sweep_values:
