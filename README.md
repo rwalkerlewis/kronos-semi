@@ -394,8 +394,8 @@ server.
 
 ## Verification
 
-Analytical sanity checks are runnable without dolfinx. The Day-1
-math helper `tests/check_day1_math.py` covers thermal voltage,
+Analytical sanity checks are runnable without dolfinx. The
+analytical-math helper `tests/check_analytical_math.py` covers thermal voltage,
 Debye length, built-in potential, mass-action, charge neutrality,
 and peak |E|.
 
@@ -411,7 +411,7 @@ Current state on `main` (post-M14.2):
   W_dmax = 144 nm, C_min/C_ox = 0.173.
 
 ```bash
-python tests/check_day1_math.py    # runs offline, no dolfinx required
+python tests/check_analytical_math.py    # runs offline, no dolfinx required
 pytest tests/                      # full suite under Docker, FEM included
 python scripts/run_verification.py # V&V suite (MMS, conservation)
 ```

@@ -30,17 +30,19 @@ recombination for 1D/2D/3D devices.
 - URL: https://github.com/rwalkerlewis/kronos-semi
 - License: MIT
 - Primary branch: `main`
-- Active dev branch: `docs/post-merge-cleanup` (PR #65: post-merge
-  documentation refresh, scipy promoted to base deps, notebook 05
-  Colab self-contained, axisymmetric runner dispatch in
-  `semi/runners/mos_cap_ac.py`)
+- Active branch: `main` (PR #65 merged via `799934d` on 2026-04-30;
+  v0.14.2 tag still pending alongside the package version bump)
 
 ## Current state
 
 M1 through M14.2 are merged into `main`. Current package version is
 `0.14.1`; M14.2 (axisymmetric MOSCAP, schema 1.3.0) merged via PR #64
-(`a4649be`) and is being tagged together with the post-merge cleanup
-in the next release. M13.1 closed in v0.14.1: the 1D transient runner
+(`a4649be`), and the post-merge documentation cleanup, scipy base-
+dependency promotion, and axisymmetric runner dispatch in
+`semi/runners/mos_cap_ac.py` followed in PR #65 (`799934d`). The
+v0.14.2 tag and the corresponding `pyproject.toml` version bump are
+outstanding administrative items, deferred to land alongside the M15
+close-out (which itself bumps the minor to 0.15.0). M13.1 closed in v0.14.1: the 1D transient runner
 uses Slotboom primary unknowns (ADR 0014, supersedes ADR 0009) and
 matches bias_sweep at deep steady state. SG flux primitives ship in
 `semi/fem/` but are not the active CD path. ADRs 0012 (SG flux) and
@@ -96,22 +98,29 @@ M15 through M18. Summary:
 
 ## Next task
 
-**Tag `v0.14.2` and merge PR #65 (`docs/post-merge-cleanup`).** The
-post-merge documentation refresh, scipy base-dependency promotion,
-and axisymmetric dispatch in `semi/runners/mos_cap_ac.py` need to land
-on `main` together with the M14.2 axisymmetric MOSCAP work, and the
-package version bumped from 0.14.1 → 0.14.2.
+**M15: GPU linear solver path.** Add a PETSc-CUDA / PETSc-HIP linear
+solver backend behind `solver.backend`, keep the CPU-MUMPS path bit-
+identical, ship a 3D Poisson benchmark at >=500k DOFs, and prove a 5x
+speedup of the linear-solve portion alone. Full deliverable, phased
+plan, and acceptance tests in
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) §4 M15 and
+§5; ordered work plan in
+[`docs/M15_STARTER_PROMPT.md`](docs/M15_STARTER_PROMPT.md).
 
-After that, the next two open work streams are:
+## Backlog
 
-1. **Physics validation suite, Phase 2** — external validation against
-   Sze and Nicollian-Brews. Phase 1 is complete: cases 01-04 pass
-   internal-consistency checks (audit case 03 confirms `mos_cv` and
-   `mos_cap_ac` byte-identity); case 02/05 sign-convention findings
-   were resolved in PR #62 (M14 sign fix); case 06 deferred. Audit
-   suite is CI-gated via the `docker-fem-audit` job.
-2. **M15 — GPU linear solver path.** Deferred until the validation
-   suite has fully run.
+Items deferred behind the next task. Order is informational, not
+binding; the owner picks one explicitly when the next task ships.
+
+- **Physics validation suite, Phase 2.** External validation against
+  Sze and Nicollian-Brews. Phase 1 is complete: cases 01-04 pass
+  internal-consistency checks (audit case 03 confirms `mos_cv` and
+  `mos_cap_ac` byte-identity); case 02/05 sign-convention findings
+  were resolved in PR #62 (M14 sign fix); case 06 deferred. Audit
+  suite is CI-gated via the `docker-fem-audit` job.
+- **v0.14.2 tag and `pyproject.toml` version bump.** Outstanding
+  administrative items from the PR #65 merge; will fold into the M15
+  close-out which bumps to 0.15.0.
 
 ## Roadmap
 

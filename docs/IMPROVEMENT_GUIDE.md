@@ -11,55 +11,80 @@ input, its acceptance test, and its dependency on prior milestones.
 
 ---
 
-## 1. Honest current state (as of v0.8.0)
+## 1. Honest current state (as of v0.14.1)
 
 What exists and works:
 
-- `semi/` package (~3,300 LOC) with a five-layer architecture; Layer 3
-  (pure-Python core) has no dolfinx dependency and is independently testable.
-- JSON schema (Draft-07, enforced via `jsonschema`) covering mesh, regions,
-  doping, contacts, physics, solver, output.
-- Builtin meshes in 1D/2D/3D plus gmsh `.msh` loader with physical groups.
+- `semi/` package with a five-layer architecture; Layer 3 (pure-Python
+  core) has no dolfinx dependency and is independently testable.
+- JSON schema 1.3.0 (Draft-07, enforced via `jsonschema`) covering
+  mesh, regions, doping, contacts, physics, solver, output, plus the
+  top-level `coordinate_system` field added in M14.2.
+- Builtin meshes in 1D/2D/3D plus gmsh `.msh` loader with physical
+  groups.
 - Equilibrium Poisson, coupled drift-diffusion in Slotboom form, SRH
   recombination with configurable trap energy.
-- Ohmic and ideal-gate contacts; multi-region Poisson with Si/SiO2 via
-  `create_submesh`.
-- Adaptive bias-ramp continuation with halving + growth, bipolar sweep support.
-- Five shipped benchmarks (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`,
-  `mos_2d`, `resistor_3d`), each with a verifier that asserts closed-form
+- Ohmic and ideal-gate contacts; multi-region Poisson with Si/SiO2
+  via `create_submesh`.
+- Adaptive bias-ramp continuation with halving and growth, bipolar
+  sweep support.
+- Transient solver in Slotboom primary unknowns: backward-Euler and
+  BDF2, with the deep-steady-state runner matching `bias_sweep`
+  within 1e-4 relative error and the `pn_1d_turnon` benchmark within
+  5% (M13, M13.1; ADRs 0010, 0014).
+- Small-signal AC sweep for two-terminal devices via the linearised
+  `(J + jωM) δu = -dF/dV δV` system in real 2x2 block form; the
+  `rc_ac_sweep` benchmark matches analytical depletion C within
+  0.4% over [1 Hz, 1 MHz] (M14; ADR 0011).
+- MOSCAP differential capacitance via AC admittance: the
+  `mos_cap_ac` runner returns dQ/dV directly from `Im(Y) / (2πf)`,
+  audit case 03 confirms byte-identity with `mos_cv` Q_gate (M14.1).
+- Axisymmetric (cylindrical) 2D path: r-weighted Poisson and Slotboom
+  drift-diffusion on the meridian half-plane; `benchmarks/moscap_axisym_2d/`
+  reproduces Hu Fig. 5-18; runner dispatch in `mos_cap_ac.py` r-weights
+  charge and sensitivity forms (M14.2; PRs #64, #65).
+- Eight shipped benchmarks (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`,
+  `pn_1d_turnon`, `mos_2d`, `resistor_3d`, `rc_ac_sweep`,
+  `moscap_axisym_2d`), each with a verifier asserting closed-form
   physical correctness.
-- MMS verification for Poisson and DD, discrete-conservation checks,
-  mesh-convergence ladder. 206 tests, 62/62 V&V PASS.
-- Four Colab notebooks that install FEniCSx via fem-on-colab and run each
-  benchmark end-to-end.
+- MMS verification for Poisson and DD across multiple variants and
+  grids, discrete-conservation checks, mesh-convergence ladder, plus
+  AC consistency and audit suites; 237+ pure-Python tests passing.
+- Five Colab notebooks that install FEniCSx via fem-on-colab and run
+  each benchmark end-to-end.
+- On-disk result artifact contract: `manifest.json`, fields, IV CSVs,
+  and convergence logs under `runs/<run_id>/`, schema-validated; a
+  pure-Python reader round-trips without dolfinx (M9).
+- HTTP server surface: `kronos_server/` with `POST /solve`,
+  `GET /runs/{id}`, WebSocket `/runs/{id}/stream`, `GET /materials`,
+  `GET /schema`; the server process imports no dolfinx at module
+  scope (M10).
+- Schema versioning: `schemas/input.v1.json` Draft-07 with full
+  UI-facing annotations, every benchmark validates, the major-version
+  gate refuses mismatched majors (M11).
+- 2D MOSFET with Gaussian n+ source/drain implants on the multi-region
+  Poisson + Slotboom DD stack (M12).
 
-What does *not* exist (the gap between "submission" and "production engine"):
+What does *not* exist:
 
-- **No machine-readable result serialization.** `SimulationResult` is a Python
-  dataclass holding live PETSc/dolfinx objects. There is no JSON/HDF5/VTU
-  output suitable for a detached UI process to consume.
-- **No server surface.** No FastAPI, no job queue, no result cache, no WebSocket
-  progress channel. A UI cannot talk to the engine today.
-- **No GPU.** Every solve is MUMPS LU on CPU via PETSc. In 3D this is the
-  bottleneck; in 2D it is fine but does not scale.
-- **Mesh tagging via JSON is weak.** `regions_by_box` and `facets_by_plane`
-  force axis-aligned geometry. Real devices need gmsh physical groups from a
-  geometry-definition format the UI can author.
-- **No transient solver, no AC small-signal, no Fermi-Dirac, no field-dependent
-  mobility, no Schottky contacts, no tunneling.** COMSOL Semiconductor has all
-  of these. The gap is large but the scaffolding is clean.
-- **Schema is missing a `version` field.** Without one, UI and engine versions
-  will drift silently.
-- **No artifact/result directory contract.** Runners write XDMF into
-  `./results/` but the on-disk layout is not documented or typed.
-- **`DEFAULT_PETSC_OPTIONS` hard-code direct LU.** Fine for benchmarks up to
-  ~50k DOFs; unusable for real 3D.
+- **No GPU linear solve.** Every solve is MUMPS LU on CPU via PETSc.
+  Above ~200k DOFs this is the wall. M15 closes the gap.
+- **No field-dependent mobility, Auger, Fermi-Dirac, Schottky
+  contacts, or tunneling.** COMSOL Semiconductor has all of these.
+  M16, one PR per model.
+- **No heterojunctions.** Position-dependent χ and Eg are not yet
+  supported. M17 (depends on M16.4 Fermi-Dirac).
+- **No Cartesian-2D MOSCAP variant** and no rigorous gate-driven HF
+  C-V method. Tracked as M14.2.x in
+  [`PLAN.md`](../PLAN.md) §Backlog and `docs/ROADMAP.md`.
+- **No `GET /capabilities` endpoint.** UI integration item; M15 will
+  close it because GPU availability is itself a capability.
 
-Bottom line: the numerics are sound and the decomposition is clean. The work
-ahead is almost entirely about (a) making the engine addressable from outside
-Python, (b) making results consumable without a dolfinx install, and (c)
-scaling the linear solver. The physics engine itself only needs incremental
-extensions.
+Bottom line: the numerics are sound, the engine is addressable from
+outside Python, results are consumable without a dolfinx install, and
+the schema is versioned and richly annotated. The remaining work is
+scaling the linear solver (M15) and adding the physics models
+engineers actually use daily (M16+).
 
 ---
 
@@ -172,213 +197,85 @@ order, but M9/M10 are load-bearing — everything after assumes them.
 
 ### M9 — Result artifact writer + manifest
 
-**Why:** Nothing downstream works without a stable, machine-readable output.
-This is the single highest-value piece of work on the list.
-
-**Deliverable:** New module `semi/io/artifact.py` exposing:
-
-```python
-def write_artifact(result: SimulationResult, out_dir: Path, run_id: str) -> Path:
-    """Write the full result tree under out_dir/run_id/. Returns the run dir."""
-```
-
-Plus a new CLI entry point `semi-run <input.json> [--out runs/]` that wraps
-`semi.run.run` and calls `write_artifact`.
-
-**Acceptance tests (gate for merge):**
-
-1. For each of the five shipped benchmarks, `semi-run` produces a run dir
-   validated against a new JSON-schema file `schemas/manifest.v1.json`.
-2. A pure-Python reader `semi.io.artifact.read_manifest(run_dir)` round-trips.
-3. A Python-only (no dolfinx) consumer script can read `fields/psi.bp` via
-   `adios2` and `iv/cathode.csv` via `numpy.loadtxt` and plot them.
-4. New test file `tests/test_artifact.py` with ≥10 assertions.
-
-**Estimated scope:** 2 days. ~400 LOC + schema + tests.
-
-**Dependencies:** none. Can start today.
+**Status: Done (2026-04-23).** `semi/io/artifact.py`, `semi-run` CLI,
+`schemas/manifest.v1.json`, pure-Python reader. Full deliverable,
+acceptance tests, and scope preserved in §10.
 
 ---
 
 ### M10 — HTTP server: `POST /solve`, `GET /runs/{id}`
 
-**Why:** This is what lets a browser UI talk to the engine.
-
-**Deliverable:** New top-level package `kronos_server/` (kept out of `semi/` to
-preserve the pure-engine boundary):
-
-```
-kronos_server/
-├── __init__.py
-├── app.py              # FastAPI app
-├── jobs.py             # job queue + worker spawning
-├── storage.py          # LocalFS + S3 backends for run dirs
-├── models.py           # pydantic models mirroring schemas/
-└── routes/
-    ├── solve.py        # POST /solve  -> {run_id, status_url}
-    ├── runs.py         # GET  /runs/{id}, GET /runs/{id}/manifest
-    └── stream.py       # WebSocket /runs/{id}/stream for SNES progress
-```
-
-**Endpoints:**
-
-| Method | Path                       | Purpose                                   |
-|-------:|----------------------------|-------------------------------------------|
-| POST   | `/solve`                   | Submit JSON, get back `{run_id, status}`  |
-| GET    | `/runs/{id}`               | Status + manifest                         |
-| GET    | `/runs/{id}/fields/{name}` | Stream a field file                       |
-| GET    | `/runs/{id}/iv/{contact}`  | Stream CSV                                |
-| WS     | `/runs/{id}/stream`        | Live SNES residual norms during solve     |
-| GET    | `/materials`               | Material DB dump for UI autocomplete      |
-| GET    | `/schema`                  | The JSON schema itself, for UI validation |
-
-**Worker model:** start with a `ProcessPoolExecutor` of size `N_CPU / 4` (each
-worker can use 4-way MPI). Redis + Celery is a later upgrade, not a day-1
-requirement.
-
-**Acceptance tests:**
-
-1. End-to-end: `curl -X POST /solve -d @pn_junction.json` → polling `/runs/{id}`
-   yields `status: "completed"` in under 30 s.
-2. WebSocket client sees at least `n_steps` progress messages during a bias
-   sweep.
-3. A second client hitting `/runs/{id}/manifest` while the job runs gets
-   `status: "running"`, not a 500.
-4. Integration test matrix covers all five benchmarks via the HTTP API.
-
-**Estimated scope:** 3 days. ~700 LOC + tests.
-
-**Dependencies:** M9.
+**Status: Done (M10).** `kronos_server/` package, FastAPI surface,
+WebSocket progress channel, `ProcessPoolExecutor`-backed workers.
+Full deliverable, acceptance tests, and scope preserved in §10.
 
 ---
 
 ### M11 — Schema versioning + UI-facing schema companion
 
-**Why:** A UI form-builder needs introspectable, versioned schemas, not just
-a validator.
-
-**Deliverable:**
-
-- Add `schema_version` as a required top-level JSON field; validator refuses
-  mismatched majors.
-- Split `semi/schema.py` into `schemas/input.v1.json` (Draft-07) + a Python
-  loader that imports it. The JSON-file schema is what the UI pulls from
-  `GET /schema` and feeds to a form generator (JSONForms, rjsf, etc.).
-- Add `title`, `description`, `default`, `examples`, and `enum` annotations
-  to every schema node so form-builders render sensible labels and help text
-  without a separate UI config.
-- Publish the schema on every git tag to `https://schemas.kronos-semi.org/input/v1.0.0.json`
-  (or similar — a static GitHub Pages works).
-
-**Acceptance tests:**
-
-1. `jsonschema-cli validate schemas/input.v1.json` against every benchmark
-   JSON passes.
-2. All existing tests still pass — schema refactor is a lift-and-shift.
-3. New test asserts every node with `type: object` has a `description`.
-
-**Estimated scope:** 1 day.
-
-**Dependencies:** M9 (so the manifest schema and input schema can share a
-layout).
+**Status: Done (M11).** `schemas/input.v1.json` Draft-07 with full
+UI annotations; `schema_version` enforced via the major-version gate
+in `semi/schema.py`. Full deliverable, acceptance tests, and scope
+preserved in §10.
 
 ---
 
 ### M12 — Mesh input beyond axis-aligned boxes
 
-**Why:** Real devices are not boxes. UI will export gmsh `.geo` or `.msh`
-files; current engine support is partial.
-
-**Deliverable:**
-
-- Extend `semi/mesh.py::_build_from_file` to cover XDMF (currently
-  `NotImplementedError`).
-- Add a `geometry` input alternative to `mesh` in the schema:
-
-```json
-"geometry": {
-  "source": "gmsh_geo",
-  "path": "device.geo",
-  "characteristic_length": 5.0e-8,
-  "physical_groups": {
-    "silicon": {"dim": 2, "tag": 1},
-    "oxide":   {"dim": 2, "tag": 2},
-    "gate":    {"dim": 1, "tag": 10}
-  }
-}
-```
-
-The engine calls gmsh in a subprocess to produce the `.msh`, caches it by
-content hash, then loads it.
-
-- Add a 2D MOSFET benchmark (`benchmarks/mosfet_2d/`) that exercises the new
-  geometry input: source/drain/gate/body contacts, non-axis-aligned doping.
-
-**Acceptance tests:**
-
-1. `.geo` → `.msh` → solve → IV curve matches SPICE-level analytical
-   approximation within 20% at V_DS = 0.1 V.
-2. Cache hit avoids re-meshing on identical `(geo_hash, char_length)`.
-3. Mesh-convergence test on the MOSFET benchmark.
-
-**Estimated scope:** 3 days.
-
-**Dependencies:** M9, M11.
+**Status: Done (M12).** Gmsh `.geo` / `.msh` ingest with content-hash
+caching; 2D MOSFET benchmark with Gaussian n+ source/drain implants.
+Full deliverable, acceptance tests, and scope preserved in §10.
 
 ---
 
 ### M13 — Transient solver
 
-**Why:** Every C-V, capacitance-transient-spectroscopy, and realistic device
-characterization involves time. Missing transient is the single biggest
-physics gap relative to COMSOL.
+**Status: Done (2026-04-25).** Backward-Euler and BDF2 time stepping
+on the coupled (psi, phi_n, phi_p) system; `pn_1d_turnon` benchmark.
+Full deliverable, acceptance tests, and scope preserved in §10.
 
-**Deliverable:**
+---
 
-- `semi/runners/transient.py` implementing backward-Euler and BDF2 time
-  stepping on the coupled (psi, phi_n, phi_p) system.
-- Schema extension: `"solver": {"type": "transient", "t_end": 1e-9, "dt": 1e-12}`
-  plus adaptive time-stepping options mirroring the bias-continuation options.
-- Benchmark `benchmarks/pn_1d_turnon/`: forward-bias step response, verify
-  charge storage and RC time constant.
+### M13.1 — Slotboom transient close-out
 
-**Acceptance tests:**
-
-1. Steady-state limit of the transient solver matches `run_bias_sweep` within
-   numerical noise.
-2. Turn-on benchmark: minority-carrier lifetime extracted from the transient
-   matches the SRH `tau_n` used as input within 5%.
-3. BDF2 convergence rate verified against MMS.
-
-**Estimated scope:** 4 days.
-
-**Dependencies:** M9.
+**Status: Done (2026-04-27).** Slotboom primary unknowns (ADR 0014,
+supersedes ADR 0009) replace the M13 (n, p) Galerkin discretisation;
+both `test_transient_steady_state_limit` and the BDF rate tests are
+active and passing as of v0.14.1; the deep-steady-state runner
+matches `bias_sweep` within 1e-4 relative error and the
+`pn_1d_turnon` benchmark is within 5%.
 
 ---
 
 ### M14 — AC small-signal analysis
 
-**Why:** Capacitance-voltage, admittance-spectroscopy, and high-frequency
-characterization all need AC. The math reuses the transient Jacobian.
+**Status: Done (2026-04-26).** Linearised
+`(J + jωM) δu = -dF/dV δV` in real 2x2 block form (PETSc-real build);
+`rc_ac_sweep` benchmark matches analytical depletion C within 0.4%
+over [1 Hz, 1 MHz]; ADR 0011 with sign-convention errata. Full
+deliverable, acceptance tests, and scope preserved in §10.
 
-**Deliverable:**
+---
 
-- `semi/runners/ac_smallsignal.py`: at each DC operating point, assemble
-  `(J + i omega M)` and solve the complex linear system for the AC response.
-- Complex-valued PETSc build requirement documented.
-- MOS C-V benchmark upgraded to compute true C(V) via AC admittance rather
-  than numerical differentiation of Q(V).
+### M14.1 — AC differential capacitance for MOSCAP
 
-**Acceptance tests:**
+**Status: Done (2026-04-26).** `semi/runners/mos_cap_ac.py` returns
+dQ/dV directly from `Im(Y) / (2πf)`, replacing the noisier
+`numpy.gradient(Q, V)` of `mos_cv` for the `mos_2d` C-V verifier;
+audit case 03 confirms byte-identity with `mos_cv` Q_gate at all 42
+gate voltages.
 
-1. Low-frequency limit of AC capacitance matches `dQ/dV` from the existing
-   MOS benchmark within 2%.
-2. Frequency sweep produces the expected MOS C-V frequency dispersion for
-   interface-trap models (once traps are added; until then, just flat).
+---
 
-**Estimated scope:** 4 days.
+### M14.2 — Axisymmetric (cylindrical) 2D MOSCAP
 
-**Dependencies:** M9, M13 (for the mass matrix infrastructure).
+**Status: Done (2026-04-30).** Top-level `coordinate_system` field
+(schema 1.3.0, `cartesian` default or `axisymmetric`) with cross-
+field validation; r-weighted Poisson and Slotboom drift-diffusion on
+the meridian half-plane (`semi/physics/axisymmetric.py`); pure-Python
+MOSCAP analytical helpers (`semi/cv.py`); `benchmarks/moscap_axisym_2d/`
+reproduces Hu Fig. 5-18; runner dispatch in `mos_cap_ac.py` r-weights
+the charge and sensitivity forms (PRs #64, #65).
 
 ---
 
@@ -549,13 +446,14 @@ preconditioner parameters per problem class. A 5× speedup is realistic; a
 
 The engine is ready for a UI when all of these are green:
 
-- [ ] M9 complete: runs produce a stable on-disk artifact.
-- [ ] M10 complete: HTTP API exposes solve, status, stream, artifact fetch.
-- [ ] M11 complete: schema is versioned, richly annotated, published.
-- [ ] `GET /materials` returns the material DB.
-- [ ] `GET /schema` returns the input schema.
+- [x] M9 complete: runs produce a stable on-disk artifact.
+- [x] M10 complete: HTTP API exposes solve, status, stream, artifact fetch.
+- [x] M11 complete: schema is versioned, richly annotated, published.
+- [x] `GET /materials` returns the material DB.
+- [x] `GET /schema` returns the input schema.
 - [ ] `GET /capabilities` returns which physics models this engine build
       supports (e.g., `{"transient": true, "ac": false, "gpu": true, ...}`).
+      (M15 will close this; GPU availability is a capability.)
 - [ ] WebSocket stream emits at least one message per SNES iteration with
       `{"residual_norm": ..., "iteration": ..., "bias_step": ...}`.
 - [ ] CORS configured on the HTTP server for the UI's dev origin.
@@ -610,4 +508,248 @@ The engine is ready for a UI when all of these are green:
 
 ## 9. Change log for this document
 
-- **2026-04-23** — initial version, written post-M8.
+- **2026-04-23**, initial version, written post-M8.
+- **2026-04-30**, refresh of §1, §4, §6 to reflect v0.14.x reality
+  post-M14.2; introduce §10 shipped-milestone appendix.
+
+---
+
+## 10. Shipped milestone detail
+
+This appendix preserves the original §4 deliverable, acceptance, and
+scope blocks for milestones that have shipped. The §4 entries above
+carry only a one-line status badge; full text lives here so that
+acceptance criteria remain available as regression references.
+
+### M9 — Result artifact writer + manifest
+
+**Why:** Nothing downstream works without a stable, machine-readable output.
+This is the single highest-value piece of work on the list.
+
+**Deliverable:** New module `semi/io/artifact.py` exposing:
+
+```python
+def write_artifact(result: SimulationResult, out_dir: Path, run_id: str) -> Path:
+    """Write the full result tree under out_dir/run_id/. Returns the run dir."""
+```
+
+Plus a new CLI entry point `semi-run <input.json> [--out runs/]` that wraps
+`semi.run.run` and calls `write_artifact`.
+
+**Acceptance tests (gate for merge):**
+
+1. For each of the five shipped benchmarks, `semi-run` produces a run dir
+   validated against a new JSON-schema file `schemas/manifest.v1.json`.
+2. A pure-Python reader `semi.io.artifact.read_manifest(run_dir)` round-trips.
+3. A Python-only (no dolfinx) consumer script can read `fields/psi.bp` via
+   `adios2` and `iv/cathode.csv` via `numpy.loadtxt` and plot them.
+4. New test file `tests/test_artifact.py` with at least 10 assertions.
+
+**Estimated scope:** 2 days. ~400 LOC + schema + tests.
+
+**Dependencies:** none.
+
+---
+
+### M10 — HTTP server: `POST /solve`, `GET /runs/{id}`
+
+**Why:** This is what lets a browser UI talk to the engine.
+
+**Deliverable:** New top-level package `kronos_server/` (kept out of `semi/` to
+preserve the pure-engine boundary):
+
+```
+kronos_server/
+├── __init__.py
+├── app.py              # FastAPI app
+├── jobs.py             # job queue + worker spawning
+├── storage.py          # LocalFS + S3 backends for run dirs
+├── models.py           # pydantic models mirroring schemas/
+└── routes/
+    ├── solve.py        # POST /solve  -> {run_id, status_url}
+    ├── runs.py         # GET  /runs/{id}, GET /runs/{id}/manifest
+    └── stream.py       # WebSocket /runs/{id}/stream for SNES progress
+```
+
+**Endpoints:**
+
+| Method | Path                       | Purpose                                   |
+|-------:|----------------------------|-------------------------------------------|
+| POST   | `/solve`                   | Submit JSON, get back `{run_id, status}`  |
+| GET    | `/runs/{id}`               | Status + manifest                         |
+| GET    | `/runs/{id}/fields/{name}` | Stream a field file                       |
+| GET    | `/runs/{id}/iv/{contact}`  | Stream CSV                                |
+| WS     | `/runs/{id}/stream`        | Live SNES residual norms during solve     |
+| GET    | `/materials`               | Material DB dump for UI autocomplete      |
+| GET    | `/schema`                  | The JSON schema itself, for UI validation |
+
+**Worker model:** start with a `ProcessPoolExecutor` of size `N_CPU / 4` (each
+worker can use 4-way MPI). Redis + Celery is a later upgrade, not a
+requirement at first ship.
+
+**Acceptance tests:**
+
+1. End-to-end: `curl -X POST /solve -d @pn_junction.json` then polling
+   `/runs/{id}` yields `status: "completed"` in under 30 s.
+2. WebSocket client sees at least `n_steps` progress messages during a bias
+   sweep.
+3. A second client hitting `/runs/{id}/manifest` while the job runs gets
+   `status: "running"`, not a 500.
+4. Integration test matrix covers all five benchmarks via the HTTP API.
+
+**Estimated scope:** 3 days. ~700 LOC + tests.
+
+**Dependencies:** M9.
+
+---
+
+### M11 — Schema versioning + UI-facing schema companion
+
+**Why:** A UI form-builder needs introspectable, versioned schemas, not just
+a validator.
+
+**Deliverable:**
+
+- Add `schema_version` as a required top-level JSON field; validator refuses
+  mismatched majors.
+- Split `semi/schema.py` into `schemas/input.v1.json` (Draft-07) plus a
+  Python loader that imports it. The JSON-file schema is what the UI pulls
+  from `GET /schema` and feeds to a form generator (JSONForms, rjsf, etc.).
+- Add `title`, `description`, `default`, `examples`, and `enum` annotations
+  to every schema node so form-builders render sensible labels and help text
+  without a separate UI config.
+- Publish the schema on every git tag to a stable URL (a static GitHub Pages
+  site is sufficient).
+
+**Acceptance tests:**
+
+1. `jsonschema-cli validate schemas/input.v1.json` against every benchmark
+   JSON passes.
+2. All existing tests still pass; the schema refactor is a lift-and-shift.
+3. New test asserts every node with `type: object` has a `description`.
+
+**Estimated scope:** 1 day.
+
+**Dependencies:** M9 (so the manifest schema and input schema can share a
+layout).
+
+---
+
+### M12 — Mesh input beyond axis-aligned boxes
+
+**Why:** Real devices are not boxes. UI will export gmsh `.geo` or `.msh`
+files; current engine support is partial.
+
+**Deliverable:**
+
+- Extend `semi/mesh.py::_build_from_file` to cover XDMF (previously
+  `NotImplementedError`).
+- Add a `geometry` input alternative to `mesh` in the schema:
+
+```json
+"geometry": {
+  "source": "gmsh_geo",
+  "path": "device.geo",
+  "characteristic_length": 5.0e-8,
+  "physical_groups": {
+    "silicon": {"dim": 2, "tag": 1},
+    "oxide":   {"dim": 2, "tag": 2},
+    "gate":    {"dim": 1, "tag": 10}
+  }
+}
+```
+
+The engine calls gmsh in a subprocess to produce the `.msh`, caches it by
+content hash, then loads it.
+
+- Add a 2D MOSFET benchmark (`benchmarks/mosfet_2d/`) that exercises the new
+  geometry input: source/drain/gate/body contacts, non-axis-aligned doping.
+
+**Acceptance tests:**
+
+1. `.geo` to `.msh` to solve to IV curve matches SPICE-level analytical
+   approximation within 20% at V_DS = 0.1 V.
+2. Cache hit avoids re-meshing on identical `(geo_hash, char_length)`.
+3. Mesh-convergence test on the MOSFET benchmark.
+
+**Estimated scope:** 3 days.
+
+**Dependencies:** M9, M11.
+
+---
+
+### M13 — Transient solver
+
+**Why:** Every C-V, capacitance-transient-spectroscopy, and realistic device
+characterization involves time. Missing transient is the single biggest
+physics gap relative to COMSOL.
+
+**Deliverable:**
+
+- `semi/runners/transient.py` implementing backward-Euler and BDF2 time
+  stepping on the coupled (psi, phi_n, phi_p) system.
+- Schema extension: `"solver": {"type": "transient", "t_end": 1e-9, "dt": 1e-12}`
+  plus adaptive time-stepping options mirroring the bias-continuation options.
+- Benchmark `benchmarks/pn_1d_turnon/`: forward-bias step response, verify
+  charge storage and RC time constant.
+
+**Acceptance tests:**
+
+1. Steady-state limit of the transient solver matches `run_bias_sweep` within
+   numerical noise.
+2. Turn-on benchmark: minority-carrier lifetime extracted from the transient
+   matches the SRH `tau_n` used as input within 5%.
+3. BDF2 convergence rate verified against MMS.
+
+**Estimated scope:** 4 days.
+
+**Dependencies:** M9.
+
+**M13.1 follow-up (closed in v0.14.1).** Slotboom primary unknowns
+(ADR 0014) replace the M13 (n, p) Galerkin discretisation; both
+`test_transient_steady_state_limit` and the BDF rate tests are active
+and passing as of v0.14.1; deep-steady-state runner matches
+`bias_sweep` within 1e-4 relative error and `pn_1d_turnon` within 5%.
+
+---
+
+### M14 — AC small-signal analysis
+
+**Why:** Capacitance-voltage, admittance-spectroscopy, and high-frequency
+characterization all need AC. The math reuses the transient Jacobian.
+
+**Deliverable:**
+
+- `semi/runners/ac_sweep.py`: at each DC operating point, assemble
+  `(J + jωM)` and solve the linearised system for the AC response. The
+  PETSc-real build forces a real 2x2 block reformulation
+  (`[[J, -ωM], [ωM, J]] [[Re δu], [Im δu]] = [[Re b], [Im b]]`); ADR
+  0011 documents the decision and lists complex PETSc as deferred
+  M16+ work.
+- Terminal admittance includes the displacement current at the
+  contact in addition to the linearised conduction current.
+- MOS C-V benchmark upgraded to compute true C(V) via AC admittance
+  (M14.1 follow-up: `mos_cap_ac` returns dQ/dV directly from
+  `Im(Y) / (2πf)`).
+
+**Acceptance tests:**
+
+1. Low-frequency limit of AC capacitance matches `dQ/dV` from the existing
+   MOS benchmark within 2%.
+2. Frequency sweep produces the expected MOS C-V frequency dispersion for
+   interface-trap models (flat until traps are added).
+3. `rc_ac_sweep` benchmark matches analytical depletion C within 0.4%
+   over [1 Hz, 1 MHz].
+
+**Estimated scope:** 4 days.
+
+**Dependencies:** M9, M13 (for the mass matrix infrastructure).
+
+**M14 sign-convention errata (2026-04-28).** Resolved Phase 1 audit
+Cases 02 and 05. `run_ac_sweep` now reports terminal current INTO the
+device (matching `bias_sweep` and
+`semi/postprocess.evaluate_current_at_contact`); `result.C =
++Im(Y) / (2πf)` is bit-identical to the pre-fix value, and ADR 0011
+gained an Errata section formalising the convention. Audit Cases 02
+and 05 assertions tightened from NaN-guards to sign-equality plus
+1% / 5% relative-error gates.
