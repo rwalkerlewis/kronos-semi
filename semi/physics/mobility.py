@@ -117,24 +117,30 @@ def caughey_thomas_vsat_for_form(vsat_cm_per_s: float, sc) -> float:
 
 
 def build_mobility_expressions(
-    physics_cfg: dict[str, Any],
-    spaces,
+    mobility_cfg: dict[str, Any] | None,
+    phi_n,
+    phi_p,
     mu_n_over_mu0: float,
     mu_p_over_mu0: float,
     sc,
 ) -> tuple[Any, Any, str]:
     """
-    Dispatch on `physics.mobility.model` and return UFL-compatible
-    mobility expressions for the electron and hole continuity blocks
-    of the DD form builder.
+    Dispatch on `mobility_cfg["model"]` and return UFL-compatible
+    mobility expressions substitutable for the legacy
+    `fem.Constant(mu_n_over_mu0)` / `fem.Constant(mu_p_over_mu0)` in
+    the DD residual builders.
 
     Parameters
     ----------
-    physics_cfg : dict
-        The validated `cfg["physics"]` dict; reads the `mobility` block.
-    spaces : DDBlockSpaces or DDBlockSpacesMR
-        Used to know which mesh / submesh the carrier-specific phi
-        functions live on (so `ufl.grad(phi_n)` resolves correctly).
+    mobility_cfg : dict or None
+        The validated `cfg["physics"]["mobility"]` sub-dict, or `None`
+        which is equivalent to `{"model": "constant"}` (preserves
+        pre-M16.1 byte-identity).
+    phi_n, phi_p : dolfinx.fem.Function
+        The carrier-specific scaled quasi-Fermi potentials. The
+        Caughey-Thomas branch reads `ufl.grad(phi_n)` for the electron
+        continuity row and `ufl.grad(phi_p)` for the hole continuity
+        row (ADR 0004 Slotboom flux form).
     mu_n_over_mu0, mu_p_over_mu0 : float
         Low-field mobility ratios (mu / sc.mu0) already computed by
         the caller.
@@ -151,7 +157,7 @@ def build_mobility_expressions(
 
     Branches
     --------
-    constant:
+    constant (default):
         Returns `(fem.Constant(msh, mu_n_over_mu0),
                   fem.Constant(msh, mu_p_over_mu0))`. Bit-identical to
         pre-M16.1 since the existing DD form already wraps the inputs
@@ -160,23 +166,21 @@ def build_mobility_expressions(
         Builds `caughey_thomas_mu(mu0_const, F_par, vsat_for_form,
         beta)` for each carrier where `F_par` is
         `sqrt(grad(phi) . grad(phi) + eps)` of the carrier-specific
-        scaled quasi-Fermi potential (so the electron continuity sees
-        |grad phi_n| and the hole continuity sees |grad phi_p|; ADR
-        0004 Slotboom flux form).
+        scaled quasi-Fermi potential.
     """
     import ufl
     from dolfinx import fem
     from petsc4py import PETSc
 
-    mob = physics_cfg.get("mobility", {}) or {}
+    mob = mobility_cfg or {}
     model = mob.get("model", "constant")
 
-    # Resolve the mesh that carries each carrier's phi function. For
-    # the multi-region (MR) variant phi_n / phi_p live on the
-    # semiconductor submesh; for the single-region variant they live
-    # on the same mesh as psi.
-    msh_n = spaces.V_phi_n.mesh
-    msh_p = spaces.V_phi_p.mesh
+    # phi_n / phi_p may live on the parent mesh or on the semiconductor
+    # submesh (multi-region variant); pull the mesh off each carrier's
+    # function space directly so the constant fem.Constants land on
+    # the same mesh as the legacy code did.
+    msh_n = phi_n.function_space.mesh
+    msh_p = phi_p.function_space.mesh
 
     if model == "constant":
         mu_n_expr = fem.Constant(msh_n, PETSc.ScalarType(mu_n_over_mu0))
@@ -203,8 +207,8 @@ def build_mobility_expressions(
     eps_n = fem.Constant(msh_n, PETSc.ScalarType(_F_PAR_EPS_SQ))
     eps_p = fem.Constant(msh_p, PETSc.ScalarType(_F_PAR_EPS_SQ))
 
-    grad_phi_n = ufl.grad(spaces.phi_n)
-    grad_phi_p = ufl.grad(spaces.phi_p)
+    grad_phi_n = ufl.grad(phi_n)
+    grad_phi_p = ufl.grad(phi_p)
     F_par_n = ufl.sqrt(ufl.dot(grad_phi_n, grad_phi_n) + eps_n)
     F_par_p = ufl.sqrt(ufl.dot(grad_phi_p, grad_phi_p) + eps_p)
 

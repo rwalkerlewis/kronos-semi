@@ -113,6 +113,7 @@ def run_bias_sweep(
     F_list = build_dd_block_residual(
         spaces, N_hat_fn, sc, ref_mat.epsilon_r,
         mu_n_hat, mu_p_hat, tau_n_hat, tau_p_hat, E_t_over_Vt,
+        mobility_cfg=mob,
     )
 
     # Both ohmic and gate contacts can carry static or swept voltages. The

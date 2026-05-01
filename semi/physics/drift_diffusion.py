@@ -73,6 +73,7 @@ def build_dd_block_residual(
     tau_n_hat: float,
     tau_p_hat: float,
     E_t_over_Vt: float = 0.0,
+    mobility_cfg: dict | None = None,
 ):
     """
     Build the three-block residual for the coupled drift-diffusion system.
@@ -90,11 +91,21 @@ def build_dd_block_residual(
         byte-identical with M2-M5) or a DG0 cellwise Function on the
         parent mesh for the multi-region Poisson coefficient jump.
     mu_n_over_mu0, mu_p_over_mu0 : float
-        Ratios of carrier mobility to the scaling reference mobility.
+        Low-field mobility ratios (mu / sc.mu0). Under the
+        caughey_thomas branch these are the `mu0` arguments to the
+        closed form (the low-field reference).
     tau_n_hat, tau_p_hat : float
         Scaled lifetimes, tau / t0.
     E_t_over_Vt : float
         Trap level relative to the intrinsic level, divided by V_t.
+    mobility_cfg : dict, optional
+        The `cfg["physics"]["mobility"]` sub-dict. `None` (default) or
+        `{"model": "constant"}` is bit-identical to pre-M16.1.
+        `{"model": "caughey_thomas", ...}` substitutes a closed-form
+        velocity-saturation expression (carrier-specific
+        |grad(phi_n)| / |grad(phi_p)| under ADR 0004 Slotboom flux
+        form; see docs/PHYSICS.md section 1.3 for the flux derivation
+        and `semi.physics.mobility` for the closed form).
 
     Returns
     -------
@@ -105,6 +116,7 @@ def build_dd_block_residual(
     from dolfinx import fem
     from petsc4py import PETSc
 
+    from .mobility import build_mobility_expressions
     from .slotboom import n_from_slotboom, p_from_slotboom
 
     psi = spaces.psi
@@ -123,8 +135,9 @@ def build_dd_block_residual(
     else:
         eps_r_ufl = eps_r
     ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
-    mu_n_hat = fem.Constant(msh, PETSc.ScalarType(mu_n_over_mu0))
-    mu_p_hat = fem.Constant(msh, PETSc.ScalarType(mu_p_over_mu0))
+    mu_n_hat, mu_p_hat, _mob_model = build_mobility_expressions(
+        mobility_cfg, phi_n, phi_p, mu_n_over_mu0, mu_p_over_mu0, sc,
+    )
     tau_n = fem.Constant(msh, PETSc.ScalarType(tau_n_hat))
     tau_p = fem.Constant(msh, PETSc.ScalarType(tau_p_hat))
 
@@ -215,6 +228,7 @@ def build_dd_block_residual_mr(
     cell_tags,
     semi_tag: int,
     E_t_over_Vt: float = 0.0,
+    mobility_cfg: dict | None = None,
 ):
     """Multi-region (submesh-based) block residual for the coupled DD system.
 
@@ -245,6 +259,7 @@ def build_dd_block_residual_mr(
     from dolfinx import fem
     from petsc4py import PETSc
 
+    from .mobility import build_mobility_expressions
     from .slotboom import n_from_slotboom, p_from_slotboom
 
     psi = spaces.psi
@@ -265,8 +280,9 @@ def build_dd_block_residual_mr(
         eps_r_ufl = eps_r
     ni_hat_parent = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
     ni_hat_sub = fem.Constant(submesh, PETSc.ScalarType(sc.n_i / sc.C0))
-    mu_n_hat = fem.Constant(submesh, PETSc.ScalarType(mu_n_over_mu0))
-    mu_p_hat = fem.Constant(submesh, PETSc.ScalarType(mu_p_over_mu0))
+    mu_n_hat, mu_p_hat, _mob_model = build_mobility_expressions(
+        mobility_cfg, phi_n, phi_p, mu_n_over_mu0, mu_p_over_mu0, sc,
+    )
     tau_n = fem.Constant(submesh, PETSc.ScalarType(tau_n_hat))
     tau_p = fem.Constant(submesh, PETSc.ScalarType(tau_p_hat))
 
