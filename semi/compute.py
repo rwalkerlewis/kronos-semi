@@ -65,15 +65,15 @@ def _probe_petsc() -> dict[str, Any]:
 
     try:
         info["petsc_version"] = ".".join(str(v) for v in PETSc.Sys.getVersion())
-    except Exception:
+    except Exception:  # pragma: no cover
         pass
     try:
         info["petsc_complex"] = bool(PETSc.ScalarType().dtype.kind == "c")  # type: ignore[attr-defined]
-    except Exception:
+    except Exception:  # pragma: no cover
         pass
     try:
         info["petsc_int64"] = bool(PETSc.IntType().dtype.itemsize == 8)  # type: ignore[attr-defined]
-    except Exception:
+    except Exception:  # pragma: no cover
         pass
 
     # Matrix and vector type strings supported by this PETSc build.
@@ -88,7 +88,7 @@ def _probe_petsc() -> dict[str, Any]:
             value = getattr(PETSc.Mat.Type, name)
             if isinstance(value, str):
                 mat_types.add(value.lower())
-    except Exception:
+    except Exception:  # pragma: no cover
         pass
     try:
         for name in dir(PETSc.Vec.Type):
@@ -97,7 +97,7 @@ def _probe_petsc() -> dict[str, Any]:
             value = getattr(PETSc.Vec.Type, name)
             if isinstance(value, str):
                 vec_types.add(value.lower())
-    except Exception:
+    except Exception:  # pragma: no cover
         pass
     try:
         for name in dir(PETSc.PC.Type):
@@ -106,7 +106,7 @@ def _probe_petsc() -> dict[str, Any]:
             value = getattr(PETSc.PC.Type, name)
             if isinstance(value, str):
                 pc_types.add(value.lower())
-    except Exception:
+    except Exception:  # pragma: no cover
         pass
 
     info["mat_types"] = frozenset(mat_types)
@@ -122,7 +122,7 @@ def _probe_petsc() -> dict[str, Any]:
     try:
         opts = PETSc.Options()
         info["hypre_gpu"] = bool(opts.getBool("pc_hypre_use_gpu", default=False))
-    except Exception:
+    except Exception:  # pragma: no cover
         info["hypre_gpu"] = False
 
     return info

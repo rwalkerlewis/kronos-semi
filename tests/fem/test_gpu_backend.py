@@ -19,7 +19,7 @@ import pytest
 dolfinx = pytest.importorskip("dolfinx")  # noqa: F841
 
 from semi import compute  # noqa: E402
-from semi.run import run_simulation  # noqa: E402
+from semi.run import run as run_simulation  # noqa: E402
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 _PN1D_INPUT = _REPO_ROOT / "benchmarks" / "pn_1d" / "input.json"
