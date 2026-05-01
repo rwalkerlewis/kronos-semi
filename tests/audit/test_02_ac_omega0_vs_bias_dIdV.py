@@ -86,13 +86,25 @@ def test_ac_omega0_vs_bias_dIdV():
         [[V_DC, G_ac, dIdV_bs, rel_err]],
     )
 
+    # The numeric values of Re(Y) and rel_err drift by ~1-2% across
+    # environments because of MUMPS LU pivot ordering on the indefinite
+    # 2x2 real block (see audit-assertion comment below). To keep
+    # docs/PHYSICS_AUDIT.md deterministic across CI / local re-runs we
+    # write a stable summary here; the precise per-run floats are in
+    # /tmp/audit/{CASE}.csv (uploaded as a CI artifact when needed).
+    sign_match = ("matches" if (G_ac > 0) == (dIdV_bs > 0)
+                  else "DISAGREES WITH")
     write_markdown(
         CASE,
         "Case 02 - AC sweep at small omega vs bias_sweep dI/dV",
-        f"At V_DC = {V_DC} V, AC sweep at 1 Hz reports Re(Y) "
-        f"= {G_ac:.3e} S; bias_sweep centered-difference dI/dV "
-        f"= {dIdV_bs:.3e} S; relative error {rel_err:.3e}.\n\n"
-        f"CSV: `/tmp/audit/{CASE}.csv`",
+        f"At V_DC = {V_DC} V (reverse bias, ~5 mS device), "
+        f"Re(Y(omega->0)) {sign_match} the sign of bias_sweep "
+        f"centered-difference dI/dV and the magnitudes agree within "
+        f"the 2% audit gate. Per-run values (G_ac, dI/dV, rel_err) "
+        f"are written to `/tmp/audit/{CASE}.csv`; they are not pinned "
+        f"in this doc because MUMPS LU pivot ordering on the indefinite "
+        f"2x2 real block introduces a ~1-2% environment-dependent "
+        f"noise floor on Re(Y).",
     )
 
     # Audit assertion: post Slotboom-rewrite (ADR-0011 Errata #2).

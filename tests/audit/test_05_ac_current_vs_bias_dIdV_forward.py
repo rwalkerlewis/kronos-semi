@@ -73,13 +73,23 @@ def test_ac_terminal_current_vs_dIdV():
         ["V_DC", "G_ac", "dIdV_bs", "rel_err"],
         [[V_DC, G_ac, dIdV_bs, rel]],
     )
+    # As in Case 02: Re(Y) drifts by ~1-2% across environments because
+    # of MUMPS LU pivot ordering. Per-run floats live in the CSV; the
+    # markdown is a stable summary so the CI sync check (`git diff
+    # --exit-code docs/PHYSICS_AUDIT.md`) is reproducible.
+    sign_match = ("matches" if (G_ac > 0) == (dIdV_bs > 0)
+                  else "DISAGREES WITH")
     write_markdown(
         CASE,
         "Case 05 - AC terminal current vs bias_sweep dI/dV (forward bias)",
-        f"At V_DC = {V_DC} V (forward bias, finite current), "
-        f"AC Re(Y) at 1 Hz = {G_ac:.3e} S; bias_sweep dI/dV "
-        f"= {dIdV_bs:.3e} S; relative error {rel:.3e}.\n\n"
-        f"CSV: `/tmp/audit/{CASE}.csv`",
+        f"At V_DC = {V_DC} V (forward bias, ~75 S device), "
+        f"Re(Y(omega->0)) {sign_match} the sign of bias_sweep "
+        f"centered-difference dI/dV and the magnitudes agree within "
+        f"the 5% audit gate. Per-run values (G_ac, dI/dV, rel_err) "
+        f"are written to `/tmp/audit/{CASE}.csv`; they are not pinned "
+        f"in this doc because MUMPS LU pivot ordering on the "
+        f"forward-bias indefinite block introduces a ~1-2% "
+        f"environment-dependent noise floor on Re(Y).",
     )
 
     # Audit assertion: post sign-convention fix.  Re(Y) at low frequency

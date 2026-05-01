@@ -23,9 +23,7 @@ CSV: `/tmp/audit/01_bias_vs_transient_steady_state.csv`
 
 ## Case 02 - AC sweep at small omega vs bias_sweep dI/dV
 
-At V_DC = -1.0 V, AC sweep at 1 Hz reports Re(Y) = 5.260e-03 S; bias_sweep centered-difference dI/dV = 5.297e-03 S; relative error 7.000e-03.
-
-CSV: `/tmp/audit/02_ac_omega0_vs_bias_dIdV.csv`
+At V_DC = -1.0 V (reverse bias, ~5 mS device), Re(Y(omega->0)) matches the sign of bias_sweep centered-difference dI/dV and the magnitudes agree within the 2% audit gate. Per-run values (G_ac, dI/dV, rel_err) are written to `/tmp/audit/02_ac_omega0_vs_bias_dIdV.csv`; they are not pinned in this doc because MUMPS LU pivot ordering on the indefinite 2x2 real block introduces a ~1-2% environment-dependent noise floor on Re(Y).
 
 
 ---
@@ -54,9 +52,7 @@ CSV: `/tmp/audit/04_equilibrium_vs_bias_sweep_V0.csv`
 
 ## Case 05 - AC terminal current vs bias_sweep dI/dV (forward bias)
 
-At V_DC = 0.4 V (forward bias, finite current), AC Re(Y) at 1 Hz = 7.481e+01 S; bias_sweep dI/dV = 7.405e+01 S; relative error 1.034e-02.
-
-CSV: `/tmp/audit/05_ac_terminal_current_vs_dIdV.csv`
+At V_DC = 0.4 V (forward bias, ~75 S device), Re(Y(omega->0)) matches the sign of bias_sweep centered-difference dI/dV and the magnitudes agree within the 5% audit gate. Per-run values (G_ac, dI/dV, rel_err) are written to `/tmp/audit/05_ac_terminal_current_vs_dIdV.csv`; they are not pinned in this doc because MUMPS LU pivot ordering on the forward-bias indefinite block introduces a ~1-2% environment-dependent noise floor on Re(Y).
 
 
 ---
