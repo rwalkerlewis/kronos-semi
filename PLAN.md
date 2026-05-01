@@ -35,20 +35,22 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M15 are merged into `main`. Current package version is
-`0.15.0`; M15 (GPU linear-solver path, schema 1.4.0, manifest 1.1.0)
-landed on `dev/m15-phase-a` and supersedes the deferred v0.14.2
-administrative bump from PR #65. M14.2 (axisymmetric MOSCAP, schema
-1.3.0) merged via PR #64 (`a4649be`), and the post-merge
-documentation cleanup, scipy base-dependency promotion, and
-axisymmetric runner dispatch in `semi/runners/mos_cap_ac.py` followed
-in PR #65 (`799934d`). M13.1 closed in v0.14.1: the 1D transient runner
+M1 through M15 plus M14.3 are merged into `main`. Current package
+version is `0.16.0`; M14.3 (Housekeeping, branch
+`dev/m14.3-housekeeping`) closed four production-hardening gaps
+before M16 physics work starts: a Pao-Sah analytical reference for
+the `mosfet_2d` benchmark, the XDMF branch in
+`semi/mesh.py::_build_from_file`, strict-mode schema v2.0.0
+(`additionalProperties: false` on every object node, with v1
+deprecated for one minor cycle), and removal of the dead-on-active-
+path `semi/fem/sg_assembly.py` (~792 LOC). The coverage gate is
+restored to 95. M15 (GPU linear-solver path, schema 1.4.0, manifest
+1.1.0) ships in v0.15.0; M14.2 (axisymmetric MOSCAP, schema 1.3.0)
+shipped in PR #64. M13.1 closed in v0.14.1: the 1D transient runner
 uses Slotboom primary unknowns (ADR 0014, supersedes ADR 0009) and
-matches bias_sweep at deep steady state. SG flux primitives ship in
-`semi/fem/` but are not the active CD path. ADRs 0012 (SG flux) and
-0013 (BC-ramp continuation) remain in force. The xfailed
-`test_transient_steady_state_limit` and BDF rate tests are now active
-and passing.
+matches bias_sweep at deep steady state. ADRs 0012 (SG flux,
+amended in M14.3 with the sg_assembly deletion pointer) and 0013
+(BC-ramp continuation) remain in force.
 
 The post-M15 roadmap was refreshed in the doc-only PR on branch
 `dev/roadmap-refresh-post-m15` (this PR). The refresh encodes the
@@ -114,26 +116,16 @@ M15 through M18. Summary:
 
 ## Next task
 
-**M14.3 Housekeeping PR** on branch `dev/m14.3-housekeeping`. Picked
-up via [`docs/M14_3_STARTER_PROMPT.md`](docs/M14_3_STARTER_PROMPT.md);
-acceptance tests in [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md)
-§ M14.3. Four-deliverable scope:
-
-1. Tighten the `mosfet_2d` verifier with a Pao-Sah / square-law
-   analytical reference in the linear regime and a documented 20%
-   tolerance window.
-2. Implement the XDMF branch in `semi/mesh.py::_build_from_file` and
-   round-trip the resistor benchmark from `box.xdmf` within 1e-12
-   relative R.
-3. Strict-mode the input schema (`additionalProperties: false`
-   everywhere), bump the schema major to v2.0.0, ship `schemas/input.v2.json`
-   alongside v1, and migrate every benchmark JSON.
-4. Delete `semi/fem/sg_assembly.py` (~792 LOC dead-on-active-path)
-   and raise the coverage gate from 92 to 95.
-
-After M14.3 lands, M16.1 (Caughey-Thomas field-dependent mobility) is
-the next physics-completeness slice; starter prompt at
-[`docs/M16_1_STARTER_PROMPT.md`](docs/M16_1_STARTER_PROMPT.md).
+**M16.1: Caughey-Thomas field-dependent mobility** on a fresh branch
+`dev/m16.1-caughey-thomas`. Picked up via
+[`docs/M16_1_STARTER_PROMPT.md`](docs/M16_1_STARTER_PROMPT.md);
+acceptance tests in
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) § M16.1.
+Adds velocity-saturation mobility behind a schema dispatch, an MMS
+verifier extension, and a new `benchmarks/diode_velsat_1d` that
+demonstrates >5% divergence vs constant mobility at V_F = 0.9 V.
+Phase A schema bump is v2.0.0 to v2.1.0 (additive minor), starting
+from the M14.3 v0.16.0 tree.
 
 ## Backlog
 
@@ -188,6 +180,7 @@ binding; the owner picks one explicitly when the next task ships.
 | M14.1: AC differential C-V | `mos_cap_ac` runner returns dQ/dV via Im(Y)/(2πf); audit case 03 byte-identity | Done |
 | M14.2: Axisymmetric MOSCAP | Cylindrical 2D path; schema 1.3.0 `coordinate_system`; Hu Fig. 5-18 benchmark | Done |
 | M15: GPU linear solver | PETSc CUDA/HIP, AMGX/hypre PCs, schema 1.4.0 `solver.backend`/`solver.compute`, manifest 1.1.0, 3D Poisson 500k-DOF benchmark | Done |
+| M14.3: Housekeeping | mosfet_2d Pao-Sah verifier, XDMF mesh ingest, strict schema v2.0.0 (`additionalProperties: false`), dead SG primitives removed, coverage gate to 95 | Done |
 | M16: Physics completeness | Caughey-Thomas, Lombardi, Auger, FD, Schottky, tunneling | Planned |
 | M17: Heterojunctions | Position-dependent chi, Eg; HEMT or HBT benchmark | Planned |
 | M18: UI (separate repo) | React + vtk.js + JSONForms, consumes M9+M10+M11 contracts | Out of scope (this repo) |
@@ -272,6 +265,69 @@ affect any verifier or benchmark result.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M14.3 Housekeeping (2026-05-22):** Branch
+  `dev/m14.3-housekeeping`, four phase-letter commits per
+  `docs/M14_3_STARTER_PROMPT.md` (Phase A struck pre-flight per
+  PR #69; B / C / D / E executed). Version bumped 0.15.0 to 0.16.0;
+  no engine physics changed.
+  - **Phase B (Pao-Sah mosfet_2d verifier).** New
+    `verify_mosfet_2d` in `scripts/run_benchmark.py` checks the
+    long-channel linear-regime current `I_D / W = (mu_n / L_ch) *
+    C_ox * (V_GS - V_T) * V_DS` in the window `V_GS in [V_T + 0.2,
+    V_T + 0.6] V` at `V_DS = 0.05 V` with a 20 % tolerance. V_T
+    comes from `semi.cv.analytical_moscap_params`, shifted into the
+    kronos-semi BC convention. The bias_sweep runner picked up
+    gate-sweep support (`_resolve_sweep` accepts gate contacts; the
+    static_voltages loop includes them; per-step iv_rows now carry
+    `J_<contact>` for every ohmic contact so the verifier reads
+    `J_drain` while the gate is the swept contact). The mosfet_2d
+    benchmark JSON restructured: drain ohmic at static `V = 0.05`,
+    gate voltage_sweep [0.0, 1.5] V step 0.1 V (16 points). New
+    `tests/test_mosfet_2d_verifier.py` (6 pure-Python assertions) and
+    `benchmarks/mosfet_2d/README.md`. `docs/PHYSICS.md` § 6.6
+    documents the verifier and the BC-convention shift.
+  - **Phase C (XDMF mesh ingest).** Wired the previously-
+    `NotImplementedError` XDMF branch in
+    `semi/mesh.py::_build_from_file` against
+    `dolfinx.io.XDMFFile`: reads the topology + geometry via
+    `read_mesh` and optional `cell_tags` / `facet_tags` via
+    `read_meshtags`, returning the same `(mesh, cell_tags,
+    facet_tags)` triple as the gmsh branch. Default grid names
+    `mesh`, `cell_tags`, `facet_tags`; override with
+    `xdmf_mesh_name`, `xdmf_cell_tags_name`,
+    `xdmf_facet_tags_name`. New `tests/fem/test_mesh_xdmf.py`
+    round-trips the resistor `box.msh` -> `box.xdmf` via
+    `XDMFFile.write_mesh + write_meshtags` and asserts R within
+    1e-12 relative on both load paths. `docs/schema/reference.md`
+    documents the XDMF format option.
+  - **Phase D (strict schema v2.0.0).** New `schemas/input.v2.json`
+    is the v1 schema with `additionalProperties: false` added to
+    every object node that defines `properties` (27 such nodes;
+    the dict-of-regions pattern is left open via
+    `additionalProperties: <schema>`). `semi/schema.py` grew
+    `ENGINE_SUPPORTED_SCHEMA_MAJORS = (1, 2)` and
+    `get_schema(major)`; `validate(cfg)` dispatches on the major
+    component of `schema_version` and emits a `DeprecationWarning`
+    on v1 inputs. Every benchmark JSON migrated from 1.x.y to
+    2.0.0 (11 files; all pass strict-v2 validation unchanged).
+    Server `/schema` endpoint now serves v2 (current). New
+    `tests/test_schema_strict.py` (8 assertions) covers acceptance
+    test 4: every benchmark validates strict v2; the contact-typo
+    `voltag` is rejected with the offending field named; v1
+    deprecation warning fires; v3+ rejected.
+  - **Phase E (dead SG primitives removed).** Deleted
+    `semi/fem/sg_assembly.py` (792 LOC), `tests/fem/test_sg_assembly.py`
+    (385 LOC), and `scripts/verify_sg_jacobian_fd.py` (268 LOC); the
+    per-edge primitives in `semi/fem/scharfetter_gummel.py` are kept.
+    ADR 0012's status section grew a recovery pointer (the deleted
+    block-assembly is reachable in git history at the parent of the
+    deletion commit). Coverage gate raised from 92 to 95 in
+    `pyproject.toml` and `.github/workflows/ci.yml`. Drive-by ruff
+    fix on two pre-existing scripts whose I001 errors had been
+    drowned out by `verify_sg_jacobian_fd.py`'s 5 errors. Pure-Python
+    suite: 309 passed, 26 skipped (no regressions). FEM coverage gate
+    is exercised by docker-fem CI.
 
 - **Phase 0 roadmap refresh (2026-05-01):** Doc-only PR on branch
   `dev/roadmap-refresh-post-m15`. PLAN, ROADMAP, and IMPROVEMENT_GUIDE

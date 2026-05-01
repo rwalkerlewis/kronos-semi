@@ -6,7 +6,7 @@ kronos-semi is a FEniCSx-based finite-element semiconductor device simulator tha
 
 All milestones M1 through M15 have shipped as of v0.15.0. The table
 below is the current state; see the Delivery history section for
-per-milestone details. Planned milestones (M14.3, M16, M19, M20)
+per-milestone details. Planned milestones (M16, M19, M20)
 have explicit acceptance tests in
 [`docs/IMPROVEMENT_GUIDE.md`](IMPROVEMENT_GUIDE.md).
 
@@ -30,10 +30,10 @@ have explicit acceptance tests in
 | Differential capacitance via AC admittance (M14.1) | 2D | shipped | mos_cap_ac vs mos_cv on Q_gate (byte-identical) |
 | Axisymmetric (cylindrical) 2D MOSCAP (M14.2) | 2D | shipped | schema 1.3.0; LF/HF C-V vs Hu Fig. 5-18 analytical |
 | GPU linear-solver path (M15) | n/a | shipped | schema 1.4.0; pn_1d psi within 1e-8 vs CPU; >=5x linear-solve speedup at 500k DOFs |
-| Test suite | pure + FEM | shipped | 328+ tests, coverage >= 92% (CI gate) |
+| Test suite | pure + FEM | shipped | 320+ tests (post-M14.3 SG cleanup), coverage >= 95% (CI gate) |
 | V&V | 10 studies | shipped | 62/62 PASS |
 | CI | pure-python + lint + docker-fem (parallelized) | shipped | green on main |
-| Housekeeping (strict schema, XDMF ingest, Pao-Sah mosfet_2d, dead SG removal) (M14.3) | n/a | Planned | per-deliverable acceptance in IMPROVEMENT_GUIDE.md |
+| Housekeeping (M14.3) | n/a | shipped | mosfet_2d Pao-Sah verifier (20% tolerance in [V_T+0.2, V_T+0.6] V); XDMF mesh ingest (R within 1e-12 vs gmsh path); strict schema v2.0.0 (additionalProperties: false; v1 deprecated for one minor cycle); semi/fem/sg_assembly.py removed; coverage gate raised to 95 |
 | Caughey-Thomas field-dependent mobility (M16.1) | 1D / 2D / 3D | Planned | MMS L2 >= 1.99; diode_velsat_1d divergence-vs-convergence verifier |
 | Lombardi surface mobility (M16.2) | 2D / 3D | Planned | mosfet_2d Sah-Pao within 10% in inversion strong-field window |
 | Auger recombination (M16.3) | 1D / 2D | Planned | diode_auger_1d analytical match within 5% at high injection |
@@ -92,14 +92,15 @@ analysis and axisymmetric (cylindrical) 2D devices:
 - Differential capacitance via AC admittance (M14.1)
 - Axisymmetric (cylindrical) 2D devices, MOSCAP LF/HF C-V (M14.2)
 
-**Explicitly out of scope today (M14.3 housekeeping, M16 physics
-completeness, M17 heterojunctions, M19 3D MOSFET, M19.1 MPI, M20
-server hardening planned):**
+- Housekeeping (M14.3, v0.16.0): mosfet_2d Pao-Sah verifier; XDMF
+  mesh ingest; strict-mode input schema v2.0.0 with
+  `additionalProperties: false`; dead Scharfetter-Gummel primitives
+  removed; coverage gate raised to 95.
 
-- Strict-mode input schema with `additionalProperties: false`,
-  XDMF mesh ingest, Pao-Sah analytical reference for the
-  `mosfet_2d` verifier, dead Scharfetter-Gummel primitives
-  (M14.3 housekeeping)
+**Explicitly out of scope today (M16 physics completeness, M17
+heterojunctions, M19 3D MOSFET, M19.1 MPI, M20 server hardening
+planned):**
+
 - Caughey-Thomas / Lombardi field-dependent mobility (M16.1, M16.2)
 - Auger and radiative recombination (M16.3)
 - Fermi-Dirac statistics: Boltzmann throughout, valid below ~1e19
@@ -111,7 +112,7 @@ server hardening planned):**
 - Heterojunctions, position-dependent chi(x) and Eg(x) (M17;
   depends on M16.4)
 - 3D MOSFET on a gmsh-sourced unstructured mesh (M19; depends on
-  M16.1 and M14.3)
+  M16.1)
 - MPI parallel orchestration in the runners (M19.1; depends on
   M19)
 - HTTP server auth, rate limiting, API keys (M20)
@@ -743,7 +744,7 @@ M14.2" finds the answer in one place.
   exercised on a more important device than a 2D MOSCAP variant).
   If a contributor still wants to ship the Cartesian-2D MOSCAP
   variant in isolation, the work is bounded (~2 days) and can be
-  picked up after M14.3 lands; the rigorous HF C-V should not be
+  picked up at any time; the rigorous HF C-V should not be
   attempted before M16.4.
 - **Physics validation suite, Phase 2 (Sze, Nicollian-Brews).**
   Phase 1 is closed. Case 06 (transient FFT vs AC sweep) is the
@@ -758,13 +759,12 @@ progression. See
 [`docs/IMPROVEMENT_GUIDE.md`](IMPROVEMENT_GUIDE.md) for the full
 milestone specs:
 
-- M14.3: housekeeping (the next shipping PR, picked up via
-  [`docs/M14_3_STARTER_PROMPT.md`](M14_3_STARTER_PROMPT.md)).
 - M16.1 through M16.7: physics-completeness sub-milestones, each its
-  own PR. M16.1 (Caughey-Thomas) starts via
+  own PR. M16.1 (Caughey-Thomas) is the next shipping PR; pick up via
   [`docs/M16_1_STARTER_PROMPT.md`](M16_1_STARTER_PROMPT.md).
 - M17: heterojunctions (depends on M16.4).
-- M19: 3D MOSFET capstone (depends on M16.1, M14.3).
+- M19: 3D MOSFET capstone (depends on M16.1; the M14.3 XDMF / strict
+  schema work is now landed).
 - M19.1: MPI parallel orchestration (depends on M19).
 - M20: HTTP server hardening (independent).
 
