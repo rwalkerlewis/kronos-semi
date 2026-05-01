@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.3.0",
+  "schema_version": "2.0.0",
   "name": "moscap_axisym_2d",
   "description": "Axisymmetric (cylindrical) 2D MOS capacitor reproducing Hu Fig. 5-18 (low-frequency vs. high-frequency C-V split). Solves on the meridian half-plane (r, z) with rotational symmetry about the z-axis. P-type Si body (5 um), N_a = 5e16 cm^-3; SiO2 gate oxide 10 nm; N+ poly-Si gate (phi_ms = -0.95 V, Q_f = 0). Gate radius R_g = 50 um, domain radius R = 200 um (>> 5 W_dmax). Gate sweep -2.0 V to +2.0 V over 81 points. C(V_g) is extracted in two ways by semi.cv: low-frequency C_LF = -dQ_s/dV_g via centered FD on the r-weighted total semiconductor charge (Hu Eq. 5.6.1); high-frequency C_HF via the depletion-approximation clamp (W_dep capped at W_dmax once phi_s >= 2 phi_B). Mesh is built from moscap_axisym.geo by gmsh and read via dolfinx.io.gmshio (the .msh is .gitignored, regenerate from the .geo).",
   "dimension": 2,
@@ -10,17 +10,34 @@
     "format": "gmsh"
   },
   "regions": {
-    "silicon": {"material": "Si",   "tag": 1, "role": "semiconductor"},
-    "oxide":   {"material": "SiO2", "tag": 2, "role": "insulator"}
+    "silicon": {
+      "material": "Si",
+      "tag": 1,
+      "role": "semiconductor"
+    },
+    "oxide": {
+      "material": "SiO2",
+      "tag": 2,
+      "role": "insulator"
+    }
   },
   "doping": [
     {
       "region": "silicon",
-      "profile": {"type": "uniform", "N_D": 0.0, "N_A": 5.0e16}
+      "profile": {
+        "type": "uniform",
+        "N_D": 0.0,
+        "N_A": 5e+16
+      }
     }
   ],
   "contacts": [
-    {"name": "body", "facet": 12, "type": "ohmic", "voltage": 0.0},
+    {
+      "name": "body",
+      "facet": 12,
+      "type": "ohmic",
+      "voltage": 0.0
+    },
     {
       "name": "gate",
       "facet": 13,
@@ -28,22 +45,47 @@
       "voltage": 0.0,
       "workfunction": -0.95,
       "oxide_region": "oxide",
-      "voltage_sweep": {"start": -2.0, "stop": 2.0, "step": 0.05}
+      "voltage_sweep": {
+        "start": -2.0,
+        "stop": 2.0,
+        "step": 0.05
+      }
     },
-    {"name": "field_oxide", "facet": 14, "type": "insulating"},
-    {"name": "outer",       "facet": 11, "type": "insulating"}
+    {
+      "name": "field_oxide",
+      "facet": 14,
+      "type": "insulating"
+    },
+    {
+      "name": "outer",
+      "facet": 11,
+      "type": "insulating"
+    }
   ],
   "physics": {
     "temperature": 300.0,
     "statistics": "boltzmann",
-    "mobility": {"mu_n": 1400.0, "mu_p": 450.0},
-    "recombination": {"srh": false, "tau_n": 1.0e-7, "tau_p": 1.0e-7, "E_t": 0.0}
+    "mobility": {
+      "mu_n": 1400.0,
+      "mu_p": 450.0
+    },
+    "recombination": {
+      "srh": false,
+      "tau_n": 1e-07,
+      "tau_p": 1e-07,
+      "E_t": 0.0
+    }
   },
   "solver": {
     "type": "mos_cap_ac"
   },
   "output": {
     "directory": "./results/moscap_axisym_2d",
-    "fields": ["potential", "n", "p", "cv"]
+    "fields": [
+      "potential",
+      "n",
+      "p",
+      "cv"
+    ]
   }
 }

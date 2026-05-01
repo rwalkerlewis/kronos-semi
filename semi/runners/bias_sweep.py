@@ -115,9 +115,15 @@ def run_bias_sweep(
         mu_n_hat, mu_p_hat, tau_n_hat, tau_p_hat, E_t_over_Vt,
     )
 
+    # Both ohmic and gate contacts can carry static or swept voltages. The
+    # runner historically only swept ohmic contacts; gate-sweep support was
+    # added so the mosfet_2d benchmark can drive V_GS at fixed V_DS for the
+    # M14.3 Pao-Sah verifier. Schottky and insulating contacts stay
+    # untouched (the schema already permits at most a static voltage on
+    # each).
     static_voltages: dict[str, float] = {}
     for c in cfg["contacts"]:
-        if c["type"] != "ohmic":
+        if c["type"] not in ("ohmic", "gate"):
             continue
         if sweep_contact is not None and c["name"] == sweep_contact:
             continue
@@ -191,6 +197,27 @@ def run_bias_sweep(
             cfg, msh, facet_tags, sweep_contact,
         )
 
+    # Per-step current recording at all ohmic contacts (in addition to the
+    # sweep contact). This lets the mosfet_2d Pao-Sah verifier read J_drain
+    # while the gate is the swept contact (which has J ~ 0 in DC). The
+    # legacy single-ohmic benchmarks (pn_1d_bias, etc.) still see the same
+    # iv_row["V"] / iv_row["J"] values; the new entries are namespaced as
+    # iv_row["J_<contact_name>"] and are additive.
+    monitor_contacts: list[tuple[str, dict]] = []
+    for c in cfg["contacts"]:
+        if c["type"] != "ohmic":
+            continue
+        info_facet = resolve_contact_facets(cfg, msh, facet_tags, c["name"])
+        monitor_contacts.append((c["name"], info_facet))
+
+    def _record_per_contact_currents(iv_row: dict) -> None:
+        from ..postprocess import evaluate_current_at_contact
+        for name, finfo in monitor_contacts:
+            J_name = evaluate_current_at_contact(
+                spaces, sc, ref_mat, finfo, mu_n_SI, mu_p_SI,
+            )
+            iv_row[f"J_{name}"] = float(J_name)
+
     iv_rows: list[dict[str, float]] = []
     last_info: dict[str, Any] = {}
 
@@ -208,6 +235,7 @@ def run_bias_sweep(
     V_prev = V_seed
     record_iv(iv_rows, V_seed, spaces, sc, ref_mat,
               sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI)
+    _record_per_contact_currents(iv_rows[-1])
     if post_step_hook is not None:
         post_step_hook(V_seed, spaces, iv_rows[-1])
     if progress_callback is not None:
@@ -261,6 +289,7 @@ def run_bias_sweep(
                 V_prev = V_try
                 record_iv(iv_rows, V_try, spaces, sc, ref_mat,
                           sweep_contact, sweep_facet_info, mu_n_SI, mu_p_SI)
+                _record_per_contact_currents(iv_rows[-1])
                 if post_step_hook is not None:
                     post_step_hook(V_try, spaces, iv_rows[-1])
                 if progress_callback is not None:
@@ -332,9 +361,15 @@ def compute_bipolar_legs(v_sweep_list: list[float]) -> list[float]:
 
 
 def _resolve_sweep(cfg):
-    """Return (contact_name, list_of_voltage_values) or (None, []) if none."""
+    """Return (contact_name, list_of_voltage_values) or (None, []) if none.
+
+    Ohmic and gate contacts are both sweepable. Ohmic-with-voltage_sweep
+    wins over gate-with-voltage_sweep when both are present (precedence
+    follows the JSON contact order; in practice a benchmark declares at
+    most one swept contact).
+    """
     for c in cfg["contacts"]:
-        if c["type"] != "ohmic":
+        if c["type"] not in ("ohmic", "gate"):
             continue
         sweep = c.get("voltage_sweep")
         if sweep is None:

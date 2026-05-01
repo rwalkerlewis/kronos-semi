@@ -1,9 +1,14 @@
 # JSON input schema reference
 
-The input JSON contract is defined by
-[`schemas/input.v1.json`](../../schemas/input.v1.json) (Draft-07).
-Every object node carries a UI-facing `description`. The engine
-loader is [`semi/schema.py`](../../semi/schema.py).
+The input JSON contract is defined by two coexisting schemas
+(both Draft-07): the strict
+[`schemas/input.v2.json`](../../schemas/input.v2.json) (current)
+and the legacy
+[`schemas/input.v1.json`](../../schemas/input.v1.json) (deprecated,
+kept for one minor cycle). Every object node carries a UI-facing
+`description`. The engine loader is
+[`semi/schema.py`](../../semi/schema.py); call
+`semi.schema.get_schema(major)` for the schema for a specific major.
 
 This page summarises the schema. For the authoritative definition,
 the full annotated source of truth is the JSON file.
@@ -11,18 +16,40 @@ the full annotated source of truth is the JSON file.
 ## Versioning
 
 - `schema_version` is required at the top level. Format `MAJOR.MINOR.PATCH`.
-- The engine refuses inputs whose major version differs from
-  `ENGINE_SUPPORTED_SCHEMA_MAJOR` (currently `1` in
-  [`semi/schema.py`](../../semi/schema.py)).
-- Minor/patch skew is accepted silently. Current minor: `3`
-  (`SCHEMA_SUPPORTED_MINOR = 3`).
-- Current schema version: **1.3.0** (added `coordinate_system`).
+- The engine accepts majors listed in `ENGINE_SUPPORTED_SCHEMA_MAJORS`
+  in [`semi/schema.py`](../../semi/schema.py); currently `(1, 2)`.
+- v1 inputs continue to validate against `input.v1.json` (loose: extra
+  fields are silently ignored) but emit a `DeprecationWarning`. They
+  will be removed after one minor release cycle.
+- v2 inputs validate against `input.v2.json` (strict:
+  `additionalProperties: false` on every object node, so typos in
+  contact / mesh / solver fields fail validation rather than being
+  silently dropped).
+- Minor/patch skew is accepted silently within a major.
+- Current schema version: **2.0.0** (M14.3 strict-mode major bump).
+
+Schemas are published to
+`https://rwalkerlewis.github.io/kronos-semi/schemas/` on every release
+tag; see [`.github/workflows/publish-schemas.yml`](../../.github/workflows/publish-schemas.yml).
+
+### v1 -> v2 migration
+
+For the M14.3 transition, every benchmark JSON in the tree is at
+`schema_version: "2.0.0"`. To migrate a downstream input:
+
+1. Bump `schema_version` from `"1.x.y"` to `"2.0.0"`.
+2. Run validation. v2 will reject any field name that does not match a
+   defined property; fix typos surfaced by the validator.
+3. The data shape is otherwise unchanged; v2 is a pure-strictness bump.
 
 History:
 - **1.0.0** (M11) — extracted from `semi.schema.SCHEMA`.
 - **1.1.0** (M13) — `solver.type = "transient"` and the BDF fields.
 - **1.2.0** (M14) — `solver.type = "ac_sweep"` and the `dc_bias` / `ac` blocks.
 - **1.3.0** (M14.2) — `coordinate_system` (`"cartesian"` / `"axisymmetric"`).
+- **1.4.0** (M15) — `solver.backend` and `solver.compute`.
+- **2.0.0** (M14.3) — strict mode (`additionalProperties: false` on every
+  object node); v1 deprecated.
 
 ## Top-level fields
 
@@ -52,10 +79,16 @@ Two variants chosen by `source`:
   - `facets_by_plane`: list of axis-aligned planes that tag boundary
     facets, referenced by name in `contacts[*].facet`.
 
-- `source: "file"` — external gmsh `.msh`.
+- `source: "file"` — external gmsh `.msh` or XDMF.
   - `path`: relative to the JSON file's directory.
-  - `format`: `"gmsh"` (XDMF reserved, not implemented).
-  - Physical groups in the `.msh` supply region and facet tags.
+  - `format`: `"gmsh"` or `"xdmf"`. The XDMF branch reads the mesh via
+    `dolfinx.io.XDMFFile.read_mesh` and then optional cell and facet
+    tag sets via `read_meshtags`. Default grid names are `mesh`,
+    `cell_tags`, and `facet_tags`; override with
+    `xdmf_mesh_name`, `xdmf_cell_tags_name`, and
+    `xdmf_facet_tags_name` if the file uses different ones.
+  - Physical groups in the `.msh` (or named meshtag sets in the
+    `.xdmf`) supply region and facet tags.
   - For axisymmetric benchmarks, the meridian mesh is built from a
     `.geo` template (e.g.
     [`benchmarks/moscap_axisym_2d/moscap_axisym.geo`](../../benchmarks/moscap_axisym_2d/moscap_axisym.geo))

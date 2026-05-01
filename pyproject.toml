@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kronos-semi"
-version = "0.15.0"
+version = "0.16.0"
 description = "JSON-driven FEM semiconductor device simulator on FEniCSx"
 readme = "README.md"
 license = {text = "MIT"}
@@ -115,11 +115,12 @@ omit = [
 # from pytest coverage to keep the threshold honest about what unit
 # tests verify versus what CI integration verifies.
 #
-# Coverage gate is 92% (CI: --cov-fail-under=92), not 95%, because
-# semi/fem/sg_assembly.py (269 stmts) has no production caller since the
-# transient runner switched to Slotboom form (ADR 0014). The SG primitives
-# are retained for future 2D high-Peclet work in M13.2.
-# TODO: re-raise to 95% when sg_assembly is wired into the M13.2 runner.
+# Coverage gate is 95% (CI: --cov-fail-under=95). Restored from 92%
+# in M14.3 Phase E once `semi/fem/sg_assembly.py` (~792 LOC,
+# dead-on-active-path since the transient runner switched to Slotboom
+# in ADR 0014) was deleted. If M13.2 ever revives the SG flux path,
+# the implementation can be recovered from the git history at the
+# pre-M14.3 commit; ADR 0012's status section carries the pointer.
 exclude_also = [
     "pragma: no cover",
     "raise NotImplementedError",

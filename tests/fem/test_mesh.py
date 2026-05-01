@@ -2,8 +2,10 @@
 Direct unit tests for `semi.mesh.build_mesh`.
 
 The benchmarks exercise `build_mesh` transitively, but the 2D and 3D
-builtin paths and the file-source NotImplementedError stub are not
-hit by any pytest collection without these tests. They are cheap.
+builtin paths and the file-source error branches are not hit by any
+pytest collection without these tests. They are cheap. The XDMF
+ingest path has its own round-trip test in
+`tests/fem/test_mesh_xdmf.py`.
 """
 from __future__ import annotations
 
@@ -90,13 +92,6 @@ def test_build_mesh_unknown_source_raises():
     cfg = _interval_cfg()
     cfg["mesh"]["source"] = "magic"
     with pytest.raises(ValueError, match="Unknown mesh source"):
-        build_mesh(cfg)
-
-
-def test_build_mesh_file_source_xdmf_raises_notimplemented():
-    cfg = _interval_cfg()
-    cfg["mesh"] = {"source": "file", "path": "dummy.xdmf", "format": "xdmf"}
-    with pytest.raises(NotImplementedError, match="XDMF"):
         build_mesh(cfg)
 
 
@@ -265,3 +260,101 @@ def test_build_submesh_by_role_raises_when_no_matching_role():
     msh, cell_tags, _facet_tags = build_mesh(cfg)
     with _pytest.raises(ValueError, match="No region in regions_cfg has role"):
         build_submesh_by_role(msh, cell_tags, cfg["regions"], role="conductor")
+
+
+def test_is_single_region_semiconductor_skips_region_without_tag():
+    """A regions_cfg entry without a 'tag' key is silently skipped."""
+    from semi.mesh import build_mesh, is_single_region_semiconductor
+
+    cfg = {
+        "dimension": 1,
+        "mesh": {
+            "source": "builtin",
+            "extents": [[0.0, 1.0e-6]],
+            "resolution": [8],
+            "regions_by_box": [
+                {"name": "silicon", "tag": 1, "bounds": [[0.0, 1.0e-6]]},
+            ],
+        },
+    }
+    msh, cell_tags, _facet_tags = build_mesh(cfg)
+    # Pass a regions_cfg where one entry lacks a 'tag' key; it must be
+    # skipped without raising and the function should still return True
+    # (single semiconductor region with tag 1).
+    regions_cfg = {
+        "untagged": {"material": "Si"},  # no "tag" key → continue
+        "silicon": {"material": "Si", "tag": 1, "role": "semiconductor"},
+    }
+    assert is_single_region_semiconductor(cell_tags, regions_cfg) is True
+
+
+def test_is_single_region_semiconductor_false_for_single_insulator():
+    """A single-region mesh whose region has role='insulator' returns False."""
+    from semi.mesh import build_mesh, is_single_region_semiconductor
+
+    cfg = {
+        "dimension": 1,
+        "mesh": {
+            "source": "builtin",
+            "extents": [[0.0, 1.0e-6]],
+            "resolution": [8],
+            "regions_by_box": [
+                {"name": "oxide", "tag": 1, "bounds": [[0.0, 1.0e-6]]},
+            ],
+        },
+    }
+    msh, cell_tags, _facet_tags = build_mesh(cfg)
+    regions_cfg = {"oxide": {"material": "SiO2", "tag": 1, "role": "insulator"}}
+    assert is_single_region_semiconductor(cell_tags, regions_cfg) is False
+
+
+def test_build_eps_r_function_returns_uniform_one_when_cell_tags_none():
+    """When cell_tags is None, build_eps_r_function returns a scalar-one DG0 fn."""
+    from semi.mesh import build_eps_r_function, build_mesh
+
+    cfg = {
+        "dimension": 1,
+        "mesh": {
+            "source": "builtin",
+            "extents": [[0.0, 1.0e-6]],
+            "resolution": [8],
+        },
+    }
+    msh, cell_tags, _facet_tags = build_mesh(cfg)
+    assert cell_tags is None
+    regions_cfg = {"silicon": {"material": "Si", "role": "semiconductor"}}
+    eps_r_fn = build_eps_r_function(msh, cell_tags, regions_cfg)
+    # No cell tags → all values should be 1.0
+    import numpy as _np
+    assert _np.allclose(eps_r_fn.x.array, 1.0)
+
+
+def test_build_eps_r_function_skips_region_without_tag():
+    """A regions_cfg entry without a 'tag' key is silently skipped."""
+    from semi.mesh import build_eps_r_function, build_mesh
+
+    cfg = _mos_like_cfg()
+    msh, cell_tags, _facet_tags = build_mesh(cfg)
+    regions_cfg = {
+        "silicon": {"material": "Si", "tag": 1, "role": "semiconductor"},
+        "untagged": {"material": "SiO2"},  # no "tag" key → continue
+    }
+    # Should not raise; the untagged region is skipped.
+    eps_r_fn = build_eps_r_function(msh, cell_tags, regions_cfg)
+    assert eps_r_fn is not None
+
+
+def test_build_submesh_by_role_skips_region_without_tag():
+    """A regions_cfg entry without a 'tag' key is silently skipped."""
+    from semi.mesh import build_mesh, build_submesh_by_role
+
+    cfg = _mos_like_cfg()
+    msh, cell_tags, _facet_tags = build_mesh(cfg)
+    regions_cfg = {
+        "silicon": {"material": "Si", "tag": 1, "role": "semiconductor"},
+        "untagged": {"material": "SiO2"},  # no "tag" key → continue
+    }
+    submesh, _em, _vm, _gm = build_submesh_by_role(
+        msh, cell_tags, regions_cfg, role="semiconductor",
+    )
+    assert submesh is not None

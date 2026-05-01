@@ -1047,6 +1047,253 @@ _PLOTTERS["mos_2d"] = plot_mos_2d
 
 
 # --------------------------------------------------------------------------- #
+# mosfet_2d verifier (M14.3 Phase B: Pao-Sah linear-regime analytical ref)    #
+# --------------------------------------------------------------------------- #
+
+def _mosfet_device_params(cfg, mat):
+    """Pull MOSFET geometry, doping, and oxide parameters from the JSON.
+
+    Returns a dict with V_T computed via `semi.cv.analytical_moscap_params`
+    against the silicon body's uniform doping, plus channel length L_ch
+    (the gate's lateral extent), drain contact line length L_dc, and the
+    static V_DS read from the drain ohmic contact's `voltage` field.
+    """
+    from semi.constants import cm3_to_m3
+    from semi.cv import analytical_moscap_params
+    from semi.materials import get_material
+
+    body_doping = next(
+        d for d in cfg["doping"]
+        if d.get("region") == "silicon" and d["profile"].get("type") == "uniform"
+    )
+    N_A_cm3 = float(body_doping["profile"].get("N_A", 0.0))
+    N_D_cm3 = float(body_doping["profile"].get("N_D", 0.0))
+    if N_A_cm3 <= 0.0 or N_D_cm3 != 0.0:
+        raise ValueError(
+            "mosfet_2d verifier expects a p-type uniform body doping (N_A>0, N_D=0)"
+        )
+
+    ox_region = next(
+        r for r in cfg["regions"].values() if r.get("role") == "insulator"
+    )
+    ox_mat = get_material(ox_region["material"])
+    ox_bounds = next(
+        rb for rb in cfg["mesh"]["regions_by_box"]
+        if int(rb["tag"]) == int(ox_region["tag"])
+    )
+    y_ox_lo, y_ox_hi = ox_bounds["bounds"][1]
+    t_ox = float(y_ox_hi - y_ox_lo)
+    x_ox_lo, x_ox_hi = ox_bounds["bounds"][0]
+    L_ch = float(x_ox_hi - x_ox_lo)
+
+    gate = next(c for c in cfg["contacts"] if c["type"] == "gate")
+    phi_ms = float(gate.get("workfunction", 0.0) or 0.0)
+
+    drain = next(c for c in cfg["contacts"] if c["name"] == "drain")
+    V_DS = float(drain.get("voltage", 0.0))
+
+    drain_facet = next(
+        f for f in cfg["mesh"]["facets_by_plane"] if f["name"] == "drain"
+    )
+    drain_axis = int(drain_facet["axis"])
+    body_extents = cfg["mesh"]["extents"]
+    other_axis = 1 - drain_axis if cfg["dimension"] == 2 else None
+    if other_axis is None:
+        L_dc = 1.0
+    else:
+        y_lo, y_hi = body_extents[other_axis]
+        L_dc = float(y_hi - y_lo)
+
+    T = float(cfg.get("physics", {}).get("temperature", 300.0))
+    mu_n_cm2 = float(cfg.get("physics", {}).get("mobility", {}).get("mu_n", 1400.0))
+    mu_n_SI = mu_n_cm2 * 1.0e-4
+
+    moscap = analytical_moscap_params(
+        body_dopant="p",
+        N_body_cm3=N_A_cm3,
+        T_ox_m=t_ox,
+        phi_ms=phi_ms,
+        Q_f_per_area=0.0,
+        T=T,
+        n_i_cm3=mat.n_i / cm3_to_m3(1.0),
+        eps_r_semi=mat.epsilon_r,
+        eps_r_ox=ox_mat.epsilon_r,
+    )
+    # `analytical_moscap_params` returns V_fb / V_t in the textbook
+    # bulk-Fermi reference (V_fb = phi_ms - Q_f/C_ox, intrinsic at the
+    # surface in equilibrium has psi_s = 0). The kronos-semi engine BC
+    # convention pins psi = 0 at the intrinsic Fermi level (ohmic body
+    # equilibrium has psi_body = -phi_F), shifting both V_fb and V_T
+    # down by phi_F. The same convention shift is applied in the
+    # `_mos_device_params` helper used by the M6 mos_2d verifier; see
+    # docs/mos_derivation.md section 6 for the derivation.
+    phi_F_mag = moscap.phi_B
+    V_T_kronos = moscap.V_t - phi_F_mag
+    V_FB_kronos = moscap.V_fb - phi_F_mag
+
+    return dict(
+        V_T=V_T_kronos,
+        V_FB=V_FB_kronos,
+        phi_F=phi_F_mag,
+        C_ox=moscap.C_ox_per_area,
+        L_ch=L_ch,
+        L_dc=L_dc,
+        V_DS=V_DS,
+        mu_n_SI=mu_n_SI,
+        N_A_cm3=N_A_cm3,
+        t_ox=t_ox,
+    )
+
+
+def _pao_sah_linear_I_D_per_W(V_GS_arr, dp):
+    """Pao-Sah linear-regime drain current per unit channel width (A/m).
+
+    Returns I_D / W = (mu_n / L_ch) * C_ox * (V_GS - V_T) * V_DS
+    for V_GS > V_T; NaN for sub-threshold V_GS.
+    """
+    arr = np.asarray(V_GS_arr, dtype=float)
+    out = np.full_like(arr, np.nan, dtype=float)
+    mask = arr > dp["V_T"]
+    out[mask] = (dp["mu_n_SI"] / dp["L_ch"]) * dp["C_ox"] * (arr[mask] - dp["V_T"]) * dp["V_DS"]
+    return out
+
+
+@register("mosfet_2d")
+def verify_mosfet_2d(result) -> list[tuple[str, bool, str]]:
+    """
+    Pao-Sah square-law linear-regime verifier for the 2D nMOSFET.
+
+    The benchmark sweeps V_GS at fixed V_DS = 0.05 V (long-channel,
+    above subthreshold but below velocity saturation). The closed-form
+    reference is
+            I_D / W = (mu_n / L_ch) * C_ox * (V_GS - V_T) * V_DS
+    (Pao-Sah linear, Hu Eq. 6.3.3 in the V_DS << V_GS - V_T limit).
+    Verifier window: V_GS in [V_T + 0.2, V_T + 0.6] V; tolerance 20 %.
+
+    The 2D simulation reports current per unit z-width through the
+    drain facet line, so I_D_sim_per_W = J_drain_reported * L_drain_line.
+    The legacy `iv_row["J"]` is the gate's J (~0 in DC); the sweep
+    runner additionally records `J_drain` per step, which is what we
+    consume here. A 20 % tolerance absorbs the long-channel
+    approximation, the implant-tail corrections to L_ch, and the
+    Boltzmann-tail residual on the low edge of the window.
+    """
+    from semi.materials import get_material
+
+    cfg = result.cfg
+    mat = get_material(cfg["regions"]["silicon"]["material"])
+
+    iv = result.iv or []
+    if not iv:
+        return [("mosfet_2d: iv table non-empty", False, "no iv rows recorded")]
+
+    dp = _mosfet_device_params(cfg, mat)
+
+    V_GS = np.array([r["V"] for r in iv], dtype=float)
+    if not all("J_drain" in r for r in iv):
+        return [(
+            "mosfet_2d: bias_sweep recorded J_drain at every step",
+            False,
+            "J_drain missing on at least one iv row; expected per-contact "
+            "current recording from the M14.3 bias_sweep extension",
+        )]
+    J_drain = np.array([r["J_drain"] for r in iv], dtype=float)
+
+    order = np.argsort(V_GS)
+    V_GS = V_GS[order]
+    J_drain = J_drain[order]
+
+    I_D_per_W_sim = J_drain * dp["L_dc"]
+    I_D_per_W_th = _pao_sah_linear_I_D_per_W(V_GS, dp)
+
+    window_lo = dp["V_T"] + 0.2
+    window_hi = dp["V_T"] + 0.6
+
+    mask = (V_GS >= window_lo - 1.0e-9) & (V_GS <= window_hi + 1.0e-9) & np.isfinite(I_D_per_W_th)
+
+    checks: list[tuple[str, bool, str]] = []
+
+    checks.append((
+        f"mosfet_2d: sweep covers V_GS = {V_GS.min():+.3f} to {V_GS.max():+.3f} V "
+        f"with V_T = {dp['V_T']:+.3f} V",
+        bool(V_GS.min() <= dp["V_T"] - 0.1) and bool(V_GS.max() >= dp["V_T"] + 0.6),
+        f"V_T = {dp['V_T']:+.3f} V; need [V_T - 0.1, V_T + 0.6] inside the sweep",
+    ))
+
+    n_window = int(mask.sum())
+    checks.append((
+        f"mosfet_2d: verifier window [V_T + 0.2, V_T + 0.6] = "
+        f"[{window_lo:.3f}, {window_hi:.3f}] V has >=3 samples",
+        n_window >= 3,
+        f"{n_window} samples in window",
+    ))
+
+    if n_window == 0:
+        return checks
+
+    rel_err = np.abs(I_D_per_W_sim[mask] - I_D_per_W_th[mask]) / I_D_per_W_th[mask]
+    worst = int(np.argmax(rel_err))
+    V_worst = float(V_GS[mask][worst])
+    sim_worst = float(I_D_per_W_sim[mask][worst])
+    th_worst = float(I_D_per_W_th[mask][worst])
+
+    checks.append((
+        f"mosfet_2d: |I_D_sim - I_D_PaoSah|/I_D_PaoSah < 20 % in "
+        f"[{window_lo:.3f}, {window_hi:.3f}] V",
+        bool(rel_err.max() < 0.20),
+        f"worst {rel_err.max() * 100:.2f}% at V_GS = {V_worst:+.3f} V "
+        f"(I_D_sim/W = {sim_worst:.3e} A/m, I_D_th/W = {th_worst:.3e} A/m, "
+        f"V_DS = {dp['V_DS']:.3f} V, L_ch = {dp['L_ch']*1e6:.2f} um, "
+        f"mu_n = {dp['mu_n_SI']*1e4:.0f} cm^2/V/s)",
+    ))
+
+    result._mosfet_params = dp
+    result._mosfet_curves = dict(
+        V_GS=V_GS, J_drain=J_drain,
+        I_D_per_W_sim=I_D_per_W_sim, I_D_per_W_th=I_D_per_W_th,
+        window_lo=window_lo, window_hi=window_hi,
+    )
+    return checks
+
+
+def plot_mosfet_2d(result, out_dir: Path) -> list[Path]:
+    """Render the I_D vs V_GS curve against the Pao-Sah analytical reference."""
+    paths: list[Path] = []
+    curves = getattr(result, "_mosfet_curves", None)
+    dp = getattr(result, "_mosfet_params", None)
+    if curves is None or dp is None:
+        return paths
+
+    V_GS = curves["V_GS"]
+    I_sim = curves["I_D_per_W_sim"]
+    I_th = curves["I_D_per_W_th"]
+    lo = curves["window_lo"]
+    hi = curves["window_hi"]
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(V_GS, I_sim * 1e3, "o-", markersize=3, label="simulation")
+    finite = np.isfinite(I_th)
+    ax.plot(V_GS[finite], I_th[finite] * 1e3, "k--",
+            label="Pao-Sah linear")
+    ax.axvline(dp["V_T"], color="grey", linestyle=":", alpha=0.6, label=r"$V_T$")
+    ax.axvspan(lo, hi, alpha=0.15, color="green", label="verifier window")
+    ax.set_xlabel(r"$V_{GS}$ (V)")
+    ax.set_ylabel(r"$I_D / W$ (mA/m)")
+    ax.set_title(rf"MOSFET 2D: $I_D(V_{{GS}})$ at $V_{{DS}}={dp['V_DS']:.3f}$ V")
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    p = out_dir / "id_vgs.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    paths.append(p)
+    return paths
+
+
+_PLOTTERS["mosfet_2d"] = plot_mosfet_2d
+
+
+# --------------------------------------------------------------------------- #
 # resistor_3d verifier and plotter                                            #
 # --------------------------------------------------------------------------- #
 

@@ -224,27 +224,37 @@ def build_dd_dirichlet_bcs(
     fdim = msh.topology.dim - 1
     bcs = []
     for c in contacts:
-        # Gate contacts live on the oxide-side of the Si/SiO2 interface;
-        # no Slotboom variable is defined there and the continuity blocks
-        # assemble only on the semiconductor submesh, so gate facets carry
-        # no (phi_n, phi_p) DOFs. We do still apply the psi Dirichlet
-        # through build_psi_dirichlet_bcs.
-        if c.kind == "gate":
-            continue
-        if c.kind != "ohmic":
+        if c.kind not in ("ohmic", "gate"):
             continue
         facets = facet_tags.find(c.facet_tag)
         if len(facets) == 0:
             raise RuntimeError(
                 f"No facets with tag {c.facet_tag} for contact {c.name!r}"
             )
+        dofs_psi = fem.locate_dofs_topological(spaces.V_psi, fdim, facets)
+
+        if c.kind == "gate":
+            # Gate contacts sit on the oxide side of the Si / SiO2
+            # interface; the Slotboom continuity blocks assemble only
+            # on the semiconductor submesh, so gate facets carry no
+            # (phi_n, phi_p) DOFs. The psi Dirichlet must still be
+            # applied here because the block solver consumes a single
+            # bcs list (the alternative `build_psi_dirichlet_bcs`
+            # entry point is used by the equilibrium and mos_cv
+            # runners which solve psi alone).
+            phi_ms = float(c.work_function) if c.work_function is not None else 0.0
+            psi_bc = (c.V_applied - phi_ms) / sc.V0
+            bcs.append(fem.dirichletbc(
+                PETSc.ScalarType(psi_bc), dofs_psi, spaces.V_psi))
+            continue
+
+        # Ohmic: Shockley boundary on the (psi, phi_n, phi_p) block.
         N_net = _evaluate_doping_at_facet(msh, facets, fdim, N_raw_fn)
         psi_eq_hat = float(np.arcsinh(N_net / (2.0 * ref_mat.n_i)))
         V_hat = c.V_applied / sc.V0
         psi_bc = psi_eq_hat + V_hat
         phi_bc = V_hat
 
-        dofs_psi = fem.locate_dofs_topological(spaces.V_psi, fdim, facets)
         dofs_n = fem.locate_dofs_topological(spaces.V_phi_n, fdim, facets)
         dofs_p = fem.locate_dofs_topological(spaces.V_phi_p, fdim, facets)
 

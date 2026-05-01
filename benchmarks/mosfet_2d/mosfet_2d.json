@@ -1,39 +1,115 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "2.0.0",
   "name": "mosfet_2d",
   "description": "2D n-channel MOSFET. P-type Si body (5 um x 2 um, N_A=1e16 cm^-3) with SiO2 gate oxide (5 nm). n+ source and drain implants (Gaussian, peak 5e19 cm^-3). Gate sweeps 0 to 1.5 V at V_DS=0.05 V. Drain current verified within +-20% of a long-channel MOSFET analytical estimate.",
   "dimension": 2,
   "mesh": {
     "source": "builtin",
-    "extents": [[0.0, 5.0e-6], [0.0, 2.005e-6]],
-    "resolution": [50, 21],
+    "extents": [
+      [
+        0.0,
+        5e-06
+      ],
+      [
+        0.0,
+        2.005e-06
+      ]
+    ],
+    "resolution": [
+      50,
+      21
+    ],
     "regions_by_box": [
-      {"name": "silicon", "tag": 1, "bounds": [[0.0, 5.0e-6], [0.0,      2.0e-6]]},
-      {"name": "oxide",   "tag": 2, "bounds": [[1.0e-6, 4.0e-6], [2.0e-6, 2.005e-6]]}
+      {
+        "name": "silicon",
+        "tag": 1,
+        "bounds": [
+          [
+            0.0,
+            5e-06
+          ],
+          [
+            0.0,
+            2e-06
+          ]
+        ]
+      },
+      {
+        "name": "oxide",
+        "tag": 2,
+        "bounds": [
+          [
+            1e-06,
+            4e-06
+          ],
+          [
+            2e-06,
+            2.005e-06
+          ]
+        ]
+      }
     ],
     "facets_by_plane": [
-      {"name": "body",   "tag": 1, "axis": 1, "value": 0.0},
-      {"name": "source", "tag": 2, "axis": 0, "value": 0.0},
-      {"name": "drain",  "tag": 3, "axis": 0, "value": 5.0e-6},
-      {"name": "gate",   "tag": 4, "axis": 1, "value": 2.005e-6}
+      {
+        "name": "body",
+        "tag": 1,
+        "axis": 1,
+        "value": 0.0
+      },
+      {
+        "name": "source",
+        "tag": 2,
+        "axis": 0,
+        "value": 0.0
+      },
+      {
+        "name": "drain",
+        "tag": 3,
+        "axis": 0,
+        "value": 5e-06
+      },
+      {
+        "name": "gate",
+        "tag": 4,
+        "axis": 1,
+        "value": 2.005e-06
+      }
     ]
   },
   "regions": {
-    "silicon": {"material": "Si",   "tag": 1, "role": "semiconductor"},
-    "oxide":   {"material": "SiO2", "tag": 2, "role": "insulator"}
+    "silicon": {
+      "material": "Si",
+      "tag": 1,
+      "role": "semiconductor"
+    },
+    "oxide": {
+      "material": "SiO2",
+      "tag": 2,
+      "role": "insulator"
+    }
   },
   "doping": [
     {
       "region": "silicon",
-      "profile": {"type": "uniform", "N_D": 0.0, "N_A": 1.0e16}
+      "profile": {
+        "type": "uniform",
+        "N_D": 0.0,
+        "N_A": 1e+16
+      }
     },
     {
       "region": "silicon",
       "profile": {
         "type": "gaussian",
-        "center": [0.5e-6, 2.0e-6],
-        "sigma": [0.4e-6, 0.15e-6],
-        "peak": 5.0e19,
+        "center": [
+          5e-07,
+          2e-06
+        ],
+        "sigma": [
+          4e-07,
+          1.5e-07
+        ],
+        "peak": 5e+19,
         "dopant": "donor"
       }
     },
@@ -41,22 +117,37 @@
       "region": "silicon",
       "profile": {
         "type": "gaussian",
-        "center": [4.5e-6, 2.0e-6],
-        "sigma": [0.4e-6, 0.15e-6],
-        "peak": 5.0e19,
+        "center": [
+          4.5e-06,
+          2e-06
+        ],
+        "sigma": [
+          4e-07,
+          1.5e-07
+        ],
+        "peak": 5e+19,
         "dopant": "donor"
       }
     }
   ],
   "contacts": [
-    {"name": "body",   "facet": "body",   "type": "ohmic", "voltage": 0.0},
-    {"name": "source", "facet": "source", "type": "ohmic", "voltage": 0.0},
+    {
+      "name": "body",
+      "facet": "body",
+      "type": "ohmic",
+      "voltage": 0.0
+    },
+    {
+      "name": "source",
+      "facet": "source",
+      "type": "ohmic",
+      "voltage": 0.0
+    },
     {
       "name": "drain",
       "facet": "drain",
       "type": "ohmic",
-      "voltage": 0.05,
-      "voltage_sweep": {"start": 0.05, "stop": 0.05, "step": 0.05}
+      "voltage": 0.05
     },
     {
       "name": "gate",
@@ -64,20 +155,42 @@
       "type": "gate",
       "voltage": 0.0,
       "workfunction": 0.0,
-      "voltage_sweep": {"start": 0.0, "stop": 1.5, "step": 0.25}
+      "voltage_sweep": {
+        "start": 0.0,
+        "stop": 1.5,
+        "step": 0.05
+      }
     }
   ],
   "physics": {
     "temperature": 300.0,
     "statistics": "boltzmann",
-    "mobility": {"mu_n": 1400.0, "mu_p": 450.0},
-    "recombination": {"srh": true, "tau_n": 1.0e-8, "tau_p": 1.0e-8, "E_t": 0.0}
+    "mobility": {
+      "mu_n": 1400.0,
+      "mu_p": 450.0
+    },
+    "recombination": {
+      "srh": true,
+      "tau_n": 1e-08,
+      "tau_p": 1e-08,
+      "E_t": 0.0
+    }
   },
   "solver": {
-    "type": "bias_sweep"
+    "type": "bias_sweep",
+    "continuation": {
+      "min_step": 1e-05,
+      "max_halvings": 10,
+      "easy_iter_threshold": 4,
+      "grow_factor": 1.5
+    }
   },
   "output": {
     "directory": "./results/mosfet_2d",
-    "fields": ["potential", "n", "p"]
+    "fields": [
+      "potential",
+      "n",
+      "p"
+    ]
   }
 }

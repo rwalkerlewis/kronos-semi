@@ -1,11 +1,12 @@
-"""Tests for schema 1.4.0: solver.backend and solver.compute (M15 Phase B).
+"""Tests for schema solver.backend and solver.compute (M15 Phase B,
+v2.0.0 strict-mode in M14.3).
 
 Pure-Python; no dolfinx required. Verifies:
-  - existing benchmark JSONs still validate against 1.4.0
+  - benchmark JSONs validate against the current strict v2 schema
   - cross-field rules between solver.backend and solver.compute.device fire
   - default-fill is byte-equivalent to today (no compute block, backend
     defaults to cpu-mumps)
-  - schema-version major-gate still accepts 1.4.0 and rejects 2.0.0
+  - schema-version major-gate accepts v1 and v2; v3+ rejected
 """
 from __future__ import annotations
 
@@ -24,7 +25,7 @@ BENCHMARKS_DIR = Path(__file__).resolve().parents[1] / "benchmarks"
 @pytest.fixture
 def minimal_cfg():
     return {
-        "schema_version": "1.4.0",
+        "schema_version": "2.0.0",
         "name": "compute_test",
         "dimension": 1,
         "mesh": {
@@ -47,18 +48,24 @@ def minimal_cfg():
     }
 
 
-def test_supported_minor_bumped_to_4():
-    assert schema.SCHEMA_SUPPORTED_MINOR == 4
+def test_supported_minor_resets_for_v2():
+    """v2.0.0 reset SCHEMA_SUPPORTED_MINOR to 0 per M14.3."""
+    assert schema.SCHEMA_SUPPORTED_MINOR == 0
 
 
-def test_schema_version_140_accepted(minimal_cfg):
+def test_schema_version_140_accepted_with_deprecation(minimal_cfg):
+    """v1.4.0 still validates (loose schema) but emits a DeprecationWarning."""
+    import warnings
     minimal_cfg["schema_version"] = "1.4.0"
-    result = schema.validate(minimal_cfg)
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        result = schema.validate(minimal_cfg)
     assert result["solver"]["backend"] == "cpu-mumps"
+    assert any(issubclass(w.category, DeprecationWarning) for w in captured)
 
 
-def test_schema_version_major_two_rejected(minimal_cfg):
-    minimal_cfg["schema_version"] = "2.0.0"
+def test_schema_version_major_three_rejected(minimal_cfg):
+    minimal_cfg["schema_version"] = "3.0.0"
     with pytest.raises(schema.SchemaError, match=r"major"):
         schema.validate(minimal_cfg)
 

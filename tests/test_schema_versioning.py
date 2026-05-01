@@ -114,7 +114,9 @@ def test_validate_rejects_major_mismatch():
     from semi import schema as schema_mod
 
     cfg = _base_cfg()
-    cfg["schema_version"] = "2.0.0"
+    # v1 and v2 are both supported as of M14.3; pick a major outside the
+    # supported range to exercise the rejection path.
+    cfg["schema_version"] = "3.0.0"
     with pytest.raises(schema_mod.SchemaError, match=r"major"):
         schema_mod.validate(cfg)
 

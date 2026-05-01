@@ -291,11 +291,24 @@ def test_build_psi_dirichlet_bcs_gate_honors_workfunction():
     assert _bc_value(gate_bc) == pytest.approx(expected, rel=1e-12)
 
 
-def test_build_dd_dirichlet_bcs_skips_gate_contact():
-    """Gate contact is on the oxide side, so DD assembly must skip it."""
+def test_build_dd_dirichlet_bcs_includes_gate_psi_only():
+    """Gate contact contributes a psi-only Dirichlet (phi_n / phi_p skipped).
+
+    Pre-M14.3, build_dd_dirichlet_bcs skipped gate contacts entirely on
+    the rationale that gates sit on the oxide side and the Slotboom
+    continuity blocks live on the semiconductor submesh. That left
+    bias_sweep with no way to apply a gate BC during a sweep, which
+    broke the M14.3 mosfet_2d Pao-Sah verifier (every step reported
+    SNES iterations=0 because the BCs were unchanged across V_gate
+    values). Fix: gate contacts now contribute a single psi
+    Dirichlet here (phi_n / phi_p remain skipped). The expected
+    BC count for a body-ohmic + gate config is therefore 3 (body
+    psi/phi_n/phi_p) + 1 (gate psi) = 4.
+    """
     from semi.physics.drift_diffusion import make_dd_block_spaces
 
-    cfg = _mos_like_cfg(V_gate=0.5, phi_ms=0.0)
+    V_gate = 0.5
+    cfg = _mos_like_cfg(V_gate=V_gate, phi_ms=0.0)
     ref_mat = get_material("Si")
     sc = make_scaling_from_config(cfg, ref_mat)
     msh, _cell_tags, facet_tags = build_mesh(cfg)
@@ -305,10 +318,45 @@ def test_build_dd_dirichlet_bcs_skips_gate_contact():
     contacts = resolve_contacts(cfg, facet_tags=facet_tags)
     bcs = build_dd_dirichlet_bcs(spaces, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
 
-    # Only the body ohmic contact contributes (psi, phi_n, phi_p) = 3 BCs.
-    # The gate is on the oxide side; DD assembles on the semiconductor submesh
-    # only, so a gate BC there is meaningless and must be skipped.
-    assert len(bcs) == 3
+    assert len(bcs) == 4
+
+    # build_dd_dirichlet_bcs processes contacts in config order:
+    # body (ohmic): bcs[0]=psi, bcs[1]=phi_n, bcs[2]=phi_p
+    # gate (gate):  bcs[3]=psi  ← the gate psi Dirichlet
+    # Verify the gate BC has the expected scaled value without relying on
+    # dolfinx FunctionSpace Python-object identity (bc.function_space is
+    # not guaranteed to be the same object across dolfinx versions).
+    gate_bc = bcs[3]
+    expected = V_gate / sc.V0
+    assert _bc_value(gate_bc) == pytest.approx(expected, rel=1e-12)
+
+
+def test_build_dd_dirichlet_bcs_gate_voltage_overrides_via_resolve():
+    """When `voltages={gate_name: V_new}` is passed to resolve_contacts,
+    the gate psi Dirichlet must reflect V_new (regression test for the
+    M14.3 mosfet_2d failure where gate BC was never updated mid-sweep).
+    """
+    from semi.physics.drift_diffusion import make_dd_block_spaces
+
+    cfg = _mos_like_cfg(V_gate=0.0, phi_ms=0.0)
+    ref_mat = get_material("Si")
+    sc = make_scaling_from_config(cfg, ref_mat)
+    msh, _cell_tags, facet_tags = build_mesh(cfg)
+    spaces = make_dd_block_spaces(msh)
+    N_raw_fn = build_profile(cfg["doping"])
+
+    V_swept = 0.7
+    contacts = resolve_contacts(
+        cfg, facet_tags=facet_tags, voltages={"gate": V_swept},
+    )
+    bcs = build_dd_dirichlet_bcs(spaces, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
+
+    # Gate psi is bcs[3] (contacts processed in config order: body ohmic
+    # contributes bcs[0-2], gate contributes bcs[3]).
+    assert len(bcs) == 4
+    gate_bc = bcs[3]
+    expected = V_swept / sc.V0
+    assert _bc_value(gate_bc) == pytest.approx(expected, rel=1e-12)
 
 
 def test_build_dd_dirichlet_bcs_matches_legacy_at_bias_step():
@@ -339,3 +387,35 @@ def test_build_dd_dirichlet_bcs_matches_legacy_at_bias_step():
     for bc_old, bc_new in zip(bcs_old, bcs_new, strict=True):
         assert _bc_value(bc_new) == pytest.approx(_bc_value(bc_old), rel=0.0, abs=1e-14)
         assert np.array_equal(_bc_dofs(bc_new), _bc_dofs(bc_old))
+
+
+def test_build_dd_dirichlet_bcs_skips_non_ohmic_non_gate_contacts():
+    """Contacts with kind not in ('ohmic', 'gate') are silently skipped.
+
+    Exercises the ``continue`` branch inside ``build_dd_dirichlet_bcs``
+    that filters out schottky contacts from the BC list.
+    """
+    from semi.bcs import ContactBC
+    from semi.physics.drift_diffusion import make_dd_block_spaces
+
+    cfg = _pn_1d_cfg()
+    ref_mat = get_material("Si")
+    sc = make_scaling_from_config(cfg, ref_mat)
+    msh, _cell_tags, facet_tags = build_mesh(cfg)
+    spaces = make_dd_block_spaces(msh)
+    N_raw_fn = build_profile(cfg["doping"])
+
+    # Resolve the ohmic contacts normally, then prepend a fake schottky
+    # contact.  build_dd_dirichlet_bcs must skip it without raising.
+    ohmic_contacts = resolve_contacts(cfg, facet_tags=facet_tags)
+    schottky = ContactBC(
+        name="fake_schottky", kind="schottky", facet_tag=999, V_applied=0.0,
+    )
+    contacts_with_schottky = [schottky] + list(ohmic_contacts)
+
+    bcs = build_dd_dirichlet_bcs(
+        spaces, msh, facet_tags, contacts_with_schottky, sc, ref_mat, N_raw_fn,
+    )
+    # Only the two ohmic contacts (3 BCs each) should appear; the schottky
+    # contact is skipped entirely.
+    assert len(bcs) == 6

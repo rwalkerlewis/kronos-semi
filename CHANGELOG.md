@@ -63,6 +63,68 @@ shipped with the M15 GPU linear-solver work in v0.15.0 below.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-05-22
+
+### Added
+
+- **M14.3 Housekeeping (cheap closes).** Bridge PR between M15 (GPU
+  linear-solver path) and M16.1 (Caughey-Thomas mobility, the first
+  physics-completeness slice). Closes four production-hardening gaps:
+  - **Pao-Sah `mosfet_2d` verifier.** New `verify_mosfet_2d` in
+    [`scripts/run_benchmark.py`](scripts/run_benchmark.py) checks
+    `I_D / W = (mu_n / L_ch) * C_ox * (V_GS - V_T) * V_DS` in
+    `V_GS in [V_T + 0.2, V_T + 0.6] V` at `V_DS = 0.05 V` with a
+    20% tolerance. V_T pulled from
+    [`semi.cv.analytical_moscap_params`](semi/cv.py) and shifted
+    into the kronos-semi BC convention.
+  - **XDMF mesh ingest.** Wired the previously-NotImplementedError
+    branch in [`semi/mesh.py`](semi/mesh.py) against
+    `dolfinx.io.XDMFFile.read_mesh` / `read_meshtags`. Optional
+    name overrides via `mesh.xdmf_mesh_name`,
+    `mesh.xdmf_cell_tags_name`, `mesh.xdmf_facet_tags_name`. New
+    [`tests/fem/test_mesh_xdmf.py`](tests/fem/test_mesh_xdmf.py)
+    round-trip test asserts R within 1e-12 relative on the resistor
+    benchmark across the two load paths.
+  - **Strict-mode schema v2.0.0.** New
+    [`schemas/input.v2.json`](schemas/input.v2.json) with
+    `additionalProperties: false` on every object node, so input
+    typos fail validation rather than being silently dropped. Both
+    schemas coexist for one minor cycle; v1 inputs continue to load
+    but emit a `DeprecationWarning`. Every benchmark JSON migrated
+    to `schema_version: "2.0.0"` (11 files). See
+    [`docs/schema/reference.md`](docs/schema/reference.md) for the
+    migration guide.
+  - **Dead SG primitives removed.** Deleted
+    `semi/fem/sg_assembly.py` (792 LOC),
+    `tests/fem/test_sg_assembly.py` (385 LOC), and
+    `scripts/verify_sg_jacobian_fd.py` (268 LOC); the per-edge
+    primitives in `semi/fem/scharfetter_gummel.py` are kept. ADR
+    0012's status section gained a recovery pointer to git
+    history. Coverage gate raised from 92 to 95 (back to the M5
+    baseline).
+
+### Changed
+
+- **bias_sweep runner**: `_resolve_sweep` and the static_voltages
+  loop accept gate-type contacts in addition to ohmic, so a gate
+  voltage_sweep with a static drain (or vice versa) drives the
+  ramp directly. Per-step iv_rows additionally carry
+  `J_<contact_name>` for every ohmic contact, so the new
+  mosfet_2d verifier reads `J_drain` while the gate is the swept
+  contact (whose own DC `J` is zero). Legacy single-ohmic
+  benchmarks (pn_1d_bias, etc.) continue to see the same
+  `iv_row["V"]` and `iv_row["J"]` values; the new keys are
+  additive.
+- **kronos_server `/schema` endpoint**: serves the v2 (strict)
+  schema; the response payload grew `supported_majors: [1, 2]`.
+
+### Notes
+
+- Five-layer architecture invariants preserved.
+- ADR 0012 status amended with the SG block-assembly deletion
+  pointer; no new ADR introduced.
+- Folds in v0.14.2 administrative items already merged via PR #65.
+
 ### Documentation
 
 - **Post-M15 roadmap refresh.** PLAN, IMPROVEMENT_GUIDE, and ROADMAP

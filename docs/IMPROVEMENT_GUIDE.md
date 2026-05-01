@@ -318,65 +318,16 @@ purposes by M16.4 and M19.
 
 ### M14.3: Housekeeping (cheap closes)
 
-**Why.** Four small production-hardening gaps are scattered across the
-codebase: the `mosfet_2d` verifier is qualitative with no analytical
-reference; `semi/mesh.py::_build_from_file` raises `NotImplementedError`
-for the XDMF branch; the input schema does not enforce
-`additionalProperties: false`; and ~792 LOC of dead-on-active-path
-Scharfetter-Gummel primitives in `semi/fem/sg_assembly.py` are not on
-any code path. Closing them in one PR removes the noise floor before
-M16 physics work starts.
-
-**Deliverable.**
-
-- Tighten the `mosfet_2d` verifier in
-  [`scripts/run_benchmark.py`](../scripts/run_benchmark.py). Add a
-  Pao-Sah or square-law analytical reference in the linear regime
-  (`V_DS = 0.05 V`, `V_GS in [V_T + 0.2, V_T + 0.6] V`) with a 20%
-  tolerance window. Document the choice in
-  [`benchmarks/mosfet_2d/README.md`](../benchmarks/mosfet_2d/README.md)
-  with a derivation paragraph; document the verifier window choice
-  in [`docs/PHYSICS.md`](PHYSICS.md) Section 6.
-- Implement XDMF mesh ingest in
-  [`semi/mesh.py::_build_from_file`](../semi/mesh.py). Wire
-  `dolfinx.io.XDMFFile.read_mesh` and propagate cell tags via
-  `read_meshtags`. Acceptance: round-trip a `box.msh` -> `box.xdmf`
-  via meshio and verify the resistor benchmark produces the same R
-  within 1e-12 relative.
-- Strict-mode the input schema. Set `additionalProperties: false`
-  on every object node in [`schemas/input.v1.json`](../schemas/input.v1.json)
-  and bump the schema major to v2.0.0. Ship
-  [`schemas/input.v2.json`](../schemas/input.v2.json) alongside v1,
-  keep the engine accepting both for one minor cycle, log a
-  deprecation warning on v1, and migrate every benchmark JSON to
-  v2.0.0. Update `SCHEMA_SUPPORTED_MINOR` and
-  `ENGINE_SUPPORTED_SCHEMA_MAJOR` in
-  [`semi/schema.py`](../semi/schema.py).
-- Delete [`semi/fem/sg_assembly.py`](../semi/fem/sg_assembly.py)
-  (~792 LOC) and remove its dedicated test
-  `tests/fem/test_sg_assembly.py`. Add a one-line note in ADR 0012's
-  status section that the SG primitives are reachable in git history
-  if M13.2 ever revives them. Raise the coverage gate in
-  [`pyproject.toml`](../pyproject.toml) from 92 to 95 (back to the
-  M5-era number) once the file is gone.
-
-**Acceptance tests.**
-
-1. `python scripts/run_benchmark.py mosfet_2d` exits 0 with the new
-   analytical-reference verifier passing inside the
-   [V_T + 0.2, V_T + 0.6] V window at the documented 20% tolerance.
-2. The resistor benchmark loaded from `box.xdmf` (newly-supported
-   ingest path) produces R within 1e-12 relative of the same
-   benchmark loaded from `box.msh`.
-3. Every benchmark JSON in `benchmarks/` validates as
-   `schema_version: "2.0.0"` with `additionalProperties: false`
-   active; an intentional typo (`"voltag"` for `"voltage"`) is
-   rejected with a clear error message that names the offending
-   field.
-4. `semi/fem/sg_assembly.py` and its dedicated test are gone, the
-   coverage gate in `pyproject.toml` is 95, and CI is green.
-
-**Dependencies.** None; M14.3 only consolidates known small fixes.
+**Status: Done (v0.16.0, 2026-05-22).** Four production-hardening gaps
+closed on branch `dev/m14.3-housekeeping`: Pao-Sah `mosfet_2d`
+verifier with `I_D / W` tolerance 20% in `V_GS in [V_T + 0.2,
+V_T + 0.6] V`; XDMF mesh ingest in
+[`semi/mesh.py`](../semi/mesh.py); strict schema v2.0.0
+(`additionalProperties: false`) with v1 deprecated for one minor
+cycle; dead-on-active-path
+[`semi/fem/sg_assembly.py`](../semi/fem/sg_assembly.py) (~792 LOC)
+deleted and the coverage gate raised from 92 to 95. See
+[CHANGELOG.md](../CHANGELOG.md) `[0.16.0]` entry.
 
 ---
 
@@ -911,6 +862,14 @@ The engine is ready for a UI when all of these are green:
 - **2026-05-15**, mark §4 M15 Done (v0.15.0); the GPU linear-solver
   path landed with schema 1.4.0 (`solver.backend`, `solver.compute`)
   and manifest 1.1.0 (KSP iters and linear-solve wall time fields).
+- **2026-05-22**, M14.3 housekeeping shipped (v0.16.0): §4 M14.3
+  marked Done with `[0.16.0]` CHANGELOG anchor; the four production-
+  hardening gaps (Pao-Sah mosfet_2d verifier, XDMF mesh ingest,
+  strict schema v2.0.0 with `additionalProperties: false`, dead SG
+  primitives removed) are closed; coverage gate restored to 95. §6
+  UI integration checklist has the dynamic `additionalProperties:
+  false` behavior available to UI form-builders so typos surface
+  with clear error messages.
 - **2026-05-01**, post-M15 roadmap refresh: §1 updated to v0.15.0,
   M14/M14.1/M14.2 status badges grew CHANGELOG anchors, M14.3
   housekeeping milestone added between M14.2 and M15, M16 umbrella
