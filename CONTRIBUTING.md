@@ -79,7 +79,9 @@ benchmarks/<name>/
   *.geo                 # optional: gmsh source for the mesh (see below)
 ```
 
-The JSON file must declare `schema_version` (currently `1.3.0`); see
+The JSON file must declare `schema_version` (currently `2.0.0`
+strict; v1.x.y is accepted but emits a `DeprecationWarning`,
+deprecated for one minor cycle); see
 [docs/schema/reference.md](docs/schema/reference.md) for the full
 contract. Wire the benchmark into the CLI driver
 [`scripts/run_benchmark.py`](scripts/run_benchmark.py) by adding a

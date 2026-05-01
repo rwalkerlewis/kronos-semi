@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Version sections below track the **package** version. The JSON input
 **schema** version is tracked separately in
-[`schemas/input.v1.json`](schemas/input.v1.json) and in the
-[schema reference](docs/schema/reference.md); the most recent schema
-bump is **1.4.0** (added `solver.backend` and `solver.compute`),
-shipped with the M15 GPU linear-solver work in v0.15.0 below.
+[`schemas/input.v2.json`](schemas/input.v2.json) (current strict
+default) and [`schemas/input.v1.json`](schemas/input.v1.json) (legacy,
+deprecated for one minor cycle), and in the
+[schema reference](docs/schema/reference.md); schema versions in
+active use are **1.4.0** (loose, deprecated for one minor cycle,
+accepted with a `DeprecationWarning`) and **2.0.0** (strict,
+`additionalProperties: false`, the M14.3 default; shipped with
+`[0.16.0]` below).
 
 ## [0.15.0] - 2026-05-15
 
