@@ -78,11 +78,15 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
     from ..constants import Q
     from ..doping import build_profile
     from ..mesh import build_eps_r_function, build_mesh
+    from ..physics.axisymmetric import build_equilibrium_poisson_form_axisym_mr
     from ..physics.poisson import build_equilibrium_poisson_form_mr
     from ..run import SimulationResult
     from ..scaling import make_scaling_from_config
     from ..solver import solve_nonlinear
     from ._common import reference_material
+
+    coord_system = cfg.get("coordinate_system", "cartesian")
+    is_axisym = coord_system == "axisymmetric"
 
     ref_mat = reference_material(cfg)
     sc = make_scaling_from_config(cfg, ref_mat)
@@ -107,9 +111,14 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
     two_ni = 2.0 * ref_mat.n_i
     psi.interpolate(lambda x: np.arcsinh(N_raw_fn(x) / two_ni))
 
-    F = build_equilibrium_poisson_form_mr(
-        V_psi, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
-    )
+    if is_axisym:
+        F = build_equilibrium_poisson_form_axisym_mr(
+            V_psi, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
+        )
+    else:
+        F = build_equilibrium_poisson_form_mr(
+            V_psi, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
+        )
 
     sweep_contact, sweep_values = _resolve_gate_sweep(cfg)
     if sweep_contact is None:
@@ -126,20 +135,34 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
         static_voltages[c["name"]] = float(c.get("voltage", 0.0))
 
     ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
-    dx_semi = ufl.Measure(
-        "dx", domain=msh, subdomain_data=cell_tags, subdomain_id=int(semi_tag),
-    )
-    rho_hat_scaled = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
-    charge_form = fem.form(rho_hat_scaled * dx_semi)
+    if is_axisym:
+        # r-weighted measures: dV_3D/(2*pi) = r dr dz on the meridian.
+        r_coord = ufl.SpatialCoordinate(msh)[0]
+        dx_semi = ufl.Measure(
+            "dx", domain=msh, subdomain_data=cell_tags, subdomain_id=int(semi_tag),
+        )
+        rho_hat_scaled = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
+        charge_form = fem.form(rho_hat_scaled * r_coord * dx_semi)
+    else:
+        dx_semi = ufl.Measure(
+            "dx", domain=msh, subdomain_data=cell_tags, subdomain_id=int(semi_tag),
+        )
+        rho_hat_scaled = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
+        charge_form = fem.form(rho_hat_scaled * dx_semi)
 
-    # Sensitivity charge form: dQ_gate/dV = (q C0 / W_lat) *
-    # integral_Si [ni_hat * (exp(-psi) + exp(psi))] * delta_psi dx.
+    # Sensitivity charge form: dQ_gate/dV = (q C0 / L_gate) *
+    # integral_Si [ni_hat * (exp(-psi) + exp(psi))] * delta_psi (r) dx.
     # We hold delta_psi as a fem.Function and reuse the same form
     # across bias points (psi mutates in place; ni_hat is constant).
     delta_psi = fem.Function(V_psi, name="delta_psi_hat")
-    sensitivity_form = fem.form(
-        ni_hat * (ufl.exp(-psi) + ufl.exp(psi)) * delta_psi * dx_semi
-    )
+    if is_axisym:
+        sensitivity_form = fem.form(
+            ni_hat * (ufl.exp(-psi) + ufl.exp(psi)) * delta_psi * r_coord * dx_semi
+        )
+    else:
+        sensitivity_form = fem.form(
+            ni_hat * (ufl.exp(-psi) + ufl.exp(psi)) * delta_psi * dx_semi
+        )
 
     # Bilinear form for the sensitivity solve: a(d, v) = d/dpsi F(psi, v)
     # at the converged psi. ufl.derivative gives this directly.
@@ -147,8 +170,36 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
     a_form = ufl.derivative(F, psi, trial_psi)
     L_zero = fem.Constant(msh, PETSc.ScalarType(0.0)) * ufl.TestFunction(V_psi) * ufl.dx
 
-    extents = cfg["mesh"]["extents"]
-    W_lat = float(extents[0][1] - extents[0][0])
+    extents = cfg["mesh"].get("extents")
+    if is_axisym:
+        # In axisymmetric, integrate r ds along the gate facet to get
+        # the gate's "characteristic length" used to convert the total
+        # 3D-equivalent semiconductor charge into per-unit-gate-area.
+        # Total gate area in 3D = 2*pi * integral_gate r ds_meridian,
+        # and total semi charge in 3D = 2*pi * q * integral_Si rho r dx,
+        # so Q_gate/A_gate = -q * integral_Si rho r dx / integral_gate r ds.
+        gate_facet_tag = None
+        for c in cfg["contacts"]:
+            if c["type"] == "gate":
+                gate_facet_tag = int(c["facet"])
+                break
+        if gate_facet_tag is None:  # pragma: no cover - schema-guarded
+            raise ValueError("mos_cap_ac (axisym): no gate contact found.")
+        ds_gate = ufl.Measure(
+            "ds", domain=msh, subdomain_data=facet_tags, subdomain_id=gate_facet_tag,
+        )
+        L_gate_local = float(fem.assemble_scalar(fem.form(r_coord * ds_gate)))
+        L_gate = msh.comm.allreduce(L_gate_local, op=MPI.SUM)
+        if L_gate <= 0.0:  # pragma: no cover - mesh has no gate facets
+            raise RuntimeError(
+                f"mos_cap_ac (axisym): gate facet (tag={gate_facet_tag}) "
+                f"has zero r-weighted length."
+            )
+        W_lat = L_gate
+    else:
+        if extents is None:  # pragma: no cover - cartesian path requires extents
+            raise ValueError("mos_cap_ac (cartesian): cfg['mesh']['extents'] missing.")
+        W_lat = float(extents[0][1] - extents[0][0])
 
     iv_rows: list[dict[str, float]] = []
     last_info: dict[str, Any] = {}
