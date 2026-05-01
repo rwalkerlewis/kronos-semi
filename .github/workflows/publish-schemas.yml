@@ -1,0 +1,107 @@
+name: Publish schemas
+
+# Publishes the bundled JSON schemas (input v1, input v2, manifest v1)
+# to the project's GitHub Pages site under /schemas/ on every release
+# tag. The published URL referenced from semi/schema.py and
+# docs/schema/reference.md is
+# https://rwalkerlewis.github.io/kronos-semi/schemas/.
+
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment; cancel in-progress runs and
+# queue new tags so the latest tag wins.
+concurrency:
+  group: "pages-publish-schemas"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out tagged commit
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve engine version
+        id: version
+        run: |
+          python -c "import re, sys; m = re.search(r'^version\s*=\s*\"([^\"]+)\"', open('pyproject.toml').read(), re.M); sys.stdout.write(m.group(1))" > version.txt
+          echo "version=$(cat version.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Build _site/schemas tree
+        run: |
+          set -eu
+          mkdir -p _site/schemas/input _site/schemas/manifest
+          cp schemas/input.v1.json    _site/schemas/input/v1.json
+          cp schemas/input.v2.json    _site/schemas/input/v2.json
+          cp schemas/manifest.v1.json _site/schemas/manifest/v1.json
+          VERSION=$(cat version.txt)
+          BASE="https://rwalkerlewis.github.io/kronos-semi/schemas"
+          python - "$VERSION" "$BASE" <<'PY' > _site/schemas/index.json
+          import json
+          import sys
+          version, base = sys.argv[1], sys.argv[2]
+          payload = {
+              "engine_version": version,
+              "schemas": [
+                  {"name": "input", "major": 1, "url": f"{base}/input/v1.json"},
+                  {"name": "input", "major": 2, "url": f"{base}/input/v2.json"},
+                  {"name": "manifest", "major": 1, "url": f"{base}/manifest/v1.json"},
+              ],
+          }
+          json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+          sys.stdout.write("\n")
+          PY
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
+
+  annotate-release:
+    runs-on: ubuntu-latest
+    needs: [build, deploy]
+    if: github.event_name == 'release'
+    steps:
+      - name: Append schema URLs to release notes
+        uses: softprops/action-gh-release@v2
+        with:
+          append_body: true
+          body: |
+
+            ### Published schemas (v${{ needs.build.outputs.version }})
+
+            - Input schema v1: https://rwalkerlewis.github.io/kronos-semi/schemas/input/v1.json
+            - Input schema v2: https://rwalkerlewis.github.io/kronos-semi/schemas/input/v2.json
+            - Manifest schema v1: https://rwalkerlewis.github.io/kronos-semi/schemas/manifest/v1.json
+            - Index: https://rwalkerlewis.github.io/kronos-semi/schemas/index.json
