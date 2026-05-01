@@ -318,23 +318,17 @@ purposes by M16.4 and M19.
 
 ### M14.3: Housekeeping (cheap closes)
 
-**Why.** Five small production-hardening gaps are scattered across the
-codebase: the GitHub-rendered `README.md` does not match `main` (the
-landing page still shows v0.1.0 framing); the `mosfet_2d` verifier is
-qualitative with no analytical reference; `semi/mesh.py::_build_from_file`
-raises `NotImplementedError` for the XDMF branch; the input schema
-does not enforce `additionalProperties: false`; and ~792 LOC of dead-
-on-active-path Scharfetter-Gummel primitives in
-`semi/fem/sg_assembly.py` are not on any code path. Closing them in
-one PR removes the noise floor before M16 physics work starts.
+**Why.** Four small production-hardening gaps are scattered across the
+codebase: the `mosfet_2d` verifier is qualitative with no analytical
+reference; `semi/mesh.py::_build_from_file` raises `NotImplementedError`
+for the XDMF branch; the input schema does not enforce
+`additionalProperties: false`; and ~792 LOC of dead-on-active-path
+Scharfetter-Gummel primitives in `semi/fem/sg_assembly.py` are not on
+any code path. Closing them in one PR removes the noise floor before
+M16 physics work starts.
 
 **Deliverable.**
 
-- Re-render the GitHub `README.md` so the `github.com` landing page
-  matches `main`. The on-disk copy is correct; the visible page is
-  stale. Investigate whether a fork is shadowing the remote, or
-  whether GitHub's render cache is the issue, and force-push or
-  file a support request as appropriate.
 - Tighten the `mosfet_2d` verifier in
   [`scripts/run_benchmark.py`](../scripts/run_benchmark.py). Add a
   Pao-Sah or square-law analytical reference in the linear regime
@@ -368,20 +362,18 @@ one PR removes the noise floor before M16 physics work starts.
 
 **Acceptance tests.**
 
-1. The GitHub-rendered README at the top of the repository page
-   shows v0.15.0 status and the M1-M15 capability matrix.
-2. `python scripts/run_benchmark.py mosfet_2d` exits 0 with the new
+1. `python scripts/run_benchmark.py mosfet_2d` exits 0 with the new
    analytical-reference verifier passing inside the
    [V_T + 0.2, V_T + 0.6] V window at the documented 20% tolerance.
-3. The resistor benchmark loaded from `box.xdmf` (newly-supported
+2. The resistor benchmark loaded from `box.xdmf` (newly-supported
    ingest path) produces R within 1e-12 relative of the same
    benchmark loaded from `box.msh`.
-4. Every benchmark JSON in `benchmarks/` validates as
+3. Every benchmark JSON in `benchmarks/` validates as
    `schema_version: "2.0.0"` with `additionalProperties: false`
    active; an intentional typo (`"voltag"` for `"voltage"`) is
    rejected with a clear error message that names the offending
    field.
-5. `semi/fem/sg_assembly.py` and its dedicated test are gone, the
+4. `semi/fem/sg_assembly.py` and its dedicated test are gone, the
    coverage gate in `pyproject.toml` is 95, and CI is green.
 
 **Dependencies.** None; M14.3 only consolidates known small fixes.
