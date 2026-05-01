@@ -128,12 +128,18 @@ def test_capabilities(client):
 
 
 def test_schema(client):
-    from semi.schema import ENGINE_SUPPORTED_SCHEMA_MAJOR, SCHEMA
+    from semi.schema import (
+        ENGINE_SUPPORTED_SCHEMA_MAJOR,
+        ENGINE_SUPPORTED_SCHEMA_MAJORS,
+        get_schema,
+    )
     r = client.get("/schema")
     assert r.status_code == 200
     body = r.json()
-    assert body["schema"] == SCHEMA
+    # /schema serves the current major's schema (strict v2 as of M14.3).
+    assert body["schema"] == get_schema(ENGINE_SUPPORTED_SCHEMA_MAJOR)
     assert body["supported_major"] == ENGINE_SUPPORTED_SCHEMA_MAJOR
+    assert body["supported_majors"] == list(ENGINE_SUPPORTED_SCHEMA_MAJORS)
     assert isinstance(body["version"], str)
     major, _, _ = body["version"].partition(".")
     assert int(major) == ENGINE_SUPPORTED_SCHEMA_MAJOR

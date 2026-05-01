@@ -31,38 +31,76 @@ Top-level structure:
 from __future__ import annotations
 
 import json
+import warnings
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-_SCHEMA_PATH = Path(__file__).parent.parent / "schemas" / "input.v1.json"
+_SCHEMAS_DIR = Path(__file__).parent.parent / "schemas"
+_SCHEMA_PATHS = {
+    1: _SCHEMAS_DIR / "input.v1.json",
+    2: _SCHEMAS_DIR / "input.v2.json",
+}
+# Default path for the legacy `SCHEMA` re-export. v1 stays the documented
+# default for one minor cycle so anything that does
+# `from semi.schema import SCHEMA` still gets the v1 surface; v2 callers
+# should use `get_schema(2)` or pass `schema_version: "2.0.0"` and let
+# `validate` dispatch.
+_SCHEMA_PATH = _SCHEMA_PATHS[1]
 
-# Major version of the input schema this engine build accepts. Inputs whose
-# `schema_version` major differs from this number are rejected by `validate`.
-# Minor/patch skew is accepted silently.
-# TODO(M11+): publish schemas/input.v1.json to a stable URL on every tag
-# (e.g. https://schemas.kronos-semi.org/input/v1.0.0.json).
-ENGINE_SUPPORTED_SCHEMA_MAJOR = 1
+# Major versions of the input schema this engine build accepts. Inputs whose
+# `schema_version` major is not in this set are rejected by `validate`.
+# v1 inputs log a `DeprecationWarning` and continue to validate against
+# input.v1.json (the loose schema); v2 inputs validate against input.v2.json
+# (strict, additionalProperties: false on every object node). Schemas are
+# published to https://rwalkerlewis.github.io/kronos-semi/schemas/ on every
+# release tag; see .github/workflows/publish-schemas.yml.
+ENGINE_SUPPORTED_SCHEMA_MAJORS = (1, 2)
+# Backwards-compatibility re-export: external callers (kronos_server, the
+# M11 schema-versioning tests) read `ENGINE_SUPPORTED_SCHEMA_MAJOR` and
+# expect a single int. Keep it at the highest supported major so server
+# `/schema` and `/capabilities` endpoints advertise the strict schema.
+ENGINE_SUPPORTED_SCHEMA_MAJOR = max(ENGINE_SUPPORTED_SCHEMA_MAJORS)
 
 # Minor version tracking. Bumped when a backward-compatible schema addition
 # is made.
 #   M13 (1.1.0): added the `transient` solver type.
 #   M14 (1.2.0): added the `ac_sweep` solver type plus solver.dc_bias and
 #                solver.ac sub-objects (frequency sweep specification).
-#   M15 (1.3.0): added the top-level `coordinate_system` field with the
-#                `axisymmetric` option for cylindrical 2D MOSCAP and similar
-#                rotationally-symmetric devices.
+#   M14.2 (1.3.0): added the top-level `coordinate_system` field with the
+#                  `axisymmetric` option for cylindrical 2D MOSCAP and
+#                  similar rotationally-symmetric devices.
 #   M15 (1.4.0): added solver.backend (cpu-mumps | gpu-amgx | gpu-hypre |
 #                auto) and solver.compute (device, precision, preconditioner,
 #                linear_solver). Defaults preserve byte-equivalent CPU-MUMPS
 #                behavior; resolution of `auto` happens at solve time.
-SCHEMA_SUPPORTED_MINOR = 4
+#   M14.3 (2.0.0): strict mode. additionalProperties:false on every object
+#                  node so input typos fail validation rather than being
+#                  silently dropped. v1 inputs continue to load with a
+#                  DeprecationWarning for one minor cycle (1.x -> 2.x).
+SCHEMA_SUPPORTED_MINOR = 0
 
 
-@lru_cache(maxsize=1)
-def _load_schema() -> dict[str, Any]:
-    with open(_SCHEMA_PATH) as f:
+@lru_cache(maxsize=8)
+def _load_schema_for_major(major: int) -> dict[str, Any]:
+    path = _SCHEMA_PATHS.get(int(major))
+    if path is None:
+        raise ValueError(
+            f"No schema bundled for major version {major!r}; "
+            f"engine supports {ENGINE_SUPPORTED_SCHEMA_MAJORS}"
+        )
+    with open(path) as f:
         return json.load(f)
+
+
+def _load_schema() -> dict[str, Any]:
+    """Legacy single-schema loader; preserved for backwards compatibility."""
+    return _load_schema_for_major(1)
+
+
+def get_schema(major: int = ENGINE_SUPPORTED_SCHEMA_MAJOR) -> dict[str, Any]:
+    """Return the JSON-schema dict for the requested input major version."""
+    return _load_schema_for_major(int(major))
 
 
 SCHEMA: dict[str, Any] = _load_schema()
@@ -75,21 +113,52 @@ class SchemaError(Exception):
 
 def validate(cfg: dict[str, Any]) -> dict[str, Any]:
     """
-    Validate a config dict against SCHEMA and fill defaults.
+    Validate a config dict against the schema for its declared major and
+    fill defaults.
 
-    Uses jsonschema if available; otherwise does minimal required-key checks.
-    After successful structural validation the major component of
-    ``schema_version`` is checked against ``ENGINE_SUPPORTED_SCHEMA_MAJOR``;
-    mismatched majors raise ``SchemaError``.
+    Major dispatch:
+      - `schema_version: "1.x.y"` validates against `schemas/input.v1.json`
+        (loose schema; unknown keys silently ignored). A
+        `DeprecationWarning` is emitted once per call so v1 callers can
+        track migration to v2.
+      - `schema_version: "2.x.y"` validates against `schemas/input.v2.json`
+        (strict; `additionalProperties: false` on every object node, so
+        typos raise instead of being silently dropped).
 
-    Returns the config (possibly modified in-place) with defaults filled.
-
-    Raises SchemaError with all errors concatenated on failure.
+    Uses jsonschema if available; otherwise falls back to a minimal
+    required-key check (the v2 strict gate cannot be enforced without
+    jsonschema).
     """
+    requested_version = cfg.get("schema_version")
+    if requested_version is None:
+        raise SchemaError(
+            "Missing required field 'schema_version' (semver string, e.g. '2.0.0')"
+        )
     try:
-        import jsonschema  # noqa: F401  (presence check for fallback below)
+        requested_major = int(str(requested_version).split(".")[0])
+    except (ValueError, AttributeError):
+        raise SchemaError(
+            f"schema_version {requested_version!r} is not a valid semver string"
+        ) from None
+    if requested_major not in ENGINE_SUPPORTED_SCHEMA_MAJORS:
+        raise SchemaError(
+            f"schema_version {requested_version!r} has major {requested_major}; "
+            f"engine supports majors {ENGINE_SUPPORTED_SCHEMA_MAJORS}"
+        )
+    if requested_major == 1:
+        warnings.warn(
+            "Schema v1 is deprecated; migrate to v2.0.0 "
+            "(strict mode, additionalProperties: false). v1 will be "
+            "removed after one minor release cycle. "
+            "See docs/schema/reference.md for the migration guide.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    schema = _load_schema_for_major(requested_major)
+    try:
         from jsonschema import Draft7Validator
-        validator = Draft7Validator(SCHEMA)
+        validator = Draft7Validator(schema)
         errors = sorted(validator.iter_errors(cfg), key=lambda e: list(e.path))
         if errors:
             messages = []
@@ -98,22 +167,9 @@ def validate(cfg: dict[str, Any]) -> dict[str, Any]:
                 messages.append(f"  at {path}: {e.message}")
             raise SchemaError("JSON schema validation failed:\n" + "\n".join(messages))
     except ImportError:
-        missing = [k for k in SCHEMA["required"] if k not in cfg]
+        missing = [k for k in schema["required"] if k not in cfg]
         if missing:
             raise SchemaError(f"Missing required fields: {missing}") from None
-
-    requested_version = cfg["schema_version"]
-    try:
-        requested_major = int(str(requested_version).split(".")[0])
-    except (ValueError, AttributeError):
-        raise SchemaError(
-            f"schema_version {requested_version!r} is not a valid semver string"
-        ) from None
-    if requested_major != ENGINE_SUPPORTED_SCHEMA_MAJOR:
-        raise SchemaError(
-            f"schema_version {requested_version!r} has major {requested_major}; "
-            f"engine supports major {ENGINE_SUPPORTED_SCHEMA_MAJOR}"
-        )
 
     return _fill_defaults(cfg)
 

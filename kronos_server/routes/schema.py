@@ -18,24 +18,32 @@ router = APIRouter()
 
 @router.get("/schema")
 def get_schema() -> dict[str, Any]:
-    """The input JSON schema plus version metadata. UI form-builders consume this.
+    """The current input JSON schema plus version metadata.
 
-    Returns ``{"schema": <Draft-07 schema>, "version": "1.0.0",
-    "supported_major": 1}``. The embedded ``schema`` matches
-    ``semi.schema.SCHEMA`` verbatim; ``version`` is the advertised schema
-    version (taken from the ``schema_version`` property's ``examples``);
-    ``supported_major`` is the engine's accepted major version.
+    UI form-builders consume this. Returns
+    ``{"schema": <Draft-07 schema>, "version": "2.0.0",
+    "supported_major": 2, "supported_majors": [1, 2]}``. The advertised
+    ``schema`` is the strict v2 schema (current); v1 callers can still
+    submit inputs and will get a DeprecationWarning back from the
+    engine.
     """
-    from semi.schema import ENGINE_SUPPORTED_SCHEMA_MAJOR, SCHEMA
+    from semi.schema import (
+        ENGINE_SUPPORTED_SCHEMA_MAJOR,
+        ENGINE_SUPPORTED_SCHEMA_MAJORS,
+        get_schema as _get_schema,
+    )
+
+    schema = _get_schema(ENGINE_SUPPORTED_SCHEMA_MAJOR)
     version = (
-        SCHEMA.get("properties", {})
+        schema.get("properties", {})
         .get("schema_version", {})
-        .get("examples", ["1.0.0"])[0]
+        .get("examples", ["2.0.0"])[0]
     )
     return {
-        "schema": SCHEMA,
+        "schema": schema,
         "version": version,
         "supported_major": ENGINE_SUPPORTED_SCHEMA_MAJOR,
+        "supported_majors": list(ENGINE_SUPPORTED_SCHEMA_MAJORS),
     }
 
 
@@ -64,13 +72,14 @@ def get_capabilities() -> CapabilitiesResponse:
         version = "unknown"
 
     from semi.compute import device_info as _device_info
-    from semi.schema import SCHEMA
+    from semi.schema import ENGINE_SUPPORTED_SCHEMA_MAJOR, get_schema as _get_schema
     info = _device_info()
     available = set(info["backends_available"])
+    schema = _get_schema(ENGINE_SUPPORTED_SCHEMA_MAJOR)
     schema_version = (
-        SCHEMA.get("properties", {})
+        schema.get("properties", {})
         .get("schema_version", {})
-        .get("examples", ["1.0.0"])[-1]
+        .get("examples", ["2.0.0"])[-1]
     )
 
     return CapabilitiesResponse(

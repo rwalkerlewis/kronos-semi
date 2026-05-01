@@ -1,22 +1,52 @@
 {
-  "schema_version": "1.2.0",
+  "schema_version": "2.0.0",
   "name": "rc_ac_sweep",
   "description": "1D pn junction reverse-biased at -1.0 V, swept by AC small-signal from 1 Hz to 1 GHz (41 logspace points). Validates the M14 ac_sweep runner against the analytical depletion capacitance C_dep(V) = sqrt(q*eps*N_eff/(2(V_bi-V))). Geometry and device match pn_1d_bias_reverse: 20 um symmetric step junction, N_A = N_D = 1e17 cm^-3, tau = 1e-8 s, 800 cells. The depletion C dominates the admittance below ~10 GHz so C(omega) is approximately constant over the swept range; the verifier checks both the magnitude (within 5% of C_dep_analytical) and the flatness across the sweep.",
   "dimension": 1,
   "mesh": {
     "source": "builtin",
-    "extents": [[0.0, 2.0e-5]],
-    "resolution": [800],
+    "extents": [
+      [
+        0.0,
+        2e-05
+      ]
+    ],
+    "resolution": [
+      800
+    ],
     "regions_by_box": [
-      {"name": "silicon", "tag": 1, "bounds": [[0.0, 2.0e-5]]}
+      {
+        "name": "silicon",
+        "tag": 1,
+        "bounds": [
+          [
+            0.0,
+            2e-05
+          ]
+        ]
+      }
     ],
     "facets_by_plane": [
-      {"name": "anode",   "tag": 1, "axis": 0, "value": 0.0},
-      {"name": "cathode", "tag": 2, "axis": 0, "value": 2.0e-5}
+      {
+        "name": "anode",
+        "tag": 1,
+        "axis": 0,
+        "value": 0.0
+      },
+      {
+        "name": "cathode",
+        "tag": 2,
+        "axis": 0,
+        "value": 2e-05
+      }
     ]
   },
   "regions": {
-    "silicon": {"material": "Si", "tag": 1, "role": "semiconductor"}
+    "silicon": {
+      "material": "Si",
+      "tag": 1,
+      "role": "semiconductor"
+    }
   },
   "doping": [
     {
@@ -24,32 +54,72 @@
       "profile": {
         "type": "step",
         "axis": 0,
-        "location": 1.0e-5,
-        "N_D_left": 0.0, "N_A_left": 1.0e17,
-        "N_D_right": 1.0e17, "N_A_right": 0.0
+        "location": 1e-05,
+        "N_D_left": 0.0,
+        "N_A_left": 1e+17,
+        "N_D_right": 1e+17,
+        "N_A_right": 0.0
       }
     }
   ],
   "contacts": [
-    {"name": "anode",   "facet": "anode",   "type": "ohmic", "voltage": 0.0},
-    {"name": "cathode", "facet": "cathode", "type": "ohmic", "voltage": 0.0}
+    {
+      "name": "anode",
+      "facet": "anode",
+      "type": "ohmic",
+      "voltage": 0.0
+    },
+    {
+      "name": "cathode",
+      "facet": "cathode",
+      "type": "ohmic",
+      "voltage": 0.0
+    }
   ],
   "physics": {
     "temperature": 300.0,
     "statistics": "boltzmann",
-    "mobility": {"mu_n": 1400.0, "mu_p": 450.0},
-    "recombination": {"srh": true, "tau_n": 1.0e-8, "tau_p": 1.0e-8, "E_t": 0.0}
+    "mobility": {
+      "mu_n": 1400.0,
+      "mu_p": 450.0
+    },
+    "recombination": {
+      "srh": true,
+      "tau_n": 1e-08,
+      "tau_p": 1e-08,
+      "E_t": 0.0
+    }
   },
   "solver": {
     "type": "ac_sweep",
-    "snes": {"rtol": 1.0e-14, "atol": 1.0e-14, "stol": 1.0e-14, "max_it": 60},
-    "continuation": {"min_step": 1.0e-5, "max_step": 0.1, "max_halvings": 14},
-    "dc_bias": {"contact": "anode", "voltage": -1.0},
+    "snes": {
+      "rtol": 1e-14,
+      "atol": 1e-14,
+      "stol": 1e-14,
+      "max_it": 60
+    },
+    "continuation": {
+      "min_step": 1e-05,
+      "max_step": 0.1,
+      "max_halvings": 14
+    },
+    "dc_bias": {
+      "contact": "anode",
+      "voltage": -1.0
+    },
     "ac": {
       "contact": "anode",
       "amplitude": 1.0,
-      "frequencies": {"type": "logspace", "start": 1.0, "stop": 1.0e9, "n_points": 41}
+      "frequencies": {
+        "type": "logspace",
+        "start": 1.0,
+        "stop": 1000000000.0,
+        "n_points": 41
+      }
     }
   },
-  "output": {"directory": "./results/rc_ac_sweep", "fields": []}
+  "output": {
+    "directory": "./results/rc_ac_sweep",
+    "fields": []
+  }
 }

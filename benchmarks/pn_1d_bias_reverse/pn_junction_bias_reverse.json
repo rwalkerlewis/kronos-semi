@@ -1,22 +1,52 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "2.0.0",
   "name": "pn_junction_1d_bias_reverse",
   "description": "1D pn junction, 20 um total, junction at 10 um, N_A=N_D=1e17 cm^-3, tau=1e-8 s. Reverse bias sweep 0 to -2 V vs Shockley saturation J_s.",
   "dimension": 1,
   "mesh": {
     "source": "builtin",
-    "extents": [[0.0, 2.0e-5]],
-    "resolution": [800],
+    "extents": [
+      [
+        0.0,
+        2e-05
+      ]
+    ],
+    "resolution": [
+      800
+    ],
     "regions_by_box": [
-      {"name": "silicon", "tag": 1, "bounds": [[0.0, 2.0e-5]]}
+      {
+        "name": "silicon",
+        "tag": 1,
+        "bounds": [
+          [
+            0.0,
+            2e-05
+          ]
+        ]
+      }
     ],
     "facets_by_plane": [
-      {"name": "anode",   "tag": 1, "axis": 0, "value": 0.0},
-      {"name": "cathode", "tag": 2, "axis": 0, "value": 2.0e-5}
+      {
+        "name": "anode",
+        "tag": 1,
+        "axis": 0,
+        "value": 0.0
+      },
+      {
+        "name": "cathode",
+        "tag": 2,
+        "axis": 0,
+        "value": 2e-05
+      }
     ]
   },
   "regions": {
-    "silicon": {"material": "Si", "tag": 1, "role": "semiconductor"}
+    "silicon": {
+      "material": "Si",
+      "tag": 1,
+      "role": "semiconductor"
+    }
   },
   "doping": [
     {
@@ -24,10 +54,10 @@
       "profile": {
         "type": "step",
         "axis": 0,
-        "location": 1.0e-5,
+        "location": 1e-05,
         "N_D_left": 0.0,
-        "N_A_left": 1.0e17,
-        "N_D_right": 1.0e17,
+        "N_A_left": 1e+17,
+        "N_D_right": 1e+17,
         "N_A_right": 0.0
       }
     }
@@ -38,26 +68,43 @@
       "facet": "anode",
       "type": "ohmic",
       "voltage": 0.0,
-      "voltage_sweep": {"start": 0.0, "stop": -2.0, "step": 0.1}
+      "voltage_sweep": {
+        "start": 0.0,
+        "stop": -2.0,
+        "step": 0.1
+      }
     },
-    {"name": "cathode", "facet": "cathode", "type": "ohmic", "voltage": 0.0}
+    {
+      "name": "cathode",
+      "facet": "cathode",
+      "type": "ohmic",
+      "voltage": 0.0
+    }
   ],
   "physics": {
     "temperature": 300.0,
     "statistics": "boltzmann",
-    "mobility": {"mu_n": 1400.0, "mu_p": 450.0},
-    "recombination": {"srh": true, "tau_n": 1.0e-8, "tau_p": 1.0e-8, "E_t": 0.0}
+    "mobility": {
+      "mu_n": 1400.0,
+      "mu_p": 450.0
+    },
+    "recombination": {
+      "srh": true,
+      "tau_n": 1e-08,
+      "tau_p": 1e-08,
+      "E_t": 0.0
+    }
   },
   "solver": {
     "type": "bias_sweep",
     "snes": {
-      "rtol": 1.0e-14,
-      "atol": 1.0e-14,
-      "stol": 1.0e-14,
+      "rtol": 1e-14,
+      "atol": 1e-14,
+      "stol": 1e-14,
       "max_it": 60
     },
     "continuation": {
-      "min_step": 1.0e-5,
+      "min_step": 1e-05,
       "max_halvings": 12,
       "max_step": 0.2,
       "easy_iter_threshold": 4,
@@ -66,6 +113,13 @@
   },
   "output": {
     "directory": "./results/pn_1d_bias_reverse",
-    "fields": ["potential", "n", "p", "phi_n", "phi_p", "iv"]
+    "fields": [
+      "potential",
+      "n",
+      "p",
+      "phi_n",
+      "phi_p",
+      "iv"
+    ]
   }
 }
