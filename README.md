@@ -44,15 +44,19 @@ What the engine does today, in plain terms:
 - **2D MOSFET** with Gaussian n+ source/drain implants (M12), built on
   the multi-region Poisson + Slotboom DD stack.
 - **Transient solver** with BDF1 (backward Euler) and BDF2 time
-  integration (M13), in (psi, n, p) primary-density form; ADRs 0009 /
-  0010. Note: the (n,p) Galerkin discretisation diverges at tight SNES
-  atol; M13.1 (Scharfetter-Gummel edge-flux assembly, issue #34) is the
-  fix, currently in flight.
-- **MOS capacitor C-V via analytic AC** (M14.1, the just-landed cycle):
-  the `mos_cap_ac` runner solves the linearised Poisson sensitivity at
-  each gate bias to return dQ/dV directly in F/m^2, replacing the
-  noisier `numpy.gradient(Q, V)` of `mos_cv`. Worst error 6.79% vs the
-  depletion-approximation reference in the verifier window.
+  integration (M13/M13.1), in Slotboom (psi, phi_n, phi_p) primary
+  unknowns; ADRs 0010, 0014 (supersedes 0009). Both
+  `test_transient_steady_state_limit` and the BDF rate tests are
+  active and passing as of v0.14.1; the deep-steady-state runner
+  matches `bias_sweep` within 1e-4 relative error and the
+  `pn_1d_turnon` benchmark is within 5%.
+- **MOS capacitor C-V via analytic AC** (M14.1): the `mos_cap_ac`
+  runner solves the linearised Poisson sensitivity at each gate bias to
+  return dQ/dV directly in F/m^2, replacing the noisier
+  `numpy.gradient(Q, V)` of `mos_cv`. Worst error 6.79% vs the
+  depletion-approximation reference in the verifier window; audit case
+  03 confirms `mos_cv` and `mos_cap_ac` agree on Q_gate to machine
+  precision.
 - **Small-signal AC sweep** for two-terminal pn diodes (M14):
   `(J + jωM) δu = -dF/dV δV` solved via real 2x2 block reformulation;
   the `rc_ac_sweep` benchmark matches analytical depletion C within

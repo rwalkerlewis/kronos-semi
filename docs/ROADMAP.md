@@ -4,7 +4,9 @@ kronos-semi is a FEniCSx-based finite-element semiconductor device simulator tha
 
 ## Capability matrix
 
-All milestones M1 through M14.1 have shipped as of v0.14.1. The table below is the current state; see the Delivery history section for per-milestone details.
+All milestones M1 through M14.2 have shipped as of v0.14.1. The table
+below is the current state; see the Delivery history section for
+per-milestone details.
 
 | Capability | Dimensions | Status | Verifier |
 |---|---|---|---|
@@ -24,13 +26,16 @@ All milestones M1 through M14.1 have shipped as of v0.14.1. The table below is t
 | Transient solver BDF1/BDF2 Slotboom (M13/M13.1) | 1D | shipped | steady-state-limit + BDF rate + pn_1d_turnon (5%) |
 | AC small-signal analysis (M14) | 1D / 2D | shipped | RC benchmark within 0.4% of analytical C_dep |
 | Differential capacitance via AC admittance (M14.1) | 2D | shipped | mos_cap_ac vs mos_cv on Q_gate (byte-identical) |
-| Test suite | pure + FEM | shipped | 328 tests, coverage >= 92% (CI gate) |
+| Axisymmetric (cylindrical) 2D MOSCAP (M14.2) | 2D | shipped | schema 1.3.0; LF/HF C-V vs Hu Fig. 5-18 analytical |
+| Test suite | pure + FEM | shipped | 328+ tests, coverage >= 92% (CI gate) |
 | V&V | 10 studies | shipped | 62/62 PASS |
 | CI | pure-python + lint + docker-fem (parallelized) | shipped | green on main |
 
 ## Scope vs. COMSOL Semiconductor Module
 
-kronos-semi covers the quasi-static steady-state and time-dependent subsets of the COMSOL Semiconductor Module, plus AC small-signal analysis:
+kronos-semi covers the quasi-static steady-state and time-dependent
+subsets of the COMSOL Semiconductor Module, plus AC small-signal
+analysis and axisymmetric (cylindrical) 2D devices:
 
 **In scope (shipped):**
 - Poisson equation with multi-region dielectric (Si/SiO2)
@@ -44,6 +49,7 @@ kronos-semi covers the quasi-static steady-state and time-dependent subsets of t
 - Transient (time-dependent) solver with BDF1/BDF2 (M13/M13.1)
 - AC small-signal analysis with frequency sweep (M14)
 - Differential capacitance via AC admittance (M14.1)
+- Axisymmetric (cylindrical) 2D devices, MOSCAP LF/HF C-V (M14.2)
 
 **Explicitly out of scope (post-submission stretch goals, M15–M17 planned):**
 - Caughey-Thomas / Lombardi field-dependent mobility (M16.1, M16.2)
@@ -605,6 +611,64 @@ contributors and reviewers know the intended direction.
   - Phase 1 audit case 03 confirms byte-identity (rel_err = 0.000 at all
     42 gate voltages).
 - **Dependencies:** M14.
+
+## M14.2: Axisymmetric (cylindrical) 2D MOSCAP (schema 1.3.0)
+
+- **Status:** Done (2026-04-30). PR #64 (`a4649be`). PR #65
+  (`docs/post-merge-cleanup`) follows up with the runner dispatch and
+  Colab self-contained notebook.
+- **Goal:** Add an axisymmetric (cylindrical) coordinate-system path so
+  rotationally symmetric devices (MOSCAPs, vertical resistors, junction
+  cylinders) can be solved on a 2D meridian mesh with the radial weight
+  carried by the weak forms.
+- **Deliverables:**
+  - **Schema 1.3.0:** new top-level `coordinate_system` field accepts
+    `"cartesian"` (default, unchanged behaviour) or `"axisymmetric"`.
+    Cross-field validation enforces dimension == 2, non-negative
+    radial extent, and rejects Dirichlet contacts on the symmetry
+    axis r = 0. `SCHEMA_SUPPORTED_MINOR` bumped 2 → 3.
+  - `semi/physics/axisymmetric.py`: r-weighted equilibrium Poisson
+    (`build_equilibrium_poisson_form_axisym_mr`) and Slotboom
+    drift-diffusion forms on the meridian half-plane.
+  - `semi/cv.py` (pure-Python, no dolfinx): MOSCAP analytical
+    parameters (V_fb, V_t, |phi_B|, W_dmax, C_ox, C_min) plus LF
+    (quasi-static, brentq) and HF (depletion-clamp) C-V helpers; FEM
+    postprocessors `compute_lf_cv_fem` and
+    `compute_hf_cv_depletion_clamp`. scipy promoted to base
+    dependencies because `lf_cv_quasistatic` uses `scipy.optimize.brentq`.
+  - `semi/runners/mos_cap_ac.py` axisymmetric branch (PR #65):
+    replaces `W_lat = extents[0][1] - extents[0][0]` with
+    `L_gate = ∫_gate r ds_meridian` (assembled via
+    `fem.assemble_scalar(fem.form(r * ds_gate))` + MPI allreduce);
+    r-weights `charge_form` and `sensitivity_form` by
+    `r = ufl.SpatialCoordinate(msh)[0]`.
+  - `benchmarks/moscap_axisym_2d/`: gmsh `.geo` template for the
+    meridian mesh, `moscap_axisym.json` config (Hu Fig. 5-18
+    parameters: p-type body N_A = 5e16 cm^-3, T_ox = 10 nm,
+    phi_ms = -0.95 V, gate radius 50 μm), `reference_cv.csv`
+    analytical baseline (V_fb = -0.950 V, V_t = +0.181 V,
+    |phi_B| = 0.399 V, W_dmax = 144 nm, C_min/C_ox = 0.173).
+  - `notebooks/05_moscap_axisym_cv.ipynb`: end-to-end Colab notebook
+    reproducing Hu Fig. 5-18. Self-contained bootstrap (FEM-on-Colab
+    installer, gmsh CLI + Python bindings, repository clone with
+    branch pin, scipy install fallback). 22 cells: analytical LF/HF
+    plot, mesh visualisation (region-shaded tripcolor, three panels),
+    equilibrium psi(r,z) contourf, full 81-point V_g sweep, FEM-vs-
+    analytical C-V plot, CSV export.
+  - Tests: `tests/check_axisym_moscap_math.py` (15/15 analytical
+    anchors green), `tests/test_coordinate_system.py` (schema gate),
+    `tests/test_moscap_axisym_cv.py` (dolfinx FEM smoke),
+    `tests/test_moscap_axisym_cv_fem.py` (FEM-vs-reference
+    regression; skip-clean when `fem_cv.csv` is absent).
+  - `docs/theory/axisymmetric.md` and `docs/theory/moscap_cv.md`:
+    derivations and conventions.
+- **Verification:**
+  - Pure-Python: 237 passed / 22 skipped (M14.2 baseline); 15/15
+    MOSCAP analytical anchors green.
+  - FEM (Colab): notebook 05 runs end-to-end; FEM C(V) tracks
+    analytical LF/HF curves through accumulation, depletion, and
+    inversion regimes.
+- **Dependencies:** M14.1.
 
 ## Forward-looking
 
