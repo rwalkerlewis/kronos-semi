@@ -11,15 +11,16 @@ input, its acceptance test, and its dependency on prior milestones.
 
 ---
 
-## 1. Honest current state (as of v0.14.1)
+## 1. Honest current state (as of v0.15.0)
 
 What exists and works:
 
 - `semi/` package with a five-layer architecture; Layer 3 (pure-Python
   core) has no dolfinx dependency and is independently testable.
-- JSON schema 1.3.0 (Draft-07, enforced via `jsonschema`) covering
+- JSON schema 1.4.0 (Draft-07, enforced via `jsonschema`) covering
   mesh, regions, doping, contacts, physics, solver, output, plus the
-  top-level `coordinate_system` field added in M14.2.
+  top-level `coordinate_system` field added in M14.2 and the
+  `solver.backend` / `solver.compute` fields added in M15.
 - Builtin meshes in 1D/2D/3D plus gmsh `.msh` loader with physical
   groups.
 - Equilibrium Poisson, coupled drift-diffusion in Slotboom form, SRH
@@ -63,28 +64,57 @@ What exists and works:
   UI-facing annotations, every benchmark validates, the major-version
   gate refuses mismatched majors (M11).
 - 2D MOSFET with Gaussian n+ source/drain implants on the multi-region
-  Poisson + Slotboom DD stack (M12).
+  Poisson + Slotboom DD stack (M12). Verifier is qualitative (M14.3
+  tightens it with a Pao-Sah / square-law analytical reference).
+- GPU linear-solver path via PETSc CUDA / HIP, AMGX or hypre BoomerAMG
+  preconditioning (M15). Schema 1.4.0 adds `solver.backend` and
+  `solver.compute`; manifest 1.1.0 adds KSP iters and linear-solve
+  wall time; `semi/compute.py` runtime probe and dynamic
+  `GET /capabilities` endpoint.
 
 What does *not* exist:
 
-- **No GPU linear solve.** Every solve is MUMPS LU on CPU via PETSc.
-  Above ~200k DOFs this is the wall. M15 closes the gap.
 - **No field-dependent mobility, Auger, Fermi-Dirac, Schottky
   contacts, or tunneling.** COMSOL Semiconductor has all of these.
-  M16, one PR per model.
+  M16.1 through M16.7, one PR per model, each with an explicit
+  numerical acceptance threshold.
+- **No real 3D semiconductor device.** The 3D coverage today is the
+  doped resistor (M7) and a pure-Poisson box (M15 acceptance test).
+  No 3D MOSFET / FinFET / planar transistor. M19 closes this with a
+  3D MOSFET benchmark on a gmsh-sourced unstructured mesh.
 - **No heterojunctions.** Position-dependent χ and Eg are not yet
-  supported. M17 (depends on M16.4 Fermi-Dirac).
+  supported. M17 (depends on M16.4 Fermi-Dirac because heterojunctions
+  break the nondegenerate approximation at the barrier).
 - **No Cartesian-2D MOSCAP variant** and no rigorous gate-driven HF
-  C-V method. Tracked as M14.2.x in
-  [`PLAN.md`](../PLAN.md) §Backlog and `docs/ROADMAP.md`.
-- **No `GET /capabilities` endpoint.** UI integration item; M15 will
-  close it because GPU availability is itself a capability.
+  C-V method. Tracked in [`docs/ROADMAP.md`](ROADMAP.md) §Deferred;
+  superseded for practical purposes by M16.4 (which the rigorous HF
+  C-V depends on at high doping) and M19 (3D MOSFET, which exercises
+  the same multi-region infrastructure on a more important device).
+- **No MPI parallel orchestration in the runners.** dolfinx supports
+  MPI natively; bias-sweep, postprocess, and IV recording in
+  `semi/runners/` and `semi/postprocess.py` need a collective-
+  communication audit before mosfet_3d at ~1M DOFs is practical.
+  M19.1.
+- **No HTTP server hardening.** `kronos_server/app.py` carries a
+  `# TODO(M10+): add auth, rate limiting, API keys before any public
+  deployment`. M20.
+- **Five small production-hardening gaps** scattered across the
+  codebase: `additionalProperties: false` is not enforced on the
+  input schema; `semi/mesh.py::_build_from_file` raises
+  `NotImplementedError` for the XDMF branch; the transient runner
+  accepts no `V(t)` (closes audit case 06); ~792 LOC of dead-on-
+  active-path Scharfetter-Gummel primitives in `semi/fem/sg_assembly.py`
+  remain in the tree. M14.3 closes the first three plus the dead-LOC
+  removal in one housekeeping PR before M16 physics work starts.
 
 Bottom line: the numerics are sound, the engine is addressable from
-outside Python, results are consumable without a dolfinx install, and
-the schema is versioned and richly annotated. The remaining work is
-scaling the linear solver (M15) and adding the physics models
-engineers actually use daily (M16+).
+outside Python, results are consumable without a dolfinx install, the
+schema is versioned and richly annotated, and the GPU linear-solve
+lever is in place. The remaining work is closing the housekeeping
+gaps (M14.3), filling out the Tier 1 physics catalogue (M16.1
+through M16.7), shipping a real 3D semiconductor device (M19),
+hardening the HTTP server for multi-tenant deployment (M20), and
+extending to heterojunctions (M17).
 
 ---
 
@@ -249,33 +279,112 @@ matches `bias_sweep` within 1e-4 relative error and the
 
 ### M14 — AC small-signal analysis
 
-**Status: Done (2026-04-26).** Linearised
+**Status: Done (2026-04-26, v0.14.0).** Linearised
 `(J + jωM) δu = -dF/dV δV` in real 2x2 block form (PETSc-real build);
 `rc_ac_sweep` benchmark matches analytical depletion C within 0.4%
-over [1 Hz, 1 MHz]; ADR 0011 with sign-convention errata. Full
-deliverable, acceptance tests, and scope preserved in §10.
+over [1 Hz, 1 MHz]; ADR 0011 with sign-convention errata. See
+[CHANGELOG.md](../CHANGELOG.md) `[0.14.0]` entry. Full deliverable,
+acceptance tests, and scope preserved in §10.
 
 ---
 
 ### M14.1 — AC differential capacitance for MOSCAP
 
-**Status: Done (2026-04-26).** `semi/runners/mos_cap_ac.py` returns
-dQ/dV directly from `Im(Y) / (2πf)`, replacing the noisier
+**Status: Done (2026-04-26, PR #38).** `semi/runners/mos_cap_ac.py`
+returns dQ/dV directly from `Im(Y) / (2πf)`, replacing the noisier
 `numpy.gradient(Q, V)` of `mos_cv` for the `mos_2d` C-V verifier;
 audit case 03 confirms byte-identity with `mos_cv` Q_gate at all 42
-gate voltages.
+gate voltages. See [CHANGELOG.md](../CHANGELOG.md) `[0.14.0]` /
+`[Unreleased]` entries.
 
 ---
 
 ### M14.2 — Axisymmetric (cylindrical) 2D MOSCAP
 
-**Status: Done (2026-04-30).** Top-level `coordinate_system` field
-(schema 1.3.0, `cartesian` default or `axisymmetric`) with cross-
-field validation; r-weighted Poisson and Slotboom drift-diffusion on
-the meridian half-plane (`semi/physics/axisymmetric.py`); pure-Python
-MOSCAP analytical helpers (`semi/cv.py`); `benchmarks/moscap_axisym_2d/`
-reproduces Hu Fig. 5-18; runner dispatch in `mos_cap_ac.py` r-weights
-the charge and sensitivity forms (PRs #64, #65).
+**Status: Done (2026-04-30, PRs #64, #65).** Top-level
+`coordinate_system` field (schema 1.3.0, `cartesian` default or
+`axisymmetric`) with cross-field validation; r-weighted Poisson and
+Slotboom drift-diffusion on the meridian half-plane
+(`semi/physics/axisymmetric.py`); pure-Python MOSCAP analytical
+helpers (`semi/cv.py`); `benchmarks/moscap_axisym_2d/` reproduces
+Hu Fig. 5-18; runner dispatch in `mos_cap_ac.py` r-weights the
+charge and sensitivity forms. See [CHANGELOG.md](../CHANGELOG.md)
+`[Unreleased]` entry. The Cartesian-2D MOSCAP variant and rigorous
+gate-driven HF C-V method (M14.2.x) are now in
+[`docs/ROADMAP.md`](ROADMAP.md) §Deferred; superseded for practical
+purposes by M16.4 and M19.
+
+---
+
+### M14.3: Housekeeping (cheap closes)
+
+**Why.** Five small production-hardening gaps are scattered across the
+codebase: the GitHub-rendered `README.md` does not match `main` (the
+landing page still shows v0.1.0 framing); the `mosfet_2d` verifier is
+qualitative with no analytical reference; `semi/mesh.py::_build_from_file`
+raises `NotImplementedError` for the XDMF branch; the input schema
+does not enforce `additionalProperties: false`; and ~792 LOC of dead-
+on-active-path Scharfetter-Gummel primitives in
+`semi/fem/sg_assembly.py` are not on any code path. Closing them in
+one PR removes the noise floor before M16 physics work starts.
+
+**Deliverable.**
+
+- Re-render the GitHub `README.md` so the `github.com` landing page
+  matches `main`. The on-disk copy is correct; the visible page is
+  stale. Investigate whether a fork is shadowing the remote, or
+  whether GitHub's render cache is the issue, and force-push or
+  file a support request as appropriate.
+- Tighten the `mosfet_2d` verifier in
+  [`scripts/run_benchmark.py`](../scripts/run_benchmark.py). Add a
+  Pao-Sah or square-law analytical reference in the linear regime
+  (`V_DS = 0.05 V`, `V_GS in [V_T + 0.2, V_T + 0.6] V`) with a 20%
+  tolerance window. Document the choice in
+  [`benchmarks/mosfet_2d/README.md`](../benchmarks/mosfet_2d/README.md)
+  with a derivation paragraph; document the verifier window choice
+  in [`docs/PHYSICS.md`](PHYSICS.md) Section 6.
+- Implement XDMF mesh ingest in
+  [`semi/mesh.py::_build_from_file`](../semi/mesh.py). Wire
+  `dolfinx.io.XDMFFile.read_mesh` and propagate cell tags via
+  `read_meshtags`. Acceptance: round-trip a `box.msh` -> `box.xdmf`
+  via meshio and verify the resistor benchmark produces the same R
+  within 1e-12 relative.
+- Strict-mode the input schema. Set `additionalProperties: false`
+  on every object node in [`schemas/input.v1.json`](../schemas/input.v1.json)
+  and bump the schema major to v2.0.0. Ship
+  [`schemas/input.v2.json`](../schemas/input.v2.json) alongside v1,
+  keep the engine accepting both for one minor cycle, log a
+  deprecation warning on v1, and migrate every benchmark JSON to
+  v2.0.0. Update `SCHEMA_SUPPORTED_MINOR` and
+  `ENGINE_SUPPORTED_SCHEMA_MAJOR` in
+  [`semi/schema.py`](../semi/schema.py).
+- Delete [`semi/fem/sg_assembly.py`](../semi/fem/sg_assembly.py)
+  (~792 LOC) and remove its dedicated test
+  `tests/fem/test_sg_assembly.py`. Add a one-line note in ADR 0012's
+  status section that the SG primitives are reachable in git history
+  if M13.2 ever revives them. Raise the coverage gate in
+  [`pyproject.toml`](../pyproject.toml) from 92 to 95 (back to the
+  M5-era number) once the file is gone.
+
+**Acceptance tests.**
+
+1. The GitHub-rendered README at the top of the repository page
+   shows v0.15.0 status and the M1-M15 capability matrix.
+2. `python scripts/run_benchmark.py mosfet_2d` exits 0 with the new
+   analytical-reference verifier passing inside the
+   [V_T + 0.2, V_T + 0.6] V window at the documented 20% tolerance.
+3. The resistor benchmark loaded from `box.xdmf` (newly-supported
+   ingest path) produces R within 1e-12 relative of the same
+   benchmark loaded from `box.msh`.
+4. Every benchmark JSON in `benchmarks/` validates as
+   `schema_version: "2.0.0"` with `additionalProperties: false`
+   active; an intentional typo (`"voltag"` for `"voltage"`) is
+   rejected with a clear error message that names the offending
+   field.
+5. `semi/fem/sg_assembly.py` and its dedicated test are gone, the
+   coverage gate in `pyproject.toml` is 95, and CI is green.
+
+**Dependencies.** None; M14.3 only consolidates known small fixes.
 
 ---
 
@@ -332,65 +441,356 @@ GPU yet — dolfinx-cuda is experimental and moving fast.
 
 ---
 
-### M16 — Physics completeness pass
+### M16: Physics completeness pass (umbrella)
 
-**Why:** To mimic COMSOL Semiconductor properly we need the models engineers
-actually use daily.
+**Why.** To mimic COMSOL Semiconductor properly we need the models
+engineers actually use daily. The umbrella M16 work is broken into
+seven sub-milestones, each shipped as its own PR with an explicit
+acceptance test and an analytical or external reference. Do them in
+the order below; M16.4 (Fermi-Dirac) is a hard prerequisite for both
+M16.6 (BBT tunneling, where the density of states matters) and M17
+(heterojunctions, where the barrier breaks the nondegenerate
+approximation).
 
-**Deliverable (do these in order, each a separate PR):**
+**Deliverable.** Seven sub-milestones, each its own PR. See M16.1
+through M16.7 below.
 
-1. **Caughey-Thomas field-dependent mobility.** Closed-form velocity-saturation
-   model. ~200 LOC.
-2. **Lombardi surface-mobility model.** Needed for realistic MOSFET I-V in
-   the inversion regime. ~300 LOC.
-3. **Auger recombination.** `R_Auger = (C_n n + C_p p)(np - n_i^2)`.
-   ~100 LOC.
-4. **Fermi-Dirac statistics.** Replace `exp(±psi)` with Fermi integrals
-   (use Blakemore approximation for speed, full FDI for validation). Gate
-   with a `statistics: "fermi-dirac"` schema option; Boltzmann remains the
-   default. ~400 LOC.
-5. **Schottky contacts.** Thermionic-emission boundary condition. ~300 LOC.
-6. **Band-to-band (Kane) and trap-assisted (Hurkx) tunneling.** Required for
-   any useful diode or floating-gate simulation. ~600 LOC.
+**Acceptance tests.** Each sub-milestone has its own gate; the
+umbrella M16 is "done" when all seven are merged and every existing
+benchmark with the default (constant mobility, Boltzmann statistics,
+SRH-only recombination) is bit-identical to v0.15.0.
 
-Each ships with its own benchmark and verifier.
+**Dependencies.** M9 (artifact writer), M11 (schema versioning),
+M14.3 (strict-mode schema must be in place before any new schema
+field is added; the v1-vs-v2 acceptance also exercises every
+benchmark JSON).
 
-**Acceptance tests:** one analytical-or-SPICE comparison per model.
+---
 
-**Estimated scope:** 2–4 days per item. Don't batch; one PR per model.
+### M16.1: Caughey-Thomas field-dependent mobility
 
-**Dependencies:** M9, M11.
+**Why.** Velocity saturation is the entry-level field-dependent
+mobility model and is required for any quantitative MOSFET I-V at
+fields above ~10 kV/cm. Without it, the M14.3 mosfet_2d verifier
+passes only in the deeply-linear regime; with it, we can extend the
+verifier window into saturation and start running 3D MOSFET
+benchmarks meaningfully.
+
+**Deliverable.**
+
+- New file `semi/physics/mobility.py` with `caughey_thomas_mu(mu0, F_par, ...)`
+  UFL builder. Closed-form, no new unknowns. Schema entry
+  `physics.mobility.model: "constant" | "caughey_thomas"` with parameters
+  `vsat_n`, `vsat_p`, `beta_n`, `beta_p`. Defaults bake in the standard
+  Si values (vsat ~ 1e7 cm/s, beta_n = 2, beta_p = 1).
+- Wire the new mobility into
+  [`semi/physics/drift_diffusion.py`](../semi/physics/drift_diffusion.py)
+  and [`semi/runners/bias_sweep.py`](../semi/runners/bias_sweep.py)
+  behind the schema dispatch. The `constant` branch is bit-identical
+  to pre-M16.1.
+- MMS verifier `tests/fem/test_mms_caughey_thomas.py`: extend the
+  existing MMS-DD harness to include a manufactured solution where
+  the mobility depends on the gradient. Acceptance L2 rate >= 1.99,
+  H1 rate >= 0.99 at the finest pair.
+- New benchmark `benchmarks/diode_velsat_1d/`: 1D pn diode at
+  `V_F in [0.5, 0.9] V` comparing constant-mu and caughey-thomas
+  forward I-V; verifier asserts the two diverge by >5% at 0.9 V and
+  converge to within 1% at 0.5 V.
+
+**Acceptance tests.**
+
+1. `python scripts/run_verification.py mms_dd` includes the
+   caughey_thomas variant and reports L2 rate >= 1.99 at the finest
+   pair.
+2. `python scripts/run_benchmark.py diode_velsat_1d` exits 0 with the
+   divergence-vs-convergence verifier passing.
+3. Every existing benchmark with `physics.mobility.model: "constant"`
+   (which is the schema default) produces results bit-identical to
+   v0.15.0.
+
+**Dependencies.** M14.3 (need the strict-mode schema and the
+tightened mosfet_2d verifier in place first; otherwise the new
+mobility schema field collides with a v1 schema bump and the
+mosfet_2d verifier has nothing analytical to compare velocity
+saturation against).
+
+---
+
+### M16.2: Lombardi surface mobility
+
+**Why.** Inversion-layer mobility in MOSFETs is dominated by surface
+scattering, which Caughey-Thomas does not capture. Required for
+quantitative MOSFET I-V in the inversion regime.
+
+**Deliverable.** Lombardi composite (Coulomb + phonon + surface
+roughness) added to `semi/physics/mobility.py`. Schema entry
+`physics.mobility.model: "lombardi"`. Benchmark:
+[`benchmarks/mosfet_2d`](../benchmarks/mosfet_2d) re-run with
+lombardi mobility, verifier threshold tightened from 20% to 10% in
+the inversion-strong-field region.
+
+**Acceptance tests.**
+
+1. MMS rate >= 1.99 L2 with a manufactured surface-distance field.
+2. Re-run mosfet_2d in the [V_T + 0.4, V_T + 1.0] V window with
+   lombardi mobility, get within 10% of the analytical Sah-Pao
+   reference.
+
+**Dependencies.** M16.1.
+
+---
+
+### M16.3: Auger recombination
+
+**Why.** High-injection diode and BJT modeling are wrong without
+Auger. Cheap (~100 LOC) and benchmarkable on a 1D diode.
+
+**Deliverable.** `R_Auger = (C_n * n + C_p * p) * (np - n_i^2)` added
+to [`semi/physics/recombination.py`](../semi/physics/recombination.py).
+Schema: `physics.recombination.auger: bool` and `C_n`, `C_p`
+parameters. Benchmark: 1D high-injection diode (N=1e15, V_F = 0.9 V)
+where SRH alone underpredicts recombination current by >20% and
+SRH+Auger matches an analytical high-injection long-diode reference.
+
+**Acceptance tests.**
+
+1. With `auger=false`, every existing benchmark produces results
+   bit-identical to v0.15.0.
+2. New benchmark `benchmarks/diode_auger_1d` shows the SRH-only-vs-
+   SRH+Auger divergence at >20% and the latter matches analytical
+   within 5%.
+
+**Dependencies.** M14.3.
+
+---
+
+### M16.4: Fermi-Dirac statistics (gated)
+
+**Why.** Boltzmann breaks above ~1e19 cm^-3, which is the source/drain
+extension regime of every modern MOSFET. Required for quantitative
+I-V at modern technology nodes and a hard prerequisite for M17
+heterojunctions.
+
+**Deliverable.** Blakemore approximation in
+`semi/physics/statistics.py` for the production path; full Fermi-Dirac
+integral via `scipy.special.fdk` for the verification reference.
+Schema: `physics.statistics: "boltzmann" | "fermi_dirac"`, default
+`boltzmann`. Replace `exp(+/- psi)` calls in
+[`semi/physics/poisson.py`](../semi/physics/poisson.py) and the
+Slotboom builders with dispatched calls.
+
+**Acceptance tests.**
+
+1. With `statistics: "boltzmann"`, every existing benchmark is
+   bit-identical to v0.15.0.
+2. New benchmark `benchmarks/diode_fermi_dirac_1d/` (1D pn,
+   `N_D = 1e20 cm^-3` in n+ region) where boltzmann and FD diverge by
+   >15% on V_bi and the FD result matches a stand-alone scipy-driven
+   reference within 1e-3.
+3. MMS rate >= 1.99 L2 on a manufactured solution that pushes the
+   Boltzmann-validity boundary.
+
+**Dependencies.** M14.3, M16.1.
+
+---
+
+### M16.5: Schottky contacts
+
+**Why.** Diode-on-Si and any metal-semiconductor interface is
+unmodellable without thermionic-emission boundary conditions.
+
+**Deliverable.** New contact `type: "schottky"` with parameter
+`barrier_height_eV`. Builder in [`semi/bcs.py`](../semi/bcs.py) adds a
+Robin-style boundary form to the continuity rows; ohmic and gate
+contacts unchanged. Benchmark: 1D Schottky diode with Pt-on-n-Si
+contact vs thermionic-emission analytical I-V.
+
+**Acceptance tests.**
+
+1. New benchmark `benchmarks/schottky_1d` matches the thermionic-
+   emission analytical I-V within 10% from V_F = 0.1 V to 0.5 V.
+2. Existing ohmic-contact benchmarks are bit-identical.
+
+**Dependencies.** M14.3.
+
+---
+
+### M16.6: Tunneling (BBT and TAT)
+
+**Why.** Required for any non-toy diode (Zener, Esaki, GIDL) and
+floating-gate flash modeling. The largest single physics addition in
+M16; do this last in M16.
+
+**Deliverable.** Kane band-to-band model and Hurkx trap-assisted
+model, both as UFL generation/recombination kernels added to
+[`semi/physics/recombination.py`](../semi/physics/recombination.py).
+Schema flags `physics.tunneling: {bbt: bool, tat: bool}` plus model
+parameters.
+
+**Acceptance tests.**
+
+1. New benchmark `benchmarks/zener_1d` shows reverse-bias breakdown
+   current matching a Kane analytical reference within 20% from
+   V_R = 4 V to 8 V on a heavily-doped (1e19) abrupt junction.
+2. Existing benchmarks bit-identical with both flags off.
+
+**Dependencies.** M14.3, M16.4 (BBT depends on the FD-corrected
+density of states).
+
+---
+
+### M19: 3D MOSFET benchmark (capstone after M16.1)
+
+This is a new milestone, not a rename of an existing one. Slotted
+between M16 and M17.
+
+**Why.** The single biggest visible gap relative to "mimics COMSOL
+Semiconductor". Exercises the multi-region MOSFET infrastructure in
+3D, the M15 GPU linear-solver path on a real device (not just on
+Poisson), and the M16.1 Caughey-Thomas mobility under non-trivial
+fields.
+
+**Deliverable.**
+
+- New benchmark `benchmarks/mosfet_3d/`: 3D n-channel MOSFET on a
+  gmsh-sourced unstructured tetrahedral mesh, ~200k DOFs to start
+  (scalable to ~1M for the GPU acceptance run). Channel length
+  L = 250 nm, width W = 1 um, oxide t_ox = 5 nm. Gaussian n+
+  source/drain implants, p-type body 1e16 cm^-3.
+- Verifier compares I_D vs V_GS in linear (`V_DS = 0.05 V`) and
+  saturation (`V_DS = 1.0 V`) regimes against the
+  Pao-Sah-with-velocity-saturation analytical reference within 25%
+  (looser than 2D because of the corner effects).
+- Run on both `cpu-mumps` and `gpu-amgx` backends to demonstrate M15
+  acceptance on a real device, not just on Poisson.
+
+**Acceptance tests.**
+
+1. `python scripts/run_benchmark.py mosfet_3d` exits 0 in both
+   CPU-MUMPS and GPU-AMGX runs.
+2. Linear-regime I_D within 25% of the Pao-Sah analytical reference
+   at three V_GS values.
+3. Saturation-regime I_DSAT within 30% of the velocity-saturation
+   reference.
+4. CPU/GPU wall-clock ratio for the linear solve >=5x at the
+   ~500k-DOF mesh refinement, on the nightly GPU runner.
+
+**Dependencies.** M16.1 (need Caughey-Thomas before saturation has
+any meaning), M14.3 (need XDMF or gmsh ingest stable).
+
+---
+
+### M16.7: Time-varying transient contact voltage
+
+**Why.** Closes audit case 06 (transient FFT vs AC sweep) which is
+currently `pytest.skip`. Enables switching-transient and ringing
+simulation, which is the second-most-asked-for transient feature
+after turn-on.
+
+**Deliverable.** Extend
+[`semi/runners/transient.py`](../semi/runners/transient.py) to accept
+a per-step contact voltage from a callable or a JSON-supplied table.
+Schema:
+`contacts[].voltage_t: {type: "table", times, values}` or
+`{type: "step", t0, v0, v1}`. Update audit case 06 to active.
+
+**Acceptance tests.**
+
+1. Audit case 06 passes: transient FFT of I(t) at a small-signal
+   V(t) sinusoid agrees with `run_ac_sweep` Y(omega) at the same
+   frequency within 5%.
+2. Existing transient benchmarks bit-identical.
+
+**Dependencies.** M14.3.
+
+---
+
+### M19.1: MPI parallel benchmark
+
+**Why.** dolfinx supports MPI natively; the runner orchestration
+does not. Above ~1M DOFs (well within reach of the M15 GPU path and
+the M19 3D MOSFET) MPI is the next bottleneck after the linear
+solver.
+
+**Deliverable.** Verify and where needed fix collective communication
+in [`semi/runners/bias_sweep.py`](../semi/runners/bias_sweep.py) and
+[`semi/postprocess.py`](../semi/postprocess.py) for IV recording. Add
+a CI matrix entry that runs `benchmarks/mosfet_3d` under
+`mpiexec -n 4`.
+
+**Acceptance tests.**
+
+1. mosfet_3d under `mpiexec -n {1,2,4}` produces the same I_D within
+   1e-8 relative.
+2. Wall-clock scaling: n=4 vs n=1 speedup >=2.5x on the ~500k-DOF
+   mesh.
+
+**Dependencies.** M19.
 
 ---
 
 ### M17 — Heterojunction / position-dependent band structure
 
-**Why:** AlGaAs/GaAs, InGaAs/InP, SiGe/Si — none of this works without
+**Why.** AlGaAs/GaAs, InGaAs/InP, SiGe/Si: none of this works without
 position-varying electron affinity `chi(x)` and bandgap `Eg(x)`.
+Required for HEMT and HBT modeling, both of which are core COMSOL
+Semiconductor capabilities.
 
-**Deliverable:** extend the material model and Poisson/continuity kernels
-to read `chi` and `Eg` as cellwise DG0 fields. Benchmark: AlGaAs/GaAs HEMT
-or SiGe HBT.
+**Deliverable.** Extend the material model and the Poisson and
+continuity kernels to read `chi` and `Eg` as cellwise DG0 fields.
+Schema: per-region `material_overrides: {chi_eV, Eg_eV}` plus a
+`heterojunction: true` switch on the region join. Benchmark: an
+AlGaAs/GaAs HEMT or a SiGe HBT with a published reference solution.
 
-**Estimated scope:** 4 days.
+**Acceptance tests.**
 
-**Dependencies:** M9, M16.4 (Fermi-Dirac, because heterojunctions break the
-nondegenerate approximation at the barrier).
+1. New benchmark `benchmarks/hemt_2d` (AlGaAs/GaAs) reproduces the
+   2DEG sheet density at the heterojunction within 15% of a published
+   self-consistent Poisson-Schrodinger reference.
+2. With a single-material override (chi and Eg constant in space),
+   every existing benchmark is bit-identical to v0.15.0.
+3. MMS rate >= 1.99 L2 on a manufactured solution with a smooth
+   chi(x) and Eg(x) variation.
+
+**Dependencies.** M16.4 (Fermi-Dirac, because heterojunctions break
+the nondegenerate approximation at the barrier).
 
 ---
 
 ### M18 — UI: first cut
 
-**Why:** At this point the engine has everything; the UI is what turns this
-into a product.
+**Why.** At this point the engine has everything; the UI is what
+turns this into a product.
 
-**Not in scope of this repo.** Mentioned here so the engine team knows what
-invariants the UI relies on.
+**Not in scope of this repo.** Mentioned here so the engine team
+knows what invariants the UI relies on.
 
-Recommended stack: React + TypeScript, three.js for 3D mesh visualization,
-vtk.js or plotly for field rendering, JSONForms for schema-driven device
-setup. The UI is a separate repo that consumes this engine's JSON schema
-and HTTP API.
+Recommended stack: React + TypeScript, three.js for 3D mesh
+visualization, vtk.js or plotly for field rendering, JSONForms for
+schema-driven device setup. The UI is a separate repo that consumes
+this engine's JSON schema and HTTP API.
+
+---
+
+### M20: HTTP server hardening
+
+**Why.** [`kronos_server/app.py`](../kronos_server/app.py) carries a
+`# TODO(M10+): add auth, rate limiting, API keys before any public
+deployment`. Required before this can be hosted multi-tenant.
+
+**Deliverable.** API-key middleware, per-key rate limiter (in-memory
+token bucket; Redis backend optional), basic admin endpoint to
+issue/revoke keys. Update OpenAPI to reflect the Authorization
+requirement.
+
+**Acceptance tests.**
+
+1. Unauthenticated `POST /solve` returns 401.
+2. Authenticated `POST /solve` is rate-limited to a configurable RPS
+   per key with a 429 response on overrun.
+3. Existing `/health` and `/ready` endpoints remain auth-free.
+
+**Dependencies.** None.
 
 ---
 
@@ -519,6 +919,17 @@ The engine is ready for a UI when all of these are green:
 - **2026-05-15**, mark §4 M15 Done (v0.15.0); the GPU linear-solver
   path landed with schema 1.4.0 (`solver.backend`, `solver.compute`)
   and manifest 1.1.0 (KSP iters and linear-solve wall time fields).
+- **2026-05-01**, post-M15 roadmap refresh: §1 updated to v0.15.0,
+  M14/M14.1/M14.2 status badges grew CHANGELOG anchors, M14.3
+  housekeeping milestone added between M14.2 and M15, M16 umbrella
+  rewritten and broken into seven sub-milestones M16.1 through M16.7
+  each with explicit four-subsection Why / Deliverable / Acceptance /
+  Dependencies blocks, M17 rewritten in the same shape, three new
+  milestones M19 (3D MOSFET capstone), M19.1 (MPI parallel
+  benchmark), and M20 (HTTP server hardening) added with full
+  acceptance tests. Two new starter prompts shipped:
+  [M14_3_STARTER_PROMPT.md](M14_3_STARTER_PROMPT.md) and
+  [M16_1_STARTER_PROMPT.md](M16_1_STARTER_PROMPT.md).
 
 ---
 
