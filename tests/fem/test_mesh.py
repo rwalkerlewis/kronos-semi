@@ -2,8 +2,10 @@
 Direct unit tests for `semi.mesh.build_mesh`.
 
 The benchmarks exercise `build_mesh` transitively, but the 2D and 3D
-builtin paths and the file-source NotImplementedError stub are not
-hit by any pytest collection without these tests. They are cheap.
+builtin paths and the file-source error branches are not hit by any
+pytest collection without these tests. They are cheap. The XDMF
+ingest path has its own round-trip test in
+`tests/fem/test_mesh_xdmf.py`.
 """
 from __future__ import annotations
 
@@ -90,13 +92,6 @@ def test_build_mesh_unknown_source_raises():
     cfg = _interval_cfg()
     cfg["mesh"]["source"] = "magic"
     with pytest.raises(ValueError, match="Unknown mesh source"):
-        build_mesh(cfg)
-
-
-def test_build_mesh_file_source_xdmf_raises_notimplemented():
-    cfg = _interval_cfg()
-    cfg["mesh"] = {"source": "file", "path": "dummy.xdmf", "format": "xdmf"}
-    with pytest.raises(NotImplementedError, match="XDMF"):
         build_mesh(cfg)
 
 

@@ -52,10 +52,16 @@ Two variants chosen by `source`:
   - `facets_by_plane`: list of axis-aligned planes that tag boundary
     facets, referenced by name in `contacts[*].facet`.
 
-- `source: "file"` — external gmsh `.msh`.
+- `source: "file"` — external gmsh `.msh` or XDMF.
   - `path`: relative to the JSON file's directory.
-  - `format`: `"gmsh"` (XDMF reserved, not implemented).
-  - Physical groups in the `.msh` supply region and facet tags.
+  - `format`: `"gmsh"` or `"xdmf"`. The XDMF branch reads the mesh via
+    `dolfinx.io.XDMFFile.read_mesh` and then optional cell and facet
+    tag sets via `read_meshtags`. Default grid names are `mesh`,
+    `cell_tags`, and `facet_tags`; override with
+    `xdmf_mesh_name`, `xdmf_cell_tags_name`, and
+    `xdmf_facet_tags_name` if the file uses different ones.
+  - Physical groups in the `.msh` (or named meshtag sets in the
+    `.xdmf`) supply region and facet tags.
   - For axisymmetric benchmarks, the meridian mesh is built from a
     `.geo` template (e.g.
     [`benchmarks/moscap_axisym_2d/moscap_axisym.geo`](../../benchmarks/moscap_axisym_2d/moscap_axisym.geo))

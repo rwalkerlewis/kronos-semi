@@ -90,14 +90,24 @@ def _build_from_file(mesh_cfg: dict, dim: int, source_dir: str | None = None):
     """
     Load a mesh from disk.
 
-    Supports gmsh `.msh` via `dolfinx.io.gmsh.read_from_msh`; physical
+    Supports gmsh `.msh` via `dolfinx.io.gmsh.read_from_msh` and XDMF
+    via `dolfinx.io.XDMFFile.read_mesh` / `read_meshtags`. Physical
     groups stored in the file are returned verbatim as `cell_tags` and
     `facet_tags`, so `build_mesh` skips the box/plane tagger for
-    file-source meshes. XDMF is reserved for a future PR.
+    file-source meshes.
 
     The `path` field is resolved relative to the JSON source directory
     when it is not absolute, matching the convention used by other
     file-relative references loaded via `semi.schema.load`.
+
+    XDMF input expectations (M14.3, Phase C). The XDMF must contain at
+    least one Grid that holds the topology and geometry; the resolved
+    grid name defaults to `mesh` and is overridable via
+    `mesh.xdmf_mesh_name`. Cell tags and facet tags, when present, are
+    read by name (`cell_tags` and `facet_tags` by default, overridable
+    via `mesh.xdmf_cell_tags_name` and `mesh.xdmf_facet_tags_name`). A
+    missing tag set is returned as `None` rather than an error so that
+    untagged mesh files (e.g. a pure-Poisson test fixture) still load.
     """
     fmt = mesh_cfg.get("format", "gmsh")
     raw_path = Path(mesh_cfg["path"])
@@ -113,9 +123,28 @@ def _build_from_file(mesh_cfg: dict, dim: int, source_dir: str | None = None):
         )
         return meshdata.mesh, meshdata.cell_tags, meshdata.facet_tags
     if fmt == "xdmf":
-        raise NotImplementedError(
-            "XDMF mesh loading not yet wired; use gmsh '.msh' instead."
-        )
+        from dolfinx.io import XDMFFile
+        from mpi4py import MPI
+
+        mesh_name = mesh_cfg.get("xdmf_mesh_name", "mesh")
+        cell_tags_name = mesh_cfg.get("xdmf_cell_tags_name", "cell_tags")
+        facet_tags_name = mesh_cfg.get("xdmf_facet_tags_name", "facet_tags")
+
+        cell_tags = None
+        facet_tags = None
+        with XDMFFile(MPI.COMM_WORLD, str(raw_path), "r") as xdmf:
+            msh = xdmf.read_mesh(name=mesh_name)
+            tdim = msh.topology.dim
+            msh.topology.create_connectivity(tdim - 1, tdim)
+            try:
+                cell_tags = xdmf.read_meshtags(msh, name=cell_tags_name)
+            except RuntimeError:
+                cell_tags = None
+            try:
+                facet_tags = xdmf.read_meshtags(msh, name=facet_tags_name)
+            except RuntimeError:
+                facet_tags = None
+        return msh, cell_tags, facet_tags
     raise ValueError(f"Unknown mesh file format {fmt!r}")
 
 
