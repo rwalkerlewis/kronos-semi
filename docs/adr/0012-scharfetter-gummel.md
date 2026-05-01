@@ -1,7 +1,7 @@
 # ADR 0012: Scharfetter-Gummel edge-flux discretisation for transient continuity
 
 **Date:** 2026-04-26
-**Status:** Accepted (supersedes the (n, p) Galerkin choice in ADR 0009); primary-unknown assumption amended by ADR 0014; SG primitives retained for future 2D high-Peclet work.
+**Status:** Accepted (supersedes the (n, p) Galerkin choice in ADR 0009); primary-unknown assumption amended by ADR 0014; the SG block-assembly module (`semi/fem/sg_assembly.py`, ~792 LOC) was deleted in M14.3 (PR on `dev/m14.3-housekeeping`) since it has no production caller; the per-edge primitives (`semi/fem/scharfetter_gummel.py`: Bernoulli function and edge fluxes) are retained for future 2D high-Peclet work. If M13.2 ever revives the SG flux path, the deleted block-assembly is reachable in git history at the parent of the M14.3 deletion commit.
 **Milestone:** M13.1 — Transient solver close-out
 
 ---

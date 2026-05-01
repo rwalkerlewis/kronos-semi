@@ -112,7 +112,7 @@ jobs:
             kronos-semi:ci \
             pytest tests/ -n auto --dist=loadfile --tb=short \
               --cov=semi --cov-report=term-missing --cov-report=xml \
-              --cov-fail-under=92
+              --cov-fail-under=95
 
       - name: Upload coverage XML
         if: always()

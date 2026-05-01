@@ -18,8 +18,8 @@ import copy
 import json
 import os
 
-from semi.runners.bias_sweep import run_bias_sweep
 from semi.runners.ac_sweep import run_ac_sweep
+from semi.runners.bias_sweep import run_bias_sweep
 
 
 def main() -> None:
