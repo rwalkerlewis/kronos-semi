@@ -11,49 +11,42 @@ input, its acceptance test, and its dependency on prior milestones.
 
 ---
 
-## 1. Honest current state (as of v0.8.0)
+## 1. Honest current state (as of v0.14.1)
 
-What exists and works:
+What exists and works (M1 through M14.2 merged; see `CHANGELOG.md` for
+per-version detail and `PLAN.md` "Completed work log"):
 
-- `semi/` package (~3,300 LOC) with a five-layer architecture; Layer 3
-  (pure-Python core) has no dolfinx dependency and is independently testable.
-- JSON schema (Draft-07, enforced via `jsonschema`) covering mesh, regions,
-  doping, contacts, physics, solver, output.
+- `semi/` package with a five-layer architecture; Layer 3 (pure-Python core)
+  has no dolfinx dependency and is independently testable.
+- JSON schema (Draft-07, enforced via `jsonschema`), schema version 1.3.0
+  (`coordinate_system` field added for axisymmetric devices in M14.2).
 - Builtin meshes in 1D/2D/3D plus gmsh `.msh` loader with physical groups.
-- Equilibrium Poisson, coupled drift-diffusion in Slotboom form, SRH
-  recombination with configurable trap energy.
-- Ohmic and ideal-gate contacts; multi-region Poisson with Si/SiO2 via
-  `create_submesh`.
-- Adaptive bias-ramp continuation with halving + growth, bipolar sweep support.
-- Five shipped benchmarks (`pn_1d`, `pn_1d_bias`, `pn_1d_bias_reverse`,
-  `mos_2d`, `resistor_3d`), each with a verifier that asserts closed-form
-  physical correctness.
-- MMS verification for Poisson and DD, discrete-conservation checks,
-  mesh-convergence ladder. 206 tests, 62/62 V&V PASS.
-- Four Colab notebooks that install FEniCSx via fem-on-colab and run each
-  benchmark end-to-end.
+- Equilibrium Poisson, coupled drift-diffusion in Slotboom primary-unknown
+  form (ADR 0004 / ADR 0014), SRH recombination with configurable trap
+  energy. Boltzmann statistics; constant mobility; ohmic and ideal-gate
+  contacts.
+- Multi-region Poisson with Si/SiO2 via `create_submesh`.
+- Adaptive bias-ramp continuation (M3), transient solver with BDF1/BDF2
+  (M13.1), AC small-signal sweep (M14).
+- Axisymmetric (cylindrical) 2D MOSCAP path (M14.2); `semi/cv.py`
+  provides pure-Python MOSCAP analytical helpers.
+- Result artifact writer (`semi/io/artifact.py`, M9), HTTP server
+  (`kronos_server/`, M10), schema versioning + UI companion (M11).
+- CLI entry point `semi-run`; Colab notebooks (05 for axisymmetric MOSCAP).
+- Nine shipped benchmarks plus MMS verification suite. Test coverage 92%+.
 
-What does *not* exist (the gap between "submission" and "production engine"):
+What does *not* exist (the gap between v0.14.1 and a production engine):
 
-- **No machine-readable result serialization.** `SimulationResult` is a Python
-  dataclass holding live PETSc/dolfinx objects. There is no JSON/HDF5/VTU
-  output suitable for a detached UI process to consume.
-- **No server surface.** No FastAPI, no job queue, no result cache, no WebSocket
-  progress channel. A UI cannot talk to the engine today.
-- **No GPU.** Every solve is MUMPS LU on CPU via PETSc. In 3D this is the
-  bottleneck; in 2D it is fine but does not scale.
-- **Mesh tagging via JSON is weak.** `regions_by_box` and `facets_by_plane`
-  force axis-aligned geometry. Real devices need gmsh physical groups from a
-  geometry-definition format the UI can author.
-- **No transient solver, no AC small-signal, no Fermi-Dirac, no field-dependent
-  mobility, no Schottky contacts, no tunneling.** COMSOL Semiconductor has all
-  of these. The gap is large but the scaffolding is clean.
-- **Schema is missing a `version` field.** Without one, UI and engine versions
-  will drift silently.
-- **No artifact/result directory contract.** Runners write XDMF into
-  `./results/` but the on-disk layout is not documented or typed.
-- **`DEFAULT_PETSC_OPTIONS` hard-code direct LU.** Fine for benchmarks up to
-  ~50k DOFs; unusable for real 3D.
+- **No GPU.** Every solve is MUMPS LU on CPU via PETSc. M15 addresses this.
+- **No field-dependent mobility.** Constant mu only; Caughey-Thomas and
+  Lombardi are M16.1 / M16.2.
+- **No Auger or radiative recombination.** SRH only. M16.3.
+- **No Fermi-Dirac statistics.** Boltzmann only; breaks at doping
+  >= 10^19 cm^-3. M16.4.
+- **No Schottky contacts.** Ohmic and ideal-gate only. M16.5.
+- **No tunneling.** Band-to-band (Kane) and trap-assisted (Hurkx) are M16.6.
+- **No incomplete dopant ionization.** Full ionization assumed. M16.7.
+- **No heterojunctions.** Single semiconductor material per device. M17.
 
 Bottom line: the numerics are sound and the decomposition is clean. The work
 ahead is almost entirely about (a) making the engine addressable from outside
@@ -431,50 +424,188 @@ GPU yet — dolfinx-cuda is experimental and moving fast.
 
 ---
 
-### M16 — Physics completeness pass
+### M16.1 -- Caughey-Thomas field-dependent mobility
 
-**Why:** To mimic COMSOL Semiconductor properly we need the models engineers
-actually use daily.
+**Why:** Constant mobility breaks above ~10^4 V/cm. Velocity saturation
+is the first-order correction and is present in every COMSOL Semiconductor
+simulation above low-field regime.
 
-**Deliverable (do these in order, each a separate PR):**
+**Deliverable:** New module `semi/physics/mobility.py`. Schema addition
+`solver.physics.mobility` with `model: "constant" | "caughey-thomas"`.
+The CT formula `mu(F_par) = mu_0 / (1 + (mu_0 |F_par| / v_sat)^beta)^(1/beta)`
+implemented as a UFL coefficient; DD weak form in `drift_diffusion.py`
+dispatches on the model. Material defaults (v_sat, beta) for Si in
+`semi/materials.py`. Schema bumped 1.3.x -> 1.4.0.
 
-1. **Caughey-Thomas field-dependent mobility.** Closed-form velocity-saturation
-   model. ~200 LOC.
-2. **Lombardi surface-mobility model.** Needed for realistic MOSFET I-V in
-   the inversion regime. ~300 LOC.
-3. **Auger recombination.** `R_Auger = (C_n n + C_p p)(np - n_i^2)`.
-   ~100 LOC.
-4. **Fermi-Dirac statistics.** Replace `exp(±psi)` with Fermi integrals
-   (use Blakemore approximation for speed, full FDI for validation). Gate
-   with a `statistics: "fermi-dirac"` schema option; Boltzmann remains the
-   default. ~400 LOC.
-5. **Schottky contacts.** Thermionic-emission boundary condition. ~300 LOC.
-6. **Band-to-band (Kane) and trap-assisted (Hurkx) tunneling.** Required for
-   any useful diode or floating-gate simulation. ~600 LOC.
+**Acceptance test:** Benchmark `benchmarks/pn_1d_velocity_saturation/` at
+V = -10 V; simulated J_sat within 15% of textbook `J_sat ~= q n_dep v_sat`.
+MMS rate >=1.95 in L2, >=0.95 in H1. Existing benchmarks byte-identical
+with `mobility.model: "constant"`.
 
-Each ships with its own benchmark and verifier.
+**LOC estimate:** ~200 LOC (mobility module + UFL branch + tests).
 
-**Acceptance tests:** one analytical-or-SPICE comparison per model.
-
-**Estimated scope:** 2–4 days per item. Don't batch; one PR per model.
-
-**Dependencies:** M9, M11.
+**Dependencies:** none. Start here.
 
 ---
 
-### M17 — Heterojunction / position-dependent band structure
+### M16.2 -- Lombardi surface-mobility
 
-**Why:** AlGaAs/GaAs, InGaAs/InP, SiGe/Si — none of this works without
-position-varying electron affinity `chi(x)` and bandgap `Eg(x)`.
+**Why:** Required for realistic MOSFET I-V in the inversion regime.
+Surface roughness and Coulomb scattering at the Si/SiO2 interface degrade
+mu by 2-5x relative to bulk; CT alone misses this.
 
-**Deliverable:** extend the material model and Poisson/continuity kernels
-to read `chi` and `Eg` as cellwise DG0 fields. Benchmark: AlGaAs/GaAs HEMT
-or SiGe HBT.
+**Deliverable:** Extend `semi/physics/mobility.py` with the Lombardi model.
+Matthiessen's rule `1/mu_total = 1/mu_b + 1/mu_ac + 1/mu_sr` with E_perp
+computed via a DG0 facet-to-cell projection in
+`semi/physics/interface_projection.py`. Schema adds `model: "lombardi"`;
+cross-field validation requires a facet with `role: "semi_insulator_interface"`.
+
+**Acceptance test:** Strong-inversion MOSFET sweep; peak channel mu is
+2-5x lower than bulk Si mu at same N_A. MMS variant confirms E_perp
+projection converges at first order.
+
+**LOC estimate:** ~300 LOC (Lombardi kernel + projection helper + tests).
+
+**Dependencies:** M16.1 (mobility framework).
+
+---
+
+### M16.3 -- Auger and radiative recombination
+
+**Why:** SRH alone misses the high-injection regime (Auger) and the
+direct-gap radiative limit. Both are needed for LED, laser, and
+high-current diode models.
+
+**Deliverable:** Extend `semi/physics/recombination.py` with
+`R_Auger = (C_n n + C_p p)(np - n_i^2)` and `R_rad = B(np - n_i^2)`.
+Recombination schema changes from a single object to a list, allowing
+multiple models to sum; existing scalar form auto-migrates to a
+single-element list at schema-load time.
+
+**Acceptance test:** Benchmark `benchmarks/pn_1d_high_injection/`:
+J(V) slope above the Auger crossover equals `~exp(qV/3kT)` (slope shift
+from kT/q to 3kT/q). Benchmark `benchmarks/gaas_pn_1d/`: radiative-limited
+ideality factor verified for GaAs. MMS variants for each new kernel.
+
+**LOC estimate:** ~100 LOC (two new recombination kernels + list schema +
+migration shim + tests).
+
+**Dependencies:** none. Can run in parallel with M16.1.
+
+---
+
+### M16.4 -- Fermi-Dirac statistics
+
+**Why:** Boltzmann breaks down at degenerate doping (>=10^19 cm^-3 in Si)
+and at heterojunction barriers. This is the largest M16 sub-item and is
+a prerequisite for M16.7 and M17. Read ADR 0015 before starting.
+
+**Deliverable:** New module `semi/physics/statistics.py` implementing
+Boltzmann and Fermi-Dirac (Blakemore and FDI-1/2 via Bednarczyk-Bednarczyk)
+carrier-density expressions. Schema adds `physics.statistics.model` and
+`physics.statistics.approximation`. DD weak form dispatches on the model.
+Ohmic-contact BC root-find updated for FD inverse.
+
+**Acceptance test:** Benchmark `benchmarks/pn_1d_degenerate/` at
+N_D = N_A = 5e19 cm^-3; FD V_bi ~30 mV smaller than Boltzmann (Sze 4th
+ed. Fig. 1.13). MMS rate unchanged vs Boltzmann case.
+
+**LOC estimate:** ~400 LOC (statistics module + UFL dispatch + FD BC
+root-find + tests).
+
+**Dependencies:** ADR 0015 (Phase A).
+
+---
+
+### M16.5 -- Schottky contacts
+
+**Why:** Schottky diodes, MESFETs, and gate leakage all need the
+thermionic-emission Robin BC. Not representable as an ohmic contact.
+
+**Deliverable:** Extend `semi/bcs.py` with a Schottky BC class implementing
+`J_n . n = q v_n_th (n - n_eq)` where `v_n_th = A_star T^2 / (q N_C)` and
+`n_eq = N_C exp(-q phi_B / kT)`. Schema adds `contacts[].type: "schottky"`
+plus `barrier_height_n` (eV). Metals (Al, W, Ti with work functions) added
+to `semi/materials.py`. ADR `docs/adr/0017-schottky-thermionic-emission.md`
+documents the Robin BC and sign convention.
+
+**Acceptance test:** Benchmark `benchmarks/schottky_diode_1d/`: Al-Si
+J_sat within 20% of `A_dstar T^2 exp(-q phi_B / kT)`.
+
+**LOC estimate:** ~300 LOC (BC class + schema + material cards + ADR + tests).
+
+**Dependencies:** none. Can run in parallel with M16.1 and M16.3.
+
+---
+
+### M16.6 -- Band-to-band and trap-assisted tunneling
+
+**Why:** Required for Zener diodes, floating-gate devices, and ESD
+protection. Largest single sub-item.
+
+**Deliverable:** New module `semi/physics/tunneling.py` with Kane BTB
+`G_BTB = A_K E^2 exp(-B_K / E)` and Hurkx trap-assisted
+`R_enhanced = (1 + Gamma(E)) R_SRH`. Both kernels appear in the
+recombination list from M16.3. Schema additions for `"kane"` and
+`"hurkx"` list entries.
+
+**Acceptance test:** Benchmark `benchmarks/zener_diode_1d/`: breakdown
+voltage within 25% of Sze closed-form. Benchmark
+`benchmarks/trap_assisted_diode_1d/`: J(V) deviates from pure-SRH curve
+in the Hurkx-dominated window.
+
+**LOC estimate:** ~600 LOC (tunneling module + two benchmarks + tests).
+
+**Dependencies:** M16.3 (recombination list infrastructure), M16.4
+(carrier-density expressions in degenerate regime).
+
+---
+
+### M16.7 -- Incomplete dopant ionization
+
+**Why:** At T < 100 K or for deep dopants (SiC, GaN), fully-ionized
+doping is wrong by 1-3 orders of magnitude.
+
+**Deliverable:** New module `semi/physics/ionization.py` with donor and
+acceptor occupation functions. Poisson source term in `poisson.py` and
+`axisymmetric.py` changes from `q(p - n + N_D - N_A)` to
+`q(p - n + f_D N_D - f_A N_A)`. Material database extended with dopant
+ionization energies and degeneracy factors. Schema adds
+`physics.ionization.model: "full" | "incomplete"`.
+
+**Acceptance test:** Benchmark `benchmarks/cryogenic_resistor_1d/` at
+T = 50 K: simulated n within 10% of freeze-out formula
+`n ~= sqrt(N_C N_D / 2) exp(-E_D/2kT)`. Schema cross-validation requires
+`fermi-dirac` statistics when `incomplete` ionization is selected.
+
+**LOC estimate:** ~200 LOC (ionization module + material DB extension +
+schema + tests).
+
+**Dependencies:** M16.4 (Fermi-Dirac occupation statistics).
+
+---
+
+### M17 -- Heterojunction / position-dependent band structure
+
+**Why:** AlGaAs/GaAs HEMTs, InGaAs/InP photodiodes, SiGe/Si HBTs -- none
+work without position-varying electron affinity `chi(x)` and bandgap `Eg(x)`.
+Read ADR 0016 before starting.
+
+**Deliverable:** Material cards gain `electron_affinity` and `bandgap_at_300K`.
+Alloy materials (AlGaAs, InGaAs, GaN, SiGe) added to `semi/materials.py`.
+Region `composition` object in the schema produces cellwise DG0 `chi(x)` and
+`E_g(x)` fields. Poisson and continuity kernels consume these fields per ADR
+0016. Schema cross-validation: heterojunction composition requires
+`physics.statistics.model: "fermi-dirac"`.
+
+**Acceptance test:** Benchmark `benchmarks/hemt_2d/`: 2DEG sheet density at
+AlGaAs/GaAs interface within 30% of Sze 4th ed. Section 7.5 closed-form.
+Benchmark `benchmarks/hbt_1d/`: collector current enhancement vs
+homojunction reference.
 
 **Estimated scope:** 4 days.
 
-**Dependencies:** M9, M16.4 (Fermi-Dirac, because heterojunctions break the
-nondegenerate approximation at the barrier).
+**Dependencies:** M16.4 (FD statistics), ADR 0016 (Phase A).
 
 ---
 

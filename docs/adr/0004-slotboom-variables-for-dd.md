@@ -1,6 +1,6 @@
 # 0004. Slotboom variables for drift-diffusion
 
-- Status: Accepted
+- Status: Accepted (carrier-density mapping subsection partially superseded by ADR 0015 for Fermi-Dirac regime)
 - Date: 2026-04-20
 
 ## Context
@@ -72,5 +72,10 @@ Harder:
 
 - `docs/PHYSICS.md` Sections 1.2 and 1.3.
 - Invariant 6 in `PLAN.md`.
+- ADR 0015 -- Slotboom variables with Fermi-Dirac statistics. ADR 0015
+  supersedes the carrier-density mapping subsection of this ADR for
+  operation under `physics.statistics.model: "fermi-dirac"`. The choice
+  of primary unknowns and the coercivity argument in this ADR remain in
+  force unchanged.
 - Future ADR if we ever need SUPG for a non-Slotboom subsystem (for
   example, hot-carrier transport).

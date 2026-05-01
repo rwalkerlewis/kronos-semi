@@ -96,22 +96,13 @@ M15 through M18. Summary:
 
 ## Next task
 
-**Tag `v0.14.2` and merge PR #65 (`docs/post-merge-cleanup`).** The
-post-merge documentation refresh, scipy base-dependency promotion,
-and axisymmetric dispatch in `semi/runners/mos_cap_ac.py` need to land
-on `main` together with the M14.2 axisymmetric MOSCAP work, and the
-package version bumped from 0.14.1 → 0.14.2.
+**M16.1 Caughey-Thomas field-dependent mobility** (first of seven M16
+sub-items + M17; tracked in `docs/M16_M17_STARTER_PROMPT.md`).
 
-After that, the next two open work streams are:
-
-1. **Physics validation suite, Phase 2** — external validation against
-   Sze and Nicollian-Brews. Phase 1 is complete: cases 01-04 pass
-   internal-consistency checks (audit case 03 confirms `mos_cv` and
-   `mos_cap_ac` byte-identity); case 02/05 sign-convention findings
-   were resolved in PR #62 (M14 sign fix); case 06 deferred. Audit
-   suite is CI-gated via the `docker-fem-audit` job.
-2. **M15 — GPU linear solver path.** Deferred until the validation
-   suite has fully run.
+M15 (GPU linear solver) remains on the roadmap but is not the immediate
+priority. The owner has directed the DD physics surface to land before M15.
+After M16.1 merges, pick the next item from the M16 sequence per the
+dependency order in `docs/M16_M17_STARTER_PROMPT.md`.
 
 ## Roadmap
 
@@ -135,8 +126,14 @@ After that, the next two open work streams are:
 | M14.1: AC differential C-V | `mos_cap_ac` runner returns dQ/dV via Im(Y)/(2πf); audit case 03 byte-identity | Done |
 | M14.2: Axisymmetric MOSCAP | Cylindrical 2D path; schema 1.3.0 `coordinate_system`; Hu Fig. 5-18 benchmark | Done |
 | M15: GPU linear solver | PETSc CUDA/HIP, AMGX preconditioner, 500k-DOF 3D benchmark | Planned |
-| M16: Physics completeness | Caughey-Thomas, Lombardi, Auger, FD, Schottky, tunneling | Planned |
-| M17: Heterojunctions | Position-dependent chi, Eg; HEMT or HBT benchmark | Planned |
+| M16.1: Caughey-Thomas mobility | Field-dependent velocity saturation; `semi/physics/mobility.py` | Planned |
+| M16.2: Lombardi surface-mobility | Surface roughness + Coulomb scattering at Si/SiO2; `mobility.py` extended | Planned |
+| M16.3: Auger + radiative recombination | `R_Auger`, `R_rad`; recombination schema becomes list | Planned |
+| M16.4: Fermi-Dirac statistics | Blakemore + FDI-1/2; `semi/physics/statistics.py`; ADR 0015 | Planned |
+| M16.5: Schottky contacts | Thermionic-emission Robin BC; `semi/bcs.py`; ADR 0017 | Planned |
+| M16.6: BTB + trap-assisted tunneling | Kane + Hurkx; `semi/physics/tunneling.py` | Planned |
+| M16.7: Incomplete ionization | Freeze-out occupation function; `semi/physics/ionization.py` | Planned |
+| M17: Heterojunctions | Position-dependent chi, Eg; HEMT or HBT benchmark; ADR 0016 | Planned |
 | M18: UI (separate repo) | React + vtk.js + JSONForms, consumes M9+M10+M11 contracts | Out of scope (this repo) |
 
 Per-milestone acceptance tests and scope definitions live in
@@ -180,26 +177,24 @@ under `docs/adr/`.
 
 ## Non-goals
 
-The following are explicitly out of scope for the current release. They
-are tracked as stretch milestones (M16/M17) in
-[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md):
+The following are explicitly out of scope for the current release:
 
-- Field-dependent mobility (Caughey-Thomas, Canali, saturation velocity).
-- Auger and radiative recombination.
-- Fermi-Dirac statistics.
-- Heterojunctions (multiple semiconductor materials with different band
-  alignments in the same device).
-- Incomplete ionization of dopants.
-- Band-to-band or trap-assisted tunneling.
-- Schottky contacts.
 - Full MOSFET with source/drain/gate/body contacts beyond the M12
   benchmark (M16+).
 - FinFET or any 3D transistor geometry (M16+).
 - GUI or web frontend (M18, separate repo).
 
-Capabilities previously listed here that have since shipped:
+Capabilities previously listed here that have since shipped or been promoted
+to the active roadmap (M16.1-M16.7 and M17):
 **transient solver** (M13/M13.1), **AC small-signal analysis** (M14),
-**axisymmetric (cylindrical) 2D devices** (M14.2).
+**axisymmetric (cylindrical) 2D devices** (M14.2),
+**field-dependent mobility** (Caughey-Thomas M16.1, Lombardi M16.2),
+**Auger and radiative recombination** (M16.3),
+**Fermi-Dirac statistics** (M16.4),
+**Schottky contacts** (M16.5),
+**band-to-band and trap-assisted tunneling** (M16.6),
+**incomplete dopant ionization** (M16.7),
+**heterojunctions** (M17).
 
 ## Post-merge follow-ups
 
