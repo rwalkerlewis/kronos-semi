@@ -39,7 +39,7 @@ def _load_cv(path: Path) -> np.ndarray:
     with path.open() as fh:
         lines = [line for line in fh if not line.lstrip().startswith(("#", '"#'))]
     # The first non-comment line is the header; skip it.
-    if lines and not lines[0][0].isdigit() and not lines[0][0] in "+-.":
+    if lines and not lines[0][0].isdigit() and lines[0][0] not in "+-.":
         lines = lines[1:]
     data = np.loadtxt(lines, delimiter=",")
     if data.ndim == 1:
