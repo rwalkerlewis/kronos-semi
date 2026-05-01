@@ -4,9 +4,11 @@ kronos-semi is a FEniCSx-based finite-element semiconductor device simulator tha
 
 ## Capability matrix
 
-All milestones M1 through M14.2 have shipped as of v0.14.1. The table
+All milestones M1 through M15 have shipped as of v0.15.0. The table
 below is the current state; see the Delivery history section for
-per-milestone details.
+per-milestone details. Planned milestones (M14.3, M16, M19, M20)
+have explicit acceptance tests in
+[`docs/IMPROVEMENT_GUIDE.md`](IMPROVEMENT_GUIDE.md).
 
 | Capability | Dimensions | Status | Verifier |
 |---|---|---|---|
@@ -22,14 +24,53 @@ per-milestone details.
 | Result artifact writer + manifest (M9) | n/a | shipped | semi-run CLI; manifest.v1.json schema |
 | HTTP server POST /solve, GET /runs/{id} (M10) | n/a | shipped | integration tests; WebSocket progress |
 | Schema versioning + UI-facing companion (M11) | n/a | shipped | schema_version gate; SCHEMA_SUPPORTED_MINOR |
-| Mesh input beyond axis-aligned boxes (M12) | 2D | shipped | MOSFET 2D verifier within ±20% |
+| Mesh input beyond axis-aligned boxes (M12) | 2D | shipped | MOSFET 2D verifier within ±20% (qualitative) |
 | Transient solver BDF1/BDF2 Slotboom (M13/M13.1) | 1D | shipped | steady-state-limit + BDF rate + pn_1d_turnon (5%) |
 | AC small-signal analysis (M14) | 1D / 2D | shipped | RC benchmark within 0.4% of analytical C_dep |
 | Differential capacitance via AC admittance (M14.1) | 2D | shipped | mos_cap_ac vs mos_cv on Q_gate (byte-identical) |
 | Axisymmetric (cylindrical) 2D MOSCAP (M14.2) | 2D | shipped | schema 1.3.0; LF/HF C-V vs Hu Fig. 5-18 analytical |
+| GPU linear-solver path (M15) | n/a | shipped | schema 1.4.0; pn_1d psi within 1e-8 vs CPU; >=5x linear-solve speedup at 500k DOFs |
 | Test suite | pure + FEM | shipped | 328+ tests, coverage >= 92% (CI gate) |
 | V&V | 10 studies | shipped | 62/62 PASS |
 | CI | pure-python + lint + docker-fem (parallelized) | shipped | green on main |
+| Housekeeping (strict schema, XDMF ingest, Pao-Sah mosfet_2d, dead SG removal) (M14.3) | n/a | Planned | per-deliverable acceptance in IMPROVEMENT_GUIDE.md |
+| Caughey-Thomas field-dependent mobility (M16.1) | 1D / 2D / 3D | Planned | MMS L2 >= 1.99; diode_velsat_1d divergence-vs-convergence verifier |
+| Lombardi surface mobility (M16.2) | 2D / 3D | Planned | mosfet_2d Sah-Pao within 10% in inversion strong-field window |
+| Auger recombination (M16.3) | 1D / 2D | Planned | diode_auger_1d analytical match within 5% at high injection |
+| Fermi-Dirac statistics (M16.4) | 1D / 2D | Planned | diode_fermi_dirac_1d FD vs scipy reference within 1e-3 |
+| Schottky contacts (M16.5) | 1D / 2D | Planned | schottky_1d thermionic-emission within 10% from V_F = 0.1 to 0.5 V |
+| BBT and TAT tunneling (M16.6) | 1D | Planned | zener_1d Kane reverse-bias breakdown within 20% from V_R = 4 to 8 V |
+| Time-varying transient contact voltage (M16.7) | 1D / 2D | Planned | audit case 06 transient FFT vs AC sweep agreement within 5% |
+| Heterojunctions (M17) | 2D | Planned | hemt_2d 2DEG sheet density within 15% of self-consistent reference |
+| 3D MOSFET benchmark (M19) | 3D | Planned | Pao-Sah within 25% (linear); velsat within 30% (saturation); >=5x GPU speedup at 500k DOFs |
+| MPI parallel benchmark (M19.1) | 3D | Planned | mosfet_3d under mpiexec -n {1,2,4} same I_D within 1e-8; n=4 vs n=1 speedup >=2.5x |
+| HTTP server hardening (M20) | n/a | Planned | unauthenticated POST /solve returns 401; authenticated rate-limited 429 on overrun |
+
+## Honest gap
+
+Three things the engine still does not do well, called out at the top
+of this document so a reviewer hits them first instead of digging
+through the milestone history.
+
+The 3D semiconductor coverage is thin. The shipped 3D benchmarks are
+the doped resistor (M7) and a pure-Poisson box (the M15 GPU
+acceptance test). There is no real 3D semiconductor device. M19
+closes this gap with a 3D MOSFET benchmark on a gmsh-sourced
+unstructured mesh, run on both CPU-MUMPS and GPU-AMGX backends; M19
+depends on M16.1 (Caughey-Thomas mobility) so saturation has any
+meaning.
+
+The physics catalogue is incomplete in three ways that matter for any
+quantitative TCAD comparison: (1) carrier statistics are Boltzmann
+throughout, which is wrong above ~1e19 cm^-3 (every modern MOSFET
+source/drain extension); (2) contacts are ohmic or ideal-gate only,
+with no Schottky thermionic-emission or thermionic-field-emission
+boundary conditions; (3) recombination is SRH only, with no Auger,
+no band-to-band tunneling, and no trap-assisted tunneling. M16.1
+through M16.7 each ship one of these as its own PR with a numerical
+acceptance test against an analytical or external reference; the
+order is dictated by physical dependencies (Fermi-Dirac before BBT,
+Caughey-Thomas before Lombardi).
 
 ## Scope vs. COMSOL Semiconductor Module
 
@@ -51,14 +92,29 @@ analysis and axisymmetric (cylindrical) 2D devices:
 - Differential capacitance via AC admittance (M14.1)
 - Axisymmetric (cylindrical) 2D devices, MOSCAP LF/HF C-V (M14.2)
 
-**Explicitly out of scope (post-submission stretch goals, M15–M17 planned):**
+**Explicitly out of scope today (M14.3 housekeeping, M16 physics
+completeness, M17 heterojunctions, M19 3D MOSFET, M19.1 MPI, M20
+server hardening planned):**
+
+- Strict-mode input schema with `additionalProperties: false`,
+  XDMF mesh ingest, Pao-Sah analytical reference for the
+  `mosfet_2d` verifier, dead Scharfetter-Gummel primitives
+  (M14.3 housekeeping)
 - Caughey-Thomas / Lombardi field-dependent mobility (M16.1, M16.2)
 - Auger and radiative recombination (M16.3)
-- Fermi-Dirac statistics — Boltzmann throughout (M16.4)
-- Band-to-band / trap-assisted tunneling (M16.6)
-- Heterojunctions (M17)
+- Fermi-Dirac statistics: Boltzmann throughout, valid below ~1e19
+  cm^-3 (M16.4)
 - Schottky contacts (M16.5)
-- Full FinFET / 3D transistor geometries (depends on M15 GPU)
+- Band-to-band / trap-assisted tunneling (M16.6)
+- Time-varying transient contact voltage (M16.7; closes audit
+  case 06)
+- Heterojunctions, position-dependent chi(x) and Eg(x) (M17;
+  depends on M16.4)
+- 3D MOSFET on a gmsh-sourced unstructured mesh (M19; depends on
+  M16.1 and M14.3)
+- MPI parallel orchestration in the runners (M19.1; depends on
+  M19)
+- HTTP server auth, rate limiting, API keys (M20)
 
 ## JSON input contract
 
@@ -670,15 +726,49 @@ contributors and reviewers know the intended direction.
     inversion regimes.
 - **Dependencies:** M14.1.
 
+## Deferred
+
+These items remain in-tree as named follow-ups but are not on the
+critical path. They are documented here, with the milestone that
+supersedes them, so that a reviewer scanning for "what is left of
+M14.2" finds the answer in one place.
+
+- **M14.2.x: Cartesian-2D MOSCAP variant and rigorous gate-driven
+  HF C-V method.** Originally tracked in
+  [`PLAN.md`](../PLAN.md) §Backlog and on the README capability
+  matrix. Superseded for practical purposes by M16.4 (Fermi-Dirac;
+  the rigorous HF C-V formulation depends on FD-corrected statistics
+  at the high doping that makes HF dispersion physically meaningful)
+  and M19 (3D MOSFET; the same multi-region MOSCAP infrastructure
+  exercised on a more important device than a 2D MOSCAP variant).
+  If a contributor still wants to ship the Cartesian-2D MOSCAP
+  variant in isolation, the work is bounded (~2 days) and can be
+  picked up after M14.3 lands; the rigorous HF C-V should not be
+  attempted before M16.4.
+- **Physics validation suite, Phase 2 (Sze, Nicollian-Brews).**
+  Phase 1 is closed. Case 06 (transient FFT vs AC sweep) is the
+  M16.7 deliverable; the rest (cases 01-05) are
+  internal-consistency checks that pass and were never load-bearing
+  on external references.
+
 ## Forward-looking
 
-See `PLAN.md` for the active "Next task" and milestone progression.
-See `docs/IMPROVEMENT_GUIDE.md` for the full milestone specs for M15
-(GPU / solver acceleration), M16 (physics additions: field-dependent
-mobility, Fermi-Dirac, additional recombination), and M17
-(heterojunctions).
+See [`PLAN.md`](../PLAN.md) for the active "Next task" and milestone
+progression. See
+[`docs/IMPROVEMENT_GUIDE.md`](IMPROVEMENT_GUIDE.md) for the full
+milestone specs:
 
-This file (`ROADMAP.md`) is the "what does this project do" document
-and is updated when milestones merge. `PLAN.md` tracks active work.
-`IMPROVEMENT_GUIDE.md` defines the acceptance criteria for future
-milestones.
+- M14.3: housekeeping (the next shipping PR, picked up via
+  [`docs/M14_3_STARTER_PROMPT.md`](M14_3_STARTER_PROMPT.md)).
+- M16.1 through M16.7: physics-completeness sub-milestones, each its
+  own PR. M16.1 (Caughey-Thomas) starts via
+  [`docs/M16_1_STARTER_PROMPT.md`](M16_1_STARTER_PROMPT.md).
+- M17: heterojunctions (depends on M16.4).
+- M19: 3D MOSFET capstone (depends on M16.1, M14.3).
+- M19.1: MPI parallel orchestration (depends on M19).
+- M20: HTTP server hardening (independent).
+
+This file (`ROADMAP.md`) is the "what does this project do"
+document and is updated when milestones merge. `PLAN.md` tracks
+active work. `IMPROVEMENT_GUIDE.md` defines the acceptance criteria
+for future milestones.

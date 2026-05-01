@@ -50,6 +50,21 @@ matches bias_sweep at deep steady state. SG flux primitives ship in
 `test_transient_steady_state_limit` and BDF rate tests are now active
 and passing.
 
+The post-M15 roadmap was refreshed in the doc-only PR on branch
+`dev/roadmap-refresh-post-m15` (this PR). The refresh encodes the
+findings of an external code review into PLAN, ROADMAP, and
+IMPROVEMENT_GUIDE: the GitHub-rendered README is stale, the 3D coverage
+is thin, the `mosfet_2d` verifier has no analytical reference, the M16
+and M17 entries were sketches not contracts, and the production-
+hardening items (strict schema, XDMF ingest, dead SG primitives, HTTP
+auth) were uncollected. The backlog now contains an explicit
+acceptance test with a numerical threshold or analytical reference for
+every Tier 1 physics model (Caughey-Thomas, Lombardi, Auger,
+Fermi-Dirac, Schottky, BBT/TAT) plus a 3D MOSFET capstone (M19), an
+MPI parallel benchmark (M19.1), and HTTP server hardening (M20). Two
+new milestone starter prompts (M14.3, M16.1) ship in this PR so the
+next contributor can pick up immediately.
+
 The capability matrix (verified in CI) is authoritative: see `README.md`
 §Status or `docs/ROADMAP.md`.
 
@@ -100,24 +115,60 @@ M15 through M18. Summary:
 
 ## Next task
 
-**Owner picks one** of: (a) M14.2.x cartesian-2D MOSCAP / rigorous HF
-C-V follow-ups; (b) Physics validation suite Phase 2 (Sze /
-Nicollian-Brews external comparisons, case 06); (c) M16.1 (first
-physics-completeness slice: Caughey-Thomas mobility). All three are
-tracked in [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md)
-and [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**M14.3 Housekeeping PR** on branch `dev/m14.3-housekeeping`. Picked
+up via [`docs/M14_3_STARTER_PROMPT.md`](docs/M14_3_STARTER_PROMPT.md);
+acceptance tests in [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md)
+§ M14.3. Five-deliverable scope:
+
+1. Re-render the GitHub `README.md` so the landing page matches `main`
+   (the on-disk copy is correct; the `github.com` cache, fork shadow,
+   or rendered view is stale at v0.1.0 framing).
+2. Tighten the `mosfet_2d` verifier with a Pao-Sah / square-law
+   analytical reference in the linear regime and a documented 20%
+   tolerance window.
+3. Implement the XDMF branch in `semi/mesh.py::_build_from_file` and
+   round-trip the resistor benchmark from `box.xdmf` within 1e-12
+   relative R.
+4. Strict-mode the input schema (`additionalProperties: false`
+   everywhere), bump the schema major to v2.0.0, ship `schemas/input.v2.json`
+   alongside v1, and migrate every benchmark JSON.
+5. Delete `semi/fem/sg_assembly.py` (~792 LOC dead-on-active-path)
+   and raise the coverage gate from 92 to 95.
+
+After M14.3 lands, M16.1 (Caughey-Thomas field-dependent mobility) is
+the next physics-completeness slice; starter prompt at
+[`docs/M16_1_STARTER_PROMPT.md`](docs/M16_1_STARTER_PROMPT.md).
 
 ## Backlog
 
 Items deferred behind the next task. Order is informational, not
 binding; the owner picks one explicitly when the next task ships.
 
+- **M14.2.x cartesian-2D MOSCAP / rigorous HF C-V follow-ups.**
+  Tracked in `docs/ROADMAP.md` §Deferred. Superseded for practical
+  purposes by M16.4 (Fermi-Dirac, which the rigorous HF C-V
+  formulation depends on at high doping) and M19 (3D MOSFET, which
+  exercises the same multi-region infrastructure with a more
+  important device).
 - **Physics validation suite, Phase 2.** External validation against
   Sze and Nicollian-Brews. Phase 1 is complete: cases 01-04 pass
   internal-consistency checks (audit case 03 confirms `mos_cv` and
   `mos_cap_ac` byte-identity); case 02/05 sign-convention findings
-  were resolved in PR #62 (M14 sign fix); case 06 deferred. Audit
-  suite is CI-gated via the `docker-fem-audit` job.
+  were resolved in PR #62 (M14 sign fix); case 06 (transient FFT vs
+  AC sweep) is deferred and is the M16.7 deliverable. Audit suite is
+  CI-gated via the `docker-fem-audit` job.
+- **M16.2 Lombardi surface mobility, M16.3 Auger, M16.4 Fermi-Dirac,
+  M16.5 Schottky contacts, M16.6 BBT/TAT tunneling.** Each its own
+  PR with explicit acceptance tests in
+  [`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md).
+- **M19 3D MOSFET benchmark.** Capstone after M16.1, depends on
+  M14.3 for stable XDMF / gmsh ingest.
+- **M19.1 MPI parallel benchmark.** Verify and where needed fix
+  collective communication in the runners; `mosfet_3d` under
+  `mpiexec -n 4`.
+- **M20 HTTP server hardening.** API-key middleware, per-key rate
+  limiting, admin endpoint to issue/revoke keys. Required before
+  multi-tenant deployment.
 
 ## Roadmap
 
@@ -225,6 +276,23 @@ affect any verifier or benchmark result.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **Phase 0 roadmap refresh (2026-05-01):** Doc-only PR on branch
+  `dev/roadmap-refresh-post-m15`. PLAN, ROADMAP, and IMPROVEMENT_GUIDE
+  rewritten to encode the post-M15 priorities derived from an external
+  code review. Each Tier 1 physics model in M16 (Caughey-Thomas,
+  Lombardi, Auger, Fermi-Dirac, Schottky, BBT/TAT) now has an explicit
+  acceptance test with a numerical threshold or analytical reference;
+  new milestones M14.3 (housekeeping), M19 (3D MOSFET capstone), M19.1
+  (MPI parallel benchmark), and M20 (HTTP server hardening) added; the
+  M14.2.x backlog moved into ROADMAP.md §Deferred with a note that it
+  is superseded by M16.4 / M19. Two ready-to-paste starter prompts
+  shipped: `docs/M14_3_STARTER_PROMPT.md` and
+  `docs/M16_1_STARTER_PROMPT.md`. ROADMAP.md grew an "Honest gap"
+  section calling out the three remaining weaknesses (3D semiconductor
+  device benchmarks, post-Boltzmann statistics, contact / tunneling
+  physics). No engine code changed; coverage gate untouched; CI ran
+  only the pure-Python and lint jobs because no FEM file moved.
 
 - **M15 GPU linear-solver path (2026-05-15):** Schema 1.4.0 adds
   `solver.backend` (`cpu-mumps` default, plus `gpu-amgx`, `gpu-hypre`,

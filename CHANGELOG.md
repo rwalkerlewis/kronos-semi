@@ -63,6 +63,50 @@ shipped with the M15 GPU linear-solver work in v0.15.0 below.
 
 ## [Unreleased]
 
+### Documentation
+
+- **Post-M15 roadmap refresh.** PLAN, IMPROVEMENT_GUIDE, and ROADMAP
+  rewritten to encode the post-M15 priorities derived from an
+  external code review. Each Tier 1 physics model in the M16
+  umbrella (Caughey-Thomas, Lombardi, Auger, Fermi-Dirac, Schottky,
+  BBT and TAT) now has an explicit acceptance test with a numerical
+  threshold or analytical reference. New milestones added:
+  - **M14.3 Housekeeping** (between M14.2 and M15): re-render the
+    GitHub README, tighten the `mosfet_2d` verifier with a Pao-Sah
+    analytical reference, implement XDMF mesh ingest, strict-mode
+    the input schema with an `additionalProperties: false` major
+    bump, and remove the dead-on-active-path Scharfetter-Gummel
+    primitives in `semi/fem/sg_assembly.py`.
+  - **M16.1 through M16.7** (physics completeness, one PR each):
+    Caughey-Thomas mobility, Lombardi surface mobility, Auger
+    recombination, Fermi-Dirac statistics (gated), Schottky
+    contacts, BBT and TAT tunneling, time-varying transient
+    contact voltage.
+  - **M19 3D MOSFET capstone**: Pao-Sah-with-velocity-saturation
+    analytical reference within 25% on linear-regime I_D, run on
+    both CPU-MUMPS and GPU-AMGX backends to demonstrate M15
+    acceptance on a real device.
+  - **M19.1 MPI parallel benchmark**: collective-communication
+    audit of the runners, `mosfet_3d` under `mpiexec -n {1, 2, 4}`.
+  - **M20 HTTP server hardening**: API-key middleware, per-key rate
+    limiting, admin endpoint to issue and revoke keys.
+- Added per-milestone starter prompts for the next two PRs:
+  [`docs/M14_3_STARTER_PROMPT.md`](docs/M14_3_STARTER_PROMPT.md)
+  and [`docs/M16_1_STARTER_PROMPT.md`](docs/M16_1_STARTER_PROMPT.md).
+  The shape mirrors `docs/M9_STARTER_PROMPT.md` and
+  `docs/M15_STARTER_PROMPT.md`.
+- Added an "Honest gap" section to
+  [`docs/ROADMAP.md`](docs/ROADMAP.md) calling out the three
+  remaining weaknesses a reviewer should hit first: thin 3D
+  semiconductor coverage, Boltzmann-only carrier statistics, and
+  no contact / tunneling physics.
+- Moved the M14.2.x cartesian-2D MOSCAP and rigorous gate-driven
+  HF C-V backlog into [`docs/ROADMAP.md`](docs/ROADMAP.md)
+  § Deferred with a note that they are superseded for practical
+  purposes by M16.4 (Fermi-Dirac) and M19 (3D MOSFET).
+- No engine code changed; coverage gate untouched; no version bump
+  (the next bump ships with M14.3).
+
 ### Added
 - Axisymmetric (cylindrical) coordinate system support (**schema 1.3.0**).
   New top-level `coordinate_system` field accepts `"cartesian"`
