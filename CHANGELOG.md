@@ -12,9 +12,10 @@ default) and [`schemas/input.v1.json`](schemas/input.v1.json) (legacy,
 deprecated for one minor cycle), and in the
 [schema reference](docs/schema/reference.md); schema versions in
 active use are **1.4.0** (loose, deprecated for one minor cycle,
-accepted with a `DeprecationWarning`) and **2.0.0** (strict,
+accepted with a `DeprecationWarning`), **2.0.0** (strict,
 `additionalProperties: false`, the M14.3 default; shipped with
-`[0.16.0]` below).
+`[0.16.0]` below), and **2.1.0** (additive minor; M16.1 caughey_thomas
+mobility dispatch; shipped with `[0.17.0]` below).
 
 ## [0.15.0] - 2026-05-15
 
@@ -66,6 +67,85 @@ accepted with a `DeprecationWarning`) and **2.0.0** (strict,
 - Folds in the v0.14.2 administrative items deferred from PR #65.
 
 ## [Unreleased]
+
+## [0.17.0] - 2026-05-01
+
+### Added
+- **M16.1 Caughey-Thomas field-dependent mobility.** First slice of
+  the M16 physics-completeness umbrella. Closed-form velocity
+  saturation `mu(F) = mu0 / (1 + (mu0 * F_par / vsat)^beta)^(1/beta)`
+  with `F_par` the magnitude of the carrier-specific scaled quasi-
+  Fermi gradient (ADR 0004 Slotboom flux form). Schema additive
+  minor bump v2.0.0 -> v2.1.0: `physics.mobility.model` enum extends
+  to `"caughey_thomas"` plus parameters `vsat_n`, `vsat_p`,
+  `beta_n`, `beta_p` (Si defaults: vsat_n = 1e7 cm/s,
+  vsat_p = 8e6 cm/s, beta_n = 2, beta_p = 1). v2.0.0 inputs continue
+  to validate; the constant branch (default) is bit-identical to
+  v0.16.1.
+- `semi/physics/mobility.py`: `caughey_thomas_mu(mu0, F_par, vsat,
+  beta)` UFL builder and `build_mobility_expressions` dispatch
+  consumed by `build_dd_block_residual` and
+  `build_dd_block_residual_mr`. Layer 4 (FEM); dolfinx / ufl /
+  petsc4py imports are deferred to function bodies so the
+  pure-Python core stays dolfinx-free.
+- MMS variant D in `semi/verification/mms_dd.py`: Variant C
+  electronics + Caughey-Thomas mobility. `MMS_D_VSAT_*_FOR_FORM`
+  engineered to push `(mu0_hat * F_par_e / vsat)^beta` to O(0.3)
+  at the typical manufactured gradient (~7 % mu reduction) so the
+  CT path is materially exercised. Acceptance gate L^2 >= 1.99 and
+  H^1 >= 0.99 on every block at the finest pair (M16.1 Acceptance
+  test 1).
+- `benchmarks/diode_velsat_1d/`: M16.1 Acceptance test 2 anchor.
+  1D pn diode (20 um, N_A = N_D = 1e17 cm^-3), forward sweep
+  V_F in [0.0, 0.9] V; verifier asserts >5 % I-V divergence at
+  V_F = 0.9 V (CT velocity saturation; observed 56 %) and <5 %
+  convergence at V_F = 0.3 V (CT factor ~ 0.99; observed 0.19 %).
+  The starter prompt's V = 0.5 V <1 % anchor was dropped because
+  the depletion-edge field at V_F = 0.5 V already gives ~12 % I-V
+  deviation on this geometry; V_F = 0.3 V is the natural low-field
+  anchor.
+- `tests/test_mobility_schema.py` (9 tests): every existing benchmark
+  validates unchanged against v2.1.0 (M16.1 Acceptance test 3).
+- `tests/test_mobility_closed_form.py` (8 tests): pure-Python unit
+  tests for the closed-form math (limit at F=0, drift saturation,
+  beta=1/2 inflection, Si-electron sample points).
+- `tests/fem/test_mms_caughey_thomas.py` (2 tests): MMS rate gate
+  in 1D and 2D for Variant D.
+- CI: `diode_velsat_1d` added to the docker-fem benchmark matrix
+  in `.github/workflows/ci.yml` so a regression is caught at PR
+  time.
+
+### Changed
+- `semi/runners/bias_sweep.py`: passes `mobility_cfg = mob` to the
+  DD residual builder so caughey_thomas inputs route into the new
+  branch. Constant branch unchanged.
+- `semi/physics/drift_diffusion.py`: `build_dd_block_residual` and
+  `build_dd_block_residual_mr` each grow an optional `mobility_cfg`
+  parameter (default `None` = constant branch, bit-identical to
+  pre-M16.1).
+- `semi/schema.py`: `SCHEMA_SUPPORTED_MINOR` bumped 0 -> 1 for
+  v2.1.0.
+- `docs/PHYSICS.md` § 5.4: Variant D paragraph and rate-table rows.
+- `docs/mms_dd_derivation.md` § 3.4: Variant D manufactured-source
+  derivation.
+- `docs/schema/reference.md`: Versioning section updated.
+
+### Notes
+- All Slotboom invariants preserved (ADR 0004); no SUPG / streamline
+  diffusion introduced. Caughey-Thomas multiplies the diffusion
+  coefficient pointwise; primary unknowns and their boundary
+  conditions are unchanged.
+- Five-layer architecture preserved: schema is Layer 1/2 (pure
+  Python), `semi/physics/mobility.py` is Layer 4 (FEM), runners
+  (Layer 5) thread the cfg through to the form builder. The
+  pure-Python lazy-imports gate (`tests/test_lazy_imports.py`)
+  passes with the new module imported.
+- Other runners (equilibrium, mos_cv, mos_cap_ac, transient,
+  ac_sweep) intentionally do not adopt the dispatch in this PR;
+  they have no continuity rows (equilibrium), are mu-independent
+  (MOSCAP gate-charge integration), or can adopt CT in a follow-up
+  (M16.7 transient V(t) builds on M13.1 turn-on, where CT effects
+  are second-order to the lifetime physics).
 
 ## [0.16.1] - 2026-05-23
 
