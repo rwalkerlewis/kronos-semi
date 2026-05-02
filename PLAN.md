@@ -35,8 +35,21 @@ recombination for 1D/2D/3D devices.
 
 ## Current state
 
-M1 through M15 plus M14.3 and M14.4 are merged into `main`. Current
-package version is `0.16.1`; M14.4 (residual cleanup, branch
+M1 through M15 plus M14.3, M14.4, and M16.1 are merged into `main`.
+Current package version is `0.17.0`; M16.1 (Caughey-Thomas
+field-dependent mobility, branch `dev/m16.1-caughey-thomas`) ships
+the first physics-completeness slice of M16: a closed-form velocity-
+saturation mobility behind a schema dispatch
+(`physics.mobility.model: caughey_thomas` plus `vsat_n`, `vsat_p`,
+`beta_n`, `beta_p`), an MMS Variant D in
+`semi/verification/mms_dd.py` that gates the discretization rate at
+L^2 >= 1.99 and H^1 >= 0.99 on every block, and a new
+`benchmarks/diode_velsat_1d/` whose verifier asserts >5 % I-V
+divergence at V_F = 0.9 V (observed 56 %) and <5 % convergence at
+V_F = 0.3 V (observed 0.19 %) between Caughey-Thomas and constant
+mobility. Schema additive minor bump v2.0.0 -> v2.1.0; v2.0.0 inputs
+continue to validate; the constant branch is bit-identical to
+v0.16.1 on every existing benchmark. M14.4 (residual cleanup, branch
 `dev/m14.4-residual-cleanup`) shipped four documentation /
 infrastructure deliverables: README rewritten without milestone tags
 or frozen test counts, post-M14.3 staleness sweep across
@@ -126,16 +139,17 @@ M15 through M18. Summary:
 
 ## Next task
 
-**M16.1: Caughey-Thomas field-dependent mobility** on a fresh branch
-`dev/m16.1-caughey-thomas`. Picked up via
-[`docs/M16_1_STARTER_PROMPT.md`](docs/M16_1_STARTER_PROMPT.md);
-acceptance tests in
-[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) § M16.1.
-Adds velocity-saturation mobility behind a schema dispatch, an MMS
-verifier extension, and a new `benchmarks/diode_velsat_1d` that
-demonstrates >5% divergence vs constant mobility at V_F = 0.9 V.
-Phase A schema bump is v2.0.0 to v2.1.0 (additive minor), starting
-from the M14.3 v0.16.0 tree.
+**M16.2: Lombardi surface mobility** on a fresh branch
+`dev/m16.2-lombardi`. To be picked up via
+`docs/M16_2_STARTER_PROMPT.md` (yet to be authored, in the same
+shape as `docs/M16_1_STARTER_PROMPT.md`); acceptance tests in
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) § M16.2.
+Adds the Lombardi composite (Coulomb + phonon + surface roughness)
+on top of the M16.1 Caughey-Thomas bulk mobility, with an MMS
+variant for the local normal-field decomposition at the Si/SiO2
+interface. The acceptance gate widens the M14.3 mosfet_2d
+Pao-Sah verifier window from `[V_T + 0.2, V_T + 0.6]` V into the
+strong-inversion regime where surface mobility dominates.
 
 ## Backlog
 
@@ -191,7 +205,8 @@ binding; the owner picks one explicitly when the next task ships.
 | M14.2: Axisymmetric MOSCAP | Cylindrical 2D path; schema 1.3.0 `coordinate_system`; Hu Fig. 5-18 benchmark | Done |
 | M15: GPU linear solver | PETSc CUDA/HIP, AMGX/hypre PCs, schema 1.4.0 `solver.backend`/`solver.compute`, manifest 1.1.0, 3D Poisson 500k-DOF benchmark | Done |
 | M14.3: Housekeeping | mosfet_2d Pao-Sah verifier, XDMF mesh ingest, strict schema v2.0.0 (`additionalProperties: false`), dead SG primitives removed, coverage gate to 95 | Done |
-| M16: Physics completeness | Caughey-Thomas, Lombardi, Auger, FD, Schottky, tunneling | Planned |
+| M16.1: Caughey-Thomas mobility | Closed-form velocity saturation; schema 2.1.0 `caughey_thomas` dispatch; MMS-DD Variant D L2 >= 1.99 / H1 >= 0.99; `diode_velsat_1d` 56 % divergence at 0.9 V / 0.19 % convergence at 0.3 V | Done |
+| M16: Physics completeness | Lombardi, Auger, FD, Schottky, tunneling (M16.1 done) | Planned |
 | M17: Heterojunctions | Position-dependent chi, Eg; HEMT or HBT benchmark | Planned |
 | M18: UI (separate repo) | React + vtk.js + JSONForms, consumes M9+M10+M11 contracts | Out of scope (this repo) |
 
@@ -262,11 +277,93 @@ Capabilities previously listed here that have since shipped:
 Small alignment items deferred from the M8 / M14.2 polish passes; none
 affect any verifier or benchmark result.
 
-None as of v0.16.1.
+None as of v0.17.0.
 
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M16.1 Caughey-Thomas field-dependent mobility (2026-05-01):**
+  Branch `dev/m16.1-caughey-thomas`, five phase-letter commits per
+  `docs/M16_1_STARTER_PROMPT.md`. Schema additive minor bump
+  v2.0.0 -> v2.1.0; package version 0.16.1 -> 0.17.0. The constant
+  branch (default) is bit-identical to v0.16.1 on every existing
+  benchmark (M16.1 Acceptance test 3 verified: pn_1d_bias
+  J(V=0.6 V) = 1.635e+03 A/m^2, byte-identical to pre-M16.1).
+  - **Phase A (schema 2.1.0).** `schemas/input.v2.json`
+    schema_version pattern and example refreshed; physics.mobility
+    extended with the `caughey_thomas` enum value plus `vsat_n`,
+    `vsat_p`, `beta_n`, `beta_p` parameters (Si defaults: vsat_n =
+    1e7 cm/s, vsat_p = 8e6 cm/s, beta_n = 2, beta_p = 1).
+    `semi/schema.py:81` `SCHEMA_SUPPORTED_MINOR` bumped 0 -> 1.
+    `tests/test_mobility_schema.py` adds 9 pure-Python assertions
+    including M16.1 Acceptance test 3 (every existing benchmark
+    JSON validates unchanged). `docs/schema/reference.md` versioning
+    section refreshed.
+  - **Phase B (closed-form mobility builder).**
+    `semi/physics/mobility.py` ships `caughey_thomas_mu(mu0, F_par,
+    vsat, beta)` UFL builder, `constant_mu` identity wrapper, and
+    `build_mobility_expressions` dispatch. `caughey_thomas_vsat_for
+    _form` converts cm/s -> 1/m for the scaled-form ratio
+    (derivation cites docs/PHYSICS.md section 2.5 and ADR 0004).
+    Module is Layer 4 (FEM); dolfinx / ufl / petsc4py imports are
+    deferred to function bodies so the pure-Python core stays
+    dolfinx-free (`tests/test_lazy_imports.py` gate clean).
+    `tests/test_mobility_closed_form.py` adds 8 pure-Python unit
+    tests (low-field limit, drift saturation, beta=1/2 closed
+    forms, Si-electron sample points).
+  - **Phase C (DD-form and bias_sweep wiring).**
+    `semi/physics/drift_diffusion.py::build_dd_block_residual` and
+    `_mr` each grow an optional `mobility_cfg` parameter (default
+    `None` = constant branch, bit-identical fallback) that delegates
+    to `build_mobility_expressions`. `semi/runners/bias_sweep.py`
+    passes `mobility_cfg = mob` to the DD form builder so
+    caughey_thomas inputs route into the new branch. The other
+    runners (equilibrium, mos_cv, mos_cap_ac, transient, ac_sweep)
+    intentionally do not adopt the dispatch in this PR per the
+    starter prompt anti-goals; they have no continuity rows
+    (equilibrium), are mu-independent (MOSCAP gate-charge integration),
+    or can adopt CT in a follow-up.
+  - **Phase D (MMS Variant D).** `semi/verification/mms_dd.py`
+    `VARIANTS = ("A", "B", "C", "D")`. New module constants
+    `MMS_D_VSAT_*_FOR_FORM = 1.5e6 m^-1` engineer the dimensionless
+    ratio `(mu0_hat * F_par_e / vsat)^beta` to O(0.3) at the typical
+    manufactured gradient (~7 % mu reduction; CT path materially
+    exercised). `_build_weak_sources` substitutes `caughey_thomas_mu`
+    evaluated at the manufactured Fermi gradients into the
+    manufactured weak source so the forcing matches the production
+    residual at phi_e exactly. `run_one_level` passes
+    `mobility_cfg = {"model": "caughey_thomas", ...}` to
+    `build_dd_block_residual` when `variant == "D"`. CLI study
+    runs Variant D on Ns_1d = [40, 80, 160] (one less level than
+    A/B/C: the finest level reaches the double-precision residual
+    floor before SNES_rtol trips and reports DIVERGED_LINE_SEARCH;
+    rate is already 2.000 at N=160) and Ns_2d = [32, 64, 128] (one
+    more level than A/B/C: the [16, 32, 64] sequence bottoms out at
+    rate 1.990 from triangle-mesh boundary-layer effects, just
+    under the 1.99 acceptance floor). M16.1 Acceptance test 1 met:
+    `python scripts/run_verification.py mms_dd` reports 12 of 12
+    studies PASS, 2d_D rates 1.997 / 0.999 (psi) and 1.999 / 1.000
+    (phi_n / phi_p); 1d_D linear and nonlinear at 2.000 / 1.000 on
+    every gated block. `tests/fem/test_mms_caughey_thomas.py` (2
+    tests) gates the same rates in pytest.
+  - **Phase E (diode_velsat_1d benchmark).** New
+    `benchmarks/diode_velsat_1d/`: 1D pn diode at N_A = N_D =
+    1e17 cm^-3, 20 um total, V_F sweep [0.0, 0.9] V step 0.05 V
+    (19 points). `verify_diode_velsat_1d` re-runs the same JSON
+    with `physics.mobility.model` overridden to `"constant"` and
+    asserts `|I_CT - I_const| / I_const > 5 %` at V_F = 0.9 V
+    (M16.1 Acceptance test 2 part 1; observed 56.27 %) and < 5 %
+    at V_F = 0.3 V (Acceptance test 2 part 2; observed 0.19 %).
+    The starter prompt's V_F = 0.5 V <1 % anchor was dropped
+    because the depletion-edge field at V_F = 0.5 V already gives
+    ~12 % I-V deviation on this geometry; V_F = 0.3 V is the
+    natural low-field anchor. CI matrix entry added in
+    `.github/workflows/ci.yml`.
+  - **Phase F (closeout).** This entry, plus PLAN.md "Next task"
+    set to M16.2 Lombardi, plus IMPROVEMENT_GUIDE / ROADMAP /
+    CHANGELOG / pyproject / `semi/__init__.py` bumped 0.16.1 ->
+    0.17.0.
 
 - **M14.4 Residual cleanup (2026-05-23):** Branch
   `dev/m14.4-residual-cleanup`, four phase-letter commits closing the

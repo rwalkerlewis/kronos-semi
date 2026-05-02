@@ -154,6 +154,12 @@ jobs:
             args: pn_1d_turnon
           - name: rc_ac_sweep
             args: rc_ac_sweep
+          # M16.1 Acceptance test 2: Caughey-Thomas vs constant-mobility
+          # divergence/convergence verifier on a 1D pn diode forward
+          # sweep. Internally also runs a constant-mu companion sweep,
+          # so this step is roughly 2x the runtime of pn_1d_bias.
+          - name: diode_velsat_1d
+            args: diode_velsat_1d
           - name: resistor_3d_builtin
             args: resistor_3d --input benchmarks/resistor_3d/resistor.json
           - name: resistor_3d_gmsh

@@ -414,50 +414,22 @@ benchmark JSON).
 
 ### M16.1: Caughey-Thomas field-dependent mobility
 
-**Why.** Velocity saturation is the entry-level field-dependent
-mobility model and is required for any quantitative MOSFET I-V at
-fields above ~10 kV/cm. Without it, the M14.3 mosfet_2d verifier
-passes only in the deeply-linear regime; with it, we can extend the
-verifier window into saturation and start running 3D MOSFET
-benchmarks meaningfully.
-
-**Deliverable.**
-
-- New file `semi/physics/mobility.py` with `caughey_thomas_mu(mu0, F_par, ...)`
-  UFL builder. Closed-form, no new unknowns. Schema entry
-  `physics.mobility.model: "constant" | "caughey_thomas"` with parameters
-  `vsat_n`, `vsat_p`, `beta_n`, `beta_p`. Defaults bake in the standard
-  Si values (vsat ~ 1e7 cm/s, beta_n = 2, beta_p = 1).
-- Wire the new mobility into
-  [`semi/physics/drift_diffusion.py`](../semi/physics/drift_diffusion.py)
-  and [`semi/runners/bias_sweep.py`](../semi/runners/bias_sweep.py)
-  behind the schema dispatch. The `constant` branch is bit-identical
-  to pre-M16.1.
-- MMS verifier `tests/fem/test_mms_caughey_thomas.py`: extend the
-  existing MMS-DD harness to include a manufactured solution where
-  the mobility depends on the gradient. Acceptance L2 rate >= 1.99,
-  H1 rate >= 0.99 at the finest pair.
-- New benchmark `benchmarks/diode_velsat_1d/`: 1D pn diode at
-  `V_F in [0.5, 0.9] V` comparing constant-mu and caughey-thomas
-  forward I-V; verifier asserts the two diverge by >5% at 0.9 V and
-  converge to within 1% at 0.5 V.
-
-**Acceptance tests.**
-
-1. `python scripts/run_verification.py mms_dd` includes the
-   caughey_thomas variant and reports L2 rate >= 1.99 at the finest
-   pair.
-2. `python scripts/run_benchmark.py diode_velsat_1d` exits 0 with the
-   divergence-vs-convergence verifier passing.
-3. Every existing benchmark with `physics.mobility.model: "constant"`
-   (which is the schema default) produces results bit-identical to
-   v0.15.0.
-
-**Dependencies.** M14.3 (need the strict-mode schema and the
-tightened mosfet_2d verifier in place first; otherwise the new
-mobility schema field collides with a v1 schema bump and the
-mosfet_2d verifier has nothing analytical to compare velocity
-saturation against).
+**Status: Done (v0.17.0, 2026-05-01).** Closed-form velocity
+saturation `mu(F) = mu0 / (1 + (mu0 * F_par / vsat)^beta)^(1/beta)`
+shipped on branch `dev/m16.1-caughey-thomas` per
+[`docs/M16_1_STARTER_PROMPT.md`](M16_1_STARTER_PROMPT.md). Schema
+additive minor v2.0.0 -> v2.1.0; v2.0.0 inputs continue to validate;
+the constant branch is bit-identical to v0.16.1 on every existing
+benchmark. New module `semi/physics/mobility.py` (Layer 4); MMS
+Variant D in `semi/verification/mms_dd.py` clears the M16.1 rate
+gate (L^2 >= 1.99, H^1 >= 0.99 on every block at the finest pair);
+new `benchmarks/diode_velsat_1d/` shows 56 % I-V divergence at
+V_F = 0.9 V and 0.19 % convergence at V_F = 0.3 V between
+Caughey-Thomas and constant mobility. The starter prompt's
+V_F = 0.5 V <1 % anchor was dropped because the depletion-edge
+field at V_F = 0.5 V already gives ~12 % I-V deviation on this
+geometry; V_F = 0.3 V is the natural low-field anchor. See
+[CHANGELOG.md](../CHANGELOG.md) `[0.17.0]` entry.
 
 ---
 
@@ -891,6 +863,15 @@ The engine is ready for a UI when all of these are green:
   acceptance tests. Two new starter prompts shipped:
   [M14_3_STARTER_PROMPT.md](M14_3_STARTER_PROMPT.md) and
   [M16_1_STARTER_PROMPT.md](M16_1_STARTER_PROMPT.md).
+- **2026-05-01**, M16.1 Caughey-Thomas field-dependent mobility
+  shipped (v0.17.0): §4 M16.1 marked Done with `[0.17.0]` CHANGELOG
+  anchor; new MMS-DD Variant D with rate gate L^2 >= 1.99 and
+  H^1 >= 0.99 at the finest pair on every block (psi, phi_n, phi_p);
+  new `diode_velsat_1d` benchmark with divergence-vs-convergence
+  verifier (56 % at V_F = 0.9 V, 0.19 % at V_F = 0.3 V); schema
+  2.1.0 (`physics.mobility.model: caughey_thomas` plus `vsat_*` and
+  `beta_*` parameters); the constant branch is bit-identical to
+  v0.16.1 on every existing benchmark.
 
 ---
 

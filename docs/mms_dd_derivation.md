@@ -207,7 +207,7 @@ f_p_weak =   L_0^2 * mu_p_hat * p_e * inner(grad(phi_p_e), grad(v_p)) * dx
 Sign of the `R_e` term is opposite to the electron block, matching the
 production residual at line 150.
 
-### 3.4 The three variants
+### 3.4 The four variants
 
 **Variant A -- psi-only (Poisson block sanity).**
 Set `phi_n_e = phi_p_e = 0` (identically). Then
@@ -243,6 +243,44 @@ All three fields nontrivial, realistic lifetimes
 with a physically nonzero `R_e`. Purpose: verify the full residual,
 including the recombination coupling between the two continuity blocks
 through the shared `R_e` term.
+
+**Variant D -- Caughey-Thomas field-dependent mobility (M16.1).**
+Variant C electronics (full coupling, Si lifetimes), but the constant
+`fem.Constant(mu_n / mu0)` is replaced by the closed-form
+
+```
+mu_n_hat(F_par_n) = mu0_n_hat / (1 + (mu0_n_hat * F_par_n / vsat_n_hat)^beta_n)^(1/beta_n)
+mu_p_hat(F_par_p) = mu0_p_hat / (1 + (mu0_p_hat * F_par_p / vsat_p_hat)^beta_p)^(1/beta_p)
+```
+
+with `F_par_n = sqrt(grad(phi_n) . grad(phi_n) + eps)` (and likewise
+for phi_p). The continuity-block weak source picks up the same
+substitution evaluated at the manufactured Fermi gradients
+(`F_par_n_e = sqrt(grad(phi_n_e) . grad(phi_n_e) + eps)`), so
+
+```
+f_n_weak = L0^2 * mu_n_CT(F_par_n_e) * n_e * inner(grad(phi_n_e), grad(v_n)) * dx
+           - R_e * v_n * dx
+f_p_weak = L0^2 * mu_p_CT(F_par_p_e) * p_e * inner(grad(phi_p_e), grad(v_p)) * dx
+           + R_e * v_p * dx
+```
+
+The MMS engineers `MMS_D_VSAT_*_FOR_FORM = 1.5e6 m^-1` so the
+dimensionless ratio `(mu0_hat * F_par_e / vsat_for_form)^beta` is
+O(0.3) at the typical manufactured gradient
+(|grad(phi_n_e)| ~ A_n * pi / L ~ 4.7e5 m^-1 with A_n = 0.3 and
+L = L_0_REF = 2 um), giving mu(F)/mu0 ~ 0.93 -- enough to materially
+exercise the Caughey-Thomas path while staying smooth and bounded.
+Variant D is gated at the M16.1 acceptance floor L^2 >= 1.99 and
+H^1 >= 0.99 on every block (`docs/IMPROVEMENT_GUIDE.md` § M16.1
+Acceptance test 1; pytest module
+`tests/fem/test_mms_caughey_thomas.py`).
+
+The flux-divergence form of `f_n_weak` follows directly from the
+Slotboom-flux derivation in 3.2 with `mu_n_hat -> mu_n_CT(F_par_n_e)`;
+ADR 0004 (Slotboom variables) is preserved because the substitution
+acts pointwise on the diffusion coefficient and does not modify the
+primary unknowns or their boundary conditions.
 
 ## 4. Boundary conditions
 

@@ -4,10 +4,10 @@ kronos-semi is a FEniCSx-based finite-element semiconductor device simulator tha
 
 ## Capability matrix
 
-All milestones M1 through M15 plus M14.3 have shipped as of v0.16.0.
-The table below is the current state; see the Delivery history
-section for per-milestone details. Planned milestones (M16, M19, M20)
-have explicit acceptance tests in
+All milestones M1 through M15 plus M14.3, M14.4, and M16.1 have
+shipped as of v0.17.0. The table below is the current state; see the
+Delivery history section for per-milestone details. Planned milestones
+(M16.2-M16.7, M19, M20) have explicit acceptance tests in
 [`docs/IMPROVEMENT_GUIDE.md`](IMPROVEMENT_GUIDE.md).
 
 | Capability | Dimensions | Status | Verifier |
@@ -34,7 +34,7 @@ have explicit acceptance tests in
 | V&V | 10 studies | shipped | 62/62 PASS |
 | CI | pure-python + lint + docker-fem (parallelized) | shipped | green on main |
 | Housekeeping (M14.3) | n/a | shipped | mosfet_2d Pao-Sah verifier (20% tolerance in [V_T+0.2, V_T+0.6] V); XDMF mesh ingest (R within 1e-12 vs gmsh path); strict schema v2.0.0 (additionalProperties: false; v1 deprecated for one minor cycle); semi/fem/sg_assembly.py removed; coverage gate raised to 95 |
-| Caughey-Thomas field-dependent mobility (M16.1) | 1D / 2D / 3D | Planned | MMS L2 >= 1.99; diode_velsat_1d divergence-vs-convergence verifier |
+| Caughey-Thomas field-dependent mobility (M16.1) | 1D / 2D | shipped | MMS-DD Variant D L2 >= 1.99 / H1 >= 0.99 on every block; diode_velsat_1d divergence 56% at V_F=0.9 V, convergence 0.19% at V_F=0.3 V |
 | Lombardi surface mobility (M16.2) | 2D / 3D | Planned | mosfet_2d Sah-Pao within 10% in inversion strong-field window |
 | Auger recombination (M16.3) | 1D / 2D | Planned | diode_auger_1d analytical match within 5% at high injection |
 | Fermi-Dirac statistics (M16.4) | 1D / 2D | Planned | diode_fermi_dirac_1d FD vs scipy reference within 1e-3 |

@@ -78,7 +78,13 @@ ENGINE_SUPPORTED_SCHEMA_MAJOR = max(ENGINE_SUPPORTED_SCHEMA_MAJORS)
 #                  node so input typos fail validation rather than being
 #                  silently dropped. v1 inputs continue to load with a
 #                  DeprecationWarning for one minor cycle (1.x -> 2.x).
-SCHEMA_SUPPORTED_MINOR = 0
+#   M16.1 (2.1.0): added physics.mobility.model: "caughey_thomas" plus
+#                  vsat_n, vsat_p, beta_n, beta_p parameters for closed-
+#                  form velocity-saturation mobility. Additive bump:
+#                  v2.0.0 inputs continue to validate (the new keys are
+#                  optional with defaults that ignore the saturation
+#                  branch).
+SCHEMA_SUPPORTED_MINOR = 1
 
 
 @lru_cache(maxsize=8)
