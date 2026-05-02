@@ -311,12 +311,14 @@ def cmd_mms_dd(args) -> int:
     """
     Phase 4: MMS for the coupled drift-diffusion block residual.
 
-    Runs nine studies (three variants x {1D linear, 1D nonlinear, 2D})
+    Runs twelve studies (four variants x {1D linear, 1D nonlinear, 2D})
     and gates the finest-pair L^2 and H^1 rates of every meaningful
     block per variant (psi only for Variant A; psi + phi_n + phi_p for
-    Variants B and C). See docs/mms_dd_derivation.md for the
-    rate-threshold rationale; this CLI enforces the same floors the
-    pytest gate uses.
+    Variants B, C, D). Variant D adds M16.1 Caughey-Thomas mobility on
+    top of Variant C and is gated at the milestone-acceptance floor
+    L^2 >= 1.99 and H^1 >= 0.99 (M16.1 Acceptance test 1). The other
+    variants stay at the existing 1.75 / 0.80 floor (the pytest gate
+    uses the same floor; see docs/mms_dd_derivation.md).
     """
     from semi.verification.mms_dd import report_table, run_cli_study
 
@@ -326,18 +328,30 @@ def cmd_mms_dd(args) -> int:
 
     all_ok = True
     for label, rows in studies.items():
-        variant = "A" if "_A_" in label or label.endswith("_A") else (
-            "B" if "_B_" in label or label.endswith("_B") else "C"
-        )
+        if "_A_" in label or label.endswith("_A"):
+            variant = "A"
+        elif "_B_" in label or label.endswith("_B"):
+            variant = "B"
+        elif "_D_" in label or label.endswith("_D"):
+            variant = "D"
+        else:
+            variant = "C"
         blocks = ("psi",) if variant == "A" else ("psi", "phi_n", "phi_p")
+        # Variant D is the M16.1 acceptance gate: tighter rate floor.
+        if variant == "D":
+            l2_floor = 1.99
+            h1_floor = 0.99
+        else:
+            l2_floor = 1.75
+            h1_floor = 0.80
         print()
         print(report_table(rows, header=f"=== mms_dd {label} ==="))
         for b in blocks:
             ok_l2, msg_l2 = _gate_finest_pair_rate(
-                rows, f"rate_L2_{b}", 1.75, f"{label} L2[{b}]",
+                rows, f"rate_L2_{b}", l2_floor, f"{label} L2[{b}]",
             )
             ok_h1, msg_h1 = _gate_finest_pair_rate(
-                rows, f"rate_H1_{b}", 0.80, f"{label} H1[{b}]",
+                rows, f"rate_H1_{b}", h1_floor, f"{label} H1[{b}]",
             )
             print(msg_l2)
             print(msg_h1)

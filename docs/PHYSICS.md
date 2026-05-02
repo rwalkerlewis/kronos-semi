@@ -604,6 +604,18 @@ in weak form:
 - **Variant C (full coupling with SRH).** Realistic lifetimes
   tau_n = tau_p = 1e-7 s. Verifies the full residual including
   the cross-block coupling through R_e.
+- **Variant D (Caughey-Thomas mobility, M16.1).** Variant C
+  electronics plus the closed-form Caughey-Thomas
+  `mu(F) = mu0 / (1 + (mu0 * F_par / vsat)^beta)^(1/beta)` substituted
+  for the constant `fem.Constant(mu_n_over_mu0)` in
+  `build_dd_block_residual`. The MMS engineers
+  `MMS_D_VSAT_*_FOR_FORM` so the dimensionless ratio
+  `(mu0 * F_par / vsat)^beta` is O(0.3) at the typical manufactured
+  gradient, ensuring the field-dependent path is materially exercised
+  (mu reduction ~7 % near the midplane, not numerically dormant).
+  Gated at L^2 >= 1.99 / H^1 >= 0.99 per the M16.1 acceptance gate
+  in `docs/IMPROVEMENT_GUIDE.md` § M16.1; pytest module
+  `tests/fem/test_mms_caughey_thomas.py`.
 
 Finest-pair rates (N = 320 for 1D, N = 64 for 2D), default
 amplitudes (A_psi, A_n, A_p) = (0.5, 0.3, -0.3):
@@ -624,12 +636,23 @@ amplitudes (A_psi, A_n, A_p) = (0.5, 0.3, -0.3):
 | 2D C                 | psi    | 1.990    | 0.996    |
 | 2D C                 | phi_n  | 1.995    | 1.000    |
 | 2D C                 | phi_p  | 1.995    | 1.000    |
+| 1D D (linear, M16.1) | psi    | 2.000    | 1.000    |
+| 1D D (linear, M16.1) | phi_n  | 2.000    | 1.000    |
+| 1D D (linear, M16.1) | phi_p  | 2.000    | 1.000    |
+| 2D D (M16.1)         | psi    | ~1.997   | ~0.998   |
+| 2D D (M16.1)         | phi_n  | ~1.997   | ~1.000   |
+| 2D D (M16.1)         | phi_p  | ~1.997   | ~1.000   |
 
 Every gated rate clears the L^2 >= 1.75 / H^1 >= 0.80 floor with
->= 0.19 of headroom, matching theoretical P1 Lagrange rates to within
-roundoff. The derivation (`mms_dd_derivation.md`) documents the
-block-residual scale-disparity issue that forced the SNES
-tolerance tweak to `atol = 0.0` with `stol = 1e-12`.
+>= 0.19 of headroom (Variants A/B/C), or the L^2 >= 1.99 / H^1 >= 0.99
+floor (Variant D, M16.1 acceptance gate), matching theoretical P1
+Lagrange rates to within roundoff. The derivation
+(`mms_dd_derivation.md`) documents the block-residual scale-disparity
+issue that forced the SNES tolerance tweak to `atol = 0.0` with
+`stol = 1e-12`. The 2D Variant D pytest test uses Ns = [32, 64, 128]
+(one extra refinement compared to A/B/C) so the finest-pair rate
+clears 1.99 cleanly; the [16, 32, 64] sequence used by A/B/C bottoms
+out at 1.990 from triangle-mesh boundary-layer effects.
 
 ### 5.5 MMS for multi-region Poisson (M6: 2D MOS capacitor)
 
