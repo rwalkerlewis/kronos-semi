@@ -561,7 +561,7 @@ def write_ac_sweep_artifact(
             writer = csv.writer(f)
             writer.writerow(["f_Hz", "C", "G", "Re_Y", "Im_Y"])
             for freq, Y_val, C_val, G_val in zip(
-                result.frequencies, result.Y, result.C, result.G
+                result.frequencies, result.Y, result.C, result.G, strict=False
             ):
                 writer.writerow([freq, C_val, G_val, Y_val.real, Y_val.imag])
         sweep_entries.append({
@@ -572,7 +572,6 @@ def write_ac_sweep_artifact(
             "bipolar": False,
         })
 
-    meta = result.meta or {}
     manifest = {
         "schema_version": _SCHEMA_VERSION,
         "engine": {
