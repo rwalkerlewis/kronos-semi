@@ -365,6 +365,150 @@ def _build_caughey_thomas(
     return mu_n_expr, mu_p_expr, "caughey_thomas"
 
 
+def _build_lombardi(
+    mob: dict[str, Any],
+    psi,
+    phi_n,
+    phi_p,
+    mu_n_over_mu0,
+    mu_p_over_mu0,
+    sc,
+    *,
+    facet_tags,
+    N_total_hat,
+):
+    """
+    Lombardi composite-mobility branch (M16.2).
+
+    Builds the resistor-sum composite
+        1/mu = 1/mu_bulk + 1/mu_AC + 1/mu_sr
+    where mu_bulk is the constant or caughey_thomas branch (selected
+    by `bulk_model`), mu_AC is the Lombardi acoustic-phonon term, and
+    mu_sr is the surface-roughness term. The closed-form math comes
+    from the public `lombardi_mu_AC`, `lombardi_mu_sr`, and
+    `lombardi_compose` helpers; this function only wraps them in UFL
+    against scaled fields.
+
+    The perpendicular field is approximated as
+        E_perp_for_form = sqrt((grad(psi) . n_hat)^2 + eps)
+    where n_hat is a unit vector along the last geometric axis (axis
+    `dim - 1` of the parent mesh). The Lombardi reference geometry has
+    the Si/SiO2 interface at the top of the silicon body (the highest
+    coordinate of the depth axis), so the last-axis convention covers
+    every benchmark currently in the tree (mosfet_2d 2D, diode_1d in
+    the unused-Lombardi default). Cells far from the interface where
+    grad(psi) . n_hat -> 0 see mu_AC, mu_sr -> +inf via the
+    regularized division, and the resistor sum collapses to mu_bulk
+    in the bulk; the Lombardi correction is naturally localized to
+    the surface region without an explicit cell indicator.
+    """
+    if facet_tags is None:
+        raise ValueError(
+            "physics.mobility.model='lombardi' requires the runner to "
+            "pass facet_tags=ft so the FEM builder can locate the "
+            "interface_facet_tag on the mesh; bias_sweep and the MMS "
+            "Variant E harness do this from Phase C of M16.2 onward"
+        )
+    if N_total_hat is None:
+        raise ValueError(
+            "physics.mobility.model='lombardi' requires the runner to "
+            "pass N_total_hat (scaled total ionized impurity field "
+            "abs(N_net_hat) for uncompensated profiles)"
+        )
+    if psi is None:
+        raise ValueError(
+            "physics.mobility.model='lombardi' requires the runner to "
+            "pass psi=spaces.psi so the perpendicular electrostatic "
+            "field can be evaluated on the parent mesh"
+        )
+
+    interface_tag = mob.get("interface_facet_tag")
+    if interface_tag is None:
+        raise ValueError(
+            "physics.mobility.model='lombardi' requires "
+            "physics.mobility.interface_facet_tag (an integer mesh "
+            "facet tag identifying the Si/SiO2 interface)"
+        )
+
+    import ufl
+    from dolfinx import fem
+    from petsc4py import PETSc
+
+    bulk_model = mob.get("bulk_model", "constant")
+    if bulk_model == "constant":
+        mu_bulk_n, mu_bulk_p, _ = _build_constant(
+            phi_n, phi_p, mu_n_over_mu0, mu_p_over_mu0
+        )
+    elif bulk_model == "caughey_thomas":
+        mu_bulk_n, mu_bulk_p, _ = _build_caughey_thomas(
+            mob, phi_n, phi_p, mu_n_over_mu0, mu_p_over_mu0, sc
+        )
+    else:
+        raise ValueError(
+            f"physics.mobility.bulk_model={bulk_model!r} not supported "
+            "under the lombardi composite; expected "
+            "'constant' or 'caughey_thomas'"
+        )
+
+    msh = psi.function_space.mesh
+    gdim = msh.geometry.dim
+    # Unit vector along the last geometric axis (the depth axis of the
+    # mosfet_2d benchmark; matches the manufactured-interface
+    # orientation in MMS Variant E).
+    normal_axis = int(mob.get("interface_normal_axis", gdim - 1))
+    if not (0 <= normal_axis < gdim):
+        raise ValueError(
+            f"interface_normal_axis={normal_axis} is out of bounds for "
+            f"a mesh with geometric dimension {gdim}"
+        )
+    n_hat_components = [0.0] * gdim
+    n_hat_components[normal_axis] = 1.0
+    n_hat = ufl.as_vector([
+        fem.Constant(msh, PETSc.ScalarType(c)) for c in n_hat_components
+    ])
+
+    cfg_lombardi = mob.get("lombardi", {}) or {}
+    conv = lombardi_unit_conversions(cfg_lombardi, sc)
+
+    T_K = float(mob.get("temperature_K", 300.0))
+    T_const = fem.Constant(msh, PETSc.ScalarType(T_K))
+    eps_perp = fem.Constant(msh, PETSc.ScalarType(_E_PERP_EPS_SQ))
+
+    grad_psi = ufl.grad(psi)
+    E_perp_signed = ufl.dot(grad_psi, n_hat)
+    E_perp = ufl.sqrt(E_perp_signed * E_perp_signed + eps_perp)
+
+    def _surface_terms(carrier: str):
+        if carrier == "n":
+            B = conv["B_n_for_form"]
+            C_geom = conv["C_n_for_form"]
+            lam = conv["lambda_n"]
+            delta = conv["delta_n_for_form"]
+        else:
+            B = conv["B_p_for_form"]
+            C_geom = conv["C_p_for_form"]
+            lam = conv["lambda_p"]
+            delta = conv["delta_p_for_form"]
+        # Fold sc.C0**lam into C_geom so the UFL expression sees the
+        # bare dimensionless N_total_hat^lam (no extra material
+        # constants in the form).
+        C_eff = C_geom * (sc.C0 ** lam)
+        B_c = fem.Constant(msh, PETSc.ScalarType(B))
+        C_c = fem.Constant(msh, PETSc.ScalarType(C_eff))
+        delta_c = fem.Constant(msh, PETSc.ScalarType(delta))
+        lam_c = fem.Constant(msh, PETSc.ScalarType(lam))
+        mu_AC = lombardi_mu_AC(B_c, C_c, N_total_hat, E_perp, lam_c, T_const)
+        mu_sr = lombardi_mu_sr(delta_c, E_perp)
+        return mu_AC, mu_sr
+
+    mu_AC_n, mu_sr_n = _surface_terms("n")
+    mu_AC_p, mu_sr_p = _surface_terms("p")
+
+    mu_n_expr = lombardi_compose(mu_bulk_n, mu_AC_n, mu_sr_n)
+    mu_p_expr = lombardi_compose(mu_bulk_p, mu_AC_p, mu_sr_p)
+    return mu_n_expr, mu_p_expr, "lombardi"
+
+
 def build_mobility_expressions(
     mobility_cfg: dict[str, Any] | None,
     phi_n,
@@ -372,6 +516,10 @@ def build_mobility_expressions(
     mu_n_over_mu0: float,
     mu_p_over_mu0: float,
     sc,
+    *,
+    psi=None,
+    facet_tags=None,
+    N_total_hat=None,
 ) -> tuple[Any, Any, str]:
     """
     Dispatch on `mobility_cfg["model"]` and return UFL-compatible
@@ -396,6 +544,21 @@ def build_mobility_expressions(
     sc : semi.scaling.Scaling
         Scaling object; used by `caughey_thomas_vsat_for_form` and
         `lombardi_unit_conversions`.
+    psi : dolfinx.fem.Function, optional
+        Scaled electrostatic potential on the parent mesh; required
+        by the lombardi branch (the perpendicular field at the
+        interface is the gradient of psi). Ignored by the constant
+        and caughey_thomas branches.
+    facet_tags : dolfinx.mesh.MeshTags, optional
+        Parent-mesh facet tags carrying the interface label; required
+        by the lombardi branch and ignored by the others. The runner
+        already constructs this for BC resolution and forwards it
+        through `build_dd_block_residual`.
+    N_total_hat : ufl expression, optional
+        Scaled total ionized impurity concentration field
+        N_total / sc.C0. For uncompensated profiles (every shipped
+        benchmark) `abs(N_net_hat)` is the right value; the runner
+        hands this in via the same Function used for the Poisson RHS.
 
     Returns
     -------
@@ -416,20 +579,12 @@ def build_mobility_expressions(
         Builds `caughey_thomas_mu(mu0_const, F_par, vsat_for_form,
         beta)` for each carrier where `F_par` is
         `sqrt(grad(phi) . grad(phi) + eps)` of the carrier-specific
-        scaled quasi-Fermi potential.
+        scaled quasi-Fermi potential. Bit-identical to v0.17.0.
     lombardi:
-        Closed-form composite of the bulk branch with the Lombardi
-        surface terms via the resistor sum
-        `1/mu = 1/mu_bulk + 1/mu_AC + 1/mu_sr` (M16.2). The pure-
-        Python helpers `lombardi_mu_AC`, `lombardi_mu_sr`,
-        `lombardi_compose`, and `lombardi_unit_conversions` are
-        public on this module and tested directly. The UFL dispatch
-        in this branch requires the runner to thread the parent mesh
-        `facet_tags` and the `N_total` doping field through; that
-        wiring lands in Phase C alongside `bias_sweep` and
-        `mos_cap_ac` adoption. Calling this branch from the current
-        signature raises `NotImplementedError` so callers see a
-        clear message rather than a silent dispatch fallback.
+        Resistor-sum composite of the bulk branch (selected by
+        `bulk_model`) with the Lombardi acoustic-phonon and
+        surface-roughness terms. Requires `psi`, `facet_tags`, and
+        `N_total_hat` to be passed; raises ValueError otherwise.
     """
     mob = mobility_cfg or {}
     model = mob.get("model", "constant")
@@ -443,22 +598,9 @@ def build_mobility_expressions(
         )
 
     if model == "lombardi":
-        # The pure-Python helpers (lombardi_mu_AC, lombardi_mu_sr,
-        # lombardi_compose, lombardi_unit_conversions) are usable by
-        # callers that build the UFL forcing themselves (the MMS-DD
-        # Variant E harness is one such caller in Phase D). The
-        # production UFL dispatch through `build_mobility_expressions`
-        # requires `facet_tags` and the doping field on the function
-        # space, which Phase C threads through bias_sweep and
-        # mos_cap_ac. Until then this branch raises so misconfigured
-        # callers see a clear message instead of a silent fallback.
-        raise NotImplementedError(
-            "physics.mobility.model='lombardi' UFL dispatch through "
-            "build_mobility_expressions requires the runner to thread "
-            "facet_tags and the doping field; this wiring lands in "
-            "Phase C of M16.2. Use the lombardi_mu_AC, lombardi_mu_sr, "
-            "lombardi_compose, and lombardi_unit_conversions helpers "
-            "directly if you need the closed form before then."
+        return _build_lombardi(
+            mob, psi, phi_n, phi_p, mu_n_over_mu0, mu_p_over_mu0, sc,
+            facet_tags=facet_tags, N_total_hat=N_total_hat,
         )
 
     raise ValueError(

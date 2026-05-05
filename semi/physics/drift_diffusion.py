@@ -74,6 +74,8 @@ def build_dd_block_residual(
     tau_p_hat: float,
     E_t_over_Vt: float = 0.0,
     mobility_cfg: dict | None = None,
+    *,
+    facet_tags=None,
 ):
     """
     Build the three-block residual for the coupled drift-diffusion system.
@@ -135,8 +137,12 @@ def build_dd_block_residual(
     else:
         eps_r_ufl = eps_r
     ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
+    # The lombardi branch reads psi for the perpendicular field and
+    # the absolute net doping field as N_total_hat. Other branches
+    # ignore these kwargs.
     mu_n_hat, mu_p_hat, _mob_model = build_mobility_expressions(
         mobility_cfg, phi_n, phi_p, mu_n_over_mu0, mu_p_over_mu0, sc,
+        psi=psi, facet_tags=facet_tags, N_total_hat=ufl.algebra.Abs(N_hat_fn),
     )
     tau_n = fem.Constant(msh, PETSc.ScalarType(tau_n_hat))
     tau_p = fem.Constant(msh, PETSc.ScalarType(tau_p_hat))
@@ -229,6 +235,8 @@ def build_dd_block_residual_mr(
     semi_tag: int,
     E_t_over_Vt: float = 0.0,
     mobility_cfg: dict | None = None,
+    *,
+    facet_tags=None,
 ):
     """Multi-region (submesh-based) block residual for the coupled DD system.
 
@@ -280,8 +288,12 @@ def build_dd_block_residual_mr(
         eps_r_ufl = eps_r
     ni_hat_parent = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
     ni_hat_sub = fem.Constant(submesh, PETSc.ScalarType(sc.n_i / sc.C0))
+    # The lombardi branch reads psi (parent-mesh electrostatic
+    # potential) and the absolute net doping. Other branches ignore
+    # the optional kwargs.
     mu_n_hat, mu_p_hat, _mob_model = build_mobility_expressions(
         mobility_cfg, phi_n, phi_p, mu_n_over_mu0, mu_p_over_mu0, sc,
+        psi=psi, facet_tags=facet_tags, N_total_hat=ufl.algebra.Abs(N_hat_fn),
     )
     tau_n = fem.Constant(submesh, PETSc.ScalarType(tau_n_hat))
     tau_p = fem.Constant(submesh, PETSc.ScalarType(tau_p_hat))

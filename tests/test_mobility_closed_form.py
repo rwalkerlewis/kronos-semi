@@ -333,11 +333,11 @@ def test_lombardi_unit_conversions_uses_defaults_for_missing_keys():
         ), key
 
 
-def test_build_mobility_expressions_lombardi_raises_pending_phase_c():
-    """The Phase B dispatch raises a clear NotImplementedError on the
-    lombardi branch so callers see the missing facet_tags wiring (the
-    pure-Python helpers above remain usable directly). Phase C
-    replaces this stub with the actual UFL builder."""
+def test_build_mobility_expressions_lombardi_requires_facet_tags():
+    """The Phase C dispatch raises a clear ValueError when the
+    runner forgets to thread facet_tags / psi / N_total_hat. The
+    closed-form helpers above remain usable directly without this
+    runner wiring."""
     from semi.physics.mobility import build_mobility_expressions
 
     class _StubFunctionSpace:
@@ -349,7 +349,7 @@ def test_build_mobility_expressions_lombardi_raises_pending_phase_c():
             self.function_space = _StubFunctionSpace()
 
     cfg = {"model": "lombardi", "interface_facet_tag": 1}
-    with pytest.raises(NotImplementedError, match="Phase C"):
+    with pytest.raises(ValueError, match="facet_tags"):
         build_mobility_expressions(
             cfg,
             _StubFunction(),
