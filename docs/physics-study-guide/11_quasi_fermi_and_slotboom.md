@@ -191,11 +191,9 @@ discretization is now well-posed at every iterate.
 At the cathode (n-side ohmic, n-type):
 - $\psi_R = \psi_R^\mathrm{eq} + V_\mathrm{applied} = 0.4167 + 0.6 = 1.0167\,\mathrm{V}$
 - $\Phi_n = \Phi_p = 0.6\,\mathrm{V}$
-- $n_R = n_i\exp((\psi_R - \Phi_n)/V_t) = 10^{16}\exp((1.0167 - 0.6)/0.02585)
-       = 10^{16}\exp(16.118) = 10^{16}\cdot 10^7 = 10^{23}\,\mathrm{m^{-3}}$
+- $n_R = n_i\exp((\psi_R - \Phi_n)/V_t) = 10^{16}\exp((1.0167 - 0.6)/0.02585) = 10^{16}\exp(16.118) = 10^{16}\cdot 10^7 = 10^{23}\,\mathrm{m^{-3}}$
        $= 10^{17}\,\mathrm{cm^{-3}}$ (= $N_D$, ✓).
-- $p_R = n_i\exp((\Phi_p - \psi_R)/V_t) = 10^{16}\exp(-16.118) = 10^{16}\cdot 10^{-7}
-       = 10^9\,\mathrm{m^{-3}} = 10^3\,\mathrm{cm^{-3}}$ (minority).
+- $p_R = n_i\exp((\Phi_p - \psi_R)/V_t) = 10^{16}\exp(-16.118) = 10^{16}\cdot 10^{-7} = 10^9\,\mathrm{m^{-3}} = 10^3\,\mathrm{cm^{-3}}$ (minority).
 
 Mass action in the forward-biased ohmic contact: $n_R p_R = 10^{17}\cdot 10^3 = 10^{20}$.
 But $n_i^2 = 10^{20}$. ✓ — at the contact, mass action *holds* because
@@ -205,8 +203,7 @@ $\Phi_n = \Phi_p$, even though the contact is biased.
 split. At the metallurgical junction with $\Phi_n - \Phi_p \approx V$,
 $np = n_i^2\exp((\Phi_p - \Phi_n)/V_t) = n_i^2\exp(-V/V_t)\cdot\exp(2V/V_t) = n_i^2\exp(V/V_t)$.
 
-Wait — let me redo the algebra. $np = n_i\exp((\psi-\Phi_n)/V_t)\cdot n_i\exp((\Phi_p - \psi)/V_t)
-= n_i^2\exp((\Phi_p - \Phi_n)/V_t)$. Under bias, $\Phi_n - \Phi_p = -V$
+Wait — let me redo the algebra. $np = n_i\exp((\psi-\Phi_n)/V_t)\cdot n_i\exp((\Phi_p - \psi)/V_t) = n_i^2\exp((\Phi_p - \Phi_n)/V_t)$. Under bias, $\Phi_n - \Phi_p = -V$
 in the depletion region (so $\Phi_p - \Phi_n = +V$); $np = n_i^2\exp(V/V_t)$.
 At $V = 0.6\,\mathrm{V}$: $np/n_i^2 = e^{23.21} = 10^{10.08}$, an
 enormous excess. This is the **mass-action breaking** that drives the
@@ -288,20 +285,15 @@ high Péclet number.
 ### Solutions
 
 **11.1.** Same algebra: $\nabla p = (p/V_t)(\nabla\Phi_p - \nabla\psi)$.
-Substitute into $\mathbf{J}_p = q\mu_p p(-\nabla\psi) - qD_p\nabla p
-= -q\mu_p p\nabla\psi - q\mu_p V_t\cdot(p/V_t)(\nabla\Phi_p - \nabla\psi)
-= -q\mu_p p\nabla\psi - q\mu_p p\nabla\Phi_p + q\mu_p p\nabla\psi
-= -q\mu_p p\nabla\Phi_p$. ✓
+Substitute into $\mathbf{J}_p = q\mu_p p(-\nabla\psi) - qD_p\nabla p = -q\mu_p p\nabla\psi - q\mu_p V_t\cdot(p/V_t)(\nabla\Phi_p - \nabla\psi) = -q\mu_p p\nabla\psi - q\mu_p p\nabla\Phi_p + q\mu_p p\nabla\psi = -q\mu_p p\nabla\Phi_p$. ✓
 
-**11.2.** $np = n_i\exp((\psi-\Phi_n)/V_t)\cdot n_i\exp((\Phi_p-\psi)/V_t)
-= n_i^2\exp((\Phi_p-\Phi_n)/V_t)$. With $\Phi_n = \Phi_p = 0$, the
+**11.2.** $np = n_i\exp((\psi-\Phi_n)/V_t)\cdot n_i\exp((\Phi_p-\psi)/V_t) = n_i^2\exp((\Phi_p-\Phi_n)/V_t)$. With $\Phi_n = \Phi_p = 0$, the
 exponent vanishes, so $np = n_i^2$.
 
 **11.3.** $\Phi_n = \Phi_p = -1\,\mathrm{V}$ at the swept (cathode)
 contact. (Or +1 if it's the anode.) At a cathode (n-type) with
 $\psi_R = 0.4167 - 1 = -0.5833\,\mathrm{V}$ (the equilibrium value
-shifted by the applied bias): $n_R = n_i\exp((\psi_R - \Phi_n)/V_t)
-= 10^{16}\exp((-0.5833 + 1)/0.02585) = 10^{16}\exp(16.12) = 10^{23}\,\mathrm{m^{-3}}$
+shifted by the applied bias): $n_R = n_i\exp((\psi_R - \Phi_n)/V_t) = 10^{16}\exp((-0.5833 + 1)/0.02585) = 10^{16}\exp(16.12) = 10^{23}\,\mathrm{m^{-3}}$
 — still equal to $N_D$, as expected for an ideal ohmic contact.
 
 **11.4.** UFL evaluates the form expression at quadrature points, so

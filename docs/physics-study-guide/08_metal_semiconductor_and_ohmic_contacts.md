@@ -66,8 +66,7 @@ the canonical *ohmic* contact for moderately doped silicon.
 The barrier creates a potential-energy hill that electrons must climb
 to flow from the semiconductor into the metal. The width of the
 depletion region under the contact is given by the same formula as a
-pn junction (Ch. 7) with $V_{bi}$ replaced by $\phi_B - (E_c - E_F)/q
-= \phi_B - V_t\ln(N_c/N_D)$.
+pn junction (Ch. 7) with $V_{bi}$ replaced by $\phi_B - (E_c - E_F)/q = \phi_B - V_t\ln(N_c/N_D)$.
 
 ### Thermionic emission
 
@@ -199,10 +198,7 @@ acceptance test is the `schottky_1d` benchmark, planned.
 $\chi = 4.05\,\mathrm{eV}$. $\phi_B = 5.65 - 4.05 = 1.60\,\mathrm{eV}$.
 
 Thermionic saturation current at 300 K, $A^* = 110\,\mathrm{A/cm^2/K^2}$:
-$J_s = 110\cdot 300^2\cdot \exp(-1.60/0.02585)
-= 9.9\times 10^6\cdot \exp(-61.89)
-= 9.9\times 10^6\cdot 1.07\times 10^{-27}
-= 1.06\times 10^{-20}\,\mathrm{A/cm^2}$.
+$J_s = 110\cdot 300^2\cdot \exp(-1.60/0.02585) = 9.9\times 10^6\cdot \exp(-61.89) = 9.9\times 10^6\cdot 1.07\times 10^{-27} = 1.06\times 10^{-20}\,\mathrm{A/cm^2}$.
 
 This is a vanishingly small reverse leakage — Pt-Si is essentially a
 perfect rectifier in this idealization. Real measurements give
@@ -213,8 +209,7 @@ an *effective* barrier of about 0.85 eV.
 **Aluminium on n-Si.** $\Phi_m = 4.10\,\mathrm{eV}$,
 $\phi_B = 0.05\,\mathrm{eV}$. The barrier is comparable to $V_t$
 ($25.85\,\mathrm{mV}$) — almost no barrier. The contact is essentially
-ohmic. Saturation current: $J_s = 9.9\times 10^6\cdot \exp(-0.05/0.02585)
-= 9.9\times 10^6\cdot 0.144 = 1.42\times 10^6\,\mathrm{A/cm^2}$ — a
+ohmic. Saturation current: $J_s = 9.9\times 10^6\cdot \exp(-0.05/0.02585) = 9.9\times 10^6\cdot 0.144 = 1.42\times 10^6\,\mathrm{A/cm^2}$ — a
 huge number, larger than any conduction current the device can carry,
 which is exactly the regime where the contact stops limiting current
 flow and acts as an ideal voltage source. This is *why* aluminium on
@@ -278,8 +273,7 @@ $\Phi_n = \Phi_p = -0.6\,\mathrm{V}$.
 ## Exercises
 
 **Exercise 8.1.** Compute $\phi_B$ for Au on n-GaAs given
-$\Phi_m^\mathrm{Au} = 5.10\,\mathrm{eV}$ and $\chi^\mathrm{GaAs} =
-4.07\,\mathrm{eV}$.
+$\Phi_m^\mathrm{Au} = 5.10\,\mathrm{eV}$ and $\chi^\mathrm{GaAs} = 4.07\,\mathrm{eV}$.
 
 **Exercise 8.2.** A Schottky contact has $\phi_B = 0.85\,\mathrm{eV}$
 and $A^* = 110\,\mathrm{A/cm^2/K^2}$. Compute the saturation current at
@@ -304,19 +298,14 @@ heavy doping the standard ohmic-contact recipe?
 
 **8.1.** $\phi_B = 5.10 - 4.07 = 1.03\,\mathrm{eV}$.
 
-**8.2.** $J_s(300) = 110\cdot 300^2\cdot \exp(-0.85/0.02585)
-= 9.9\times 10^6\cdot 5.42\times 10^{-15} = 5.36\times 10^{-8}\,\mathrm{A/cm^2}$.
-$J_s(400) = 110\cdot 400^2\cdot \exp(-0.85/(k\cdot 400/q))
-= 1.76\times 10^7\cdot \exp(-0.85/0.0345)
-= 1.76\times 10^7\cdot 1.96\times 10^{-11} = 3.45\times 10^{-4}\,\mathrm{A/cm^2}$.
+**8.2.** $J_s(300) = 110\cdot 300^2\cdot \exp(-0.85/0.02585) = 9.9\times 10^6\cdot 5.42\times 10^{-15} = 5.36\times 10^{-8}\,\mathrm{A/cm^2}$.
+$J_s(400) = 110\cdot 400^2\cdot \exp(-0.85/(k\cdot 400/q)) = 1.76\times 10^7\cdot \exp(-0.85/0.0345) = 1.76\times 10^7\cdot 1.96\times 10^{-11} = 3.45\times 10^{-4}\,\mathrm{A/cm^2}$.
 Ratio $\approx 6400$. Schottky reverse leakage is *very* sensitive to
 temperature.
 
 **8.3.** $\psi_\mathrm{contact} = V_t\,\mathrm{asinh}(N_D/(2n_i)) + V$.
 $\Phi_n = V$. Substitute into (3.7):
-$n = n_i\exp((\psi-\Phi_n)/V_t) = n_i\exp(\mathrm{asinh}(N_D/(2n_i)))
-= n_i \cdot (N_D/(2n_i) + \sqrt{1 + (N_D/(2n_i))^2})
-\approx n_i \cdot N_D/n_i = N_D$ for $N_D \gg n_i$. ✓
+$n = n_i\exp((\psi-\Phi_n)/V_t) = n_i\exp(\mathrm{asinh}(N_D/(2n_i))) = n_i \cdot (N_D/(2n_i) + \sqrt{1 + (N_D/(2n_i))^2}) \approx n_i \cdot N_D/n_i = N_D$ for $N_D \gg n_i$. ✓
 
 **8.4.** Carriers (Slotboom $\Phi_n, \Phi_p$) live only on the
 semiconductor submesh; gate facets are on the oxide-side boundary of
@@ -326,10 +315,7 @@ electrostatic potential through the interfacial flux-continuity
 condition. This is also why no `phi_n_bc` or `phi_p_bc` is built at
 the gate.
 
-**8.5.** $\sqrt{2 m^*\phi_B} = \sqrt{2\cdot 0.26\cdot 9.11\times 10^{-31}\cdot
-1.6\times 10^{-19}\cdot 0.85} \approx 4.0\times 10^{-25}\,\mathrm{kg^{1/2}\,J^{1/2}}
-= 4.0\times 10^{-25}/\hbar = 4.0\times 10^{-25}/1.055\times 10^{-34}
-= 3.8\times 10^9\,\mathrm{m^{-1}}$. Then
+**8.5.** $\sqrt{2 m^*\phi_B} = \sqrt{2\cdot 0.26\cdot 9.11\times 10^{-31}\cdot 1.6\times 10^{-19}\cdot 0.85} \approx 4.0\times 10^{-25}\,\mathrm{kg^{1/2}\,J^{1/2}} = 4.0\times 10^{-25}/\hbar = 4.0\times 10^{-25}/1.055\times 10^{-34} = 3.8\times 10^9\,\mathrm{m^{-1}}$. Then
 $T \approx \exp(-2\cdot 3.8\times 10^9\cdot 5\times 10^{-9}) = \exp(-38) = 3.1\times 10^{-17}$.
 That is small per electron — but at $10^{20}\,\mathrm{cm^{-3}}$
 electron density and saturation velocity $\sim 10^7\,\mathrm{cm/s}$,

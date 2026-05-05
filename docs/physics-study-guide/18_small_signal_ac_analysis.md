@@ -2,8 +2,7 @@
 
 ## Learning objectives
 
-- Derive the small-signal AC system $(J + j\omega M)\delta\mathbf{u} =
-  -\partial F/\partial V\,\delta V$ by linearizing the steady-state
+- Derive the small-signal AC system $(J + j\omega M)\delta\mathbf{u} = -\partial F/\partial V\,\delta V$ by linearizing the steady-state
   residual around a converged DC operating point.
 - Explain the **real 2×2 block reformulation** that lets a real-PETSc
   build solve the complex linear system at doubled size.
@@ -237,8 +236,7 @@ implements the $\omega \to 0$ limit:
    $K = \partial F/\partial\psi$ at the converged $\psi_0$.
 2. The gate's Dirichlet condition shifts by $\delta V_g$ uniformly:
    $\partial F/\partial V_g$ is concentrated at the gate row.
-3. Solve $K\,\delta\psi = -\partial F/\partial V_g$ with $\delta\psi_\mathrm{gate}
-   = 1/V_t$ (per-unit-V_g BC perturbation) and homogeneous BCs elsewhere.
+3. Solve $K\,\delta\psi = -\partial F/\partial V_g$ with $\delta\psi_\mathrm{gate} = 1/V_t$ (per-unit-V_g BC perturbation) and homogeneous BCs elsewhere.
 4. Compute the differential gate charge:
 
 $$
@@ -335,8 +333,7 @@ visual accuracy on the notebook 05 plot.
    resulting scale; complex-PETSc would be cleaner if available
    ([`docs/gpu.md`](../gpu.md) lists this as deferred).
 3. **Mass matrix at BC rows.** Setting `diag = 0.0` on the BC rows of
-   $M$ (vs `diag = 1.0` on $J$) ensures the BC perturbation $\delta u_\mathrm{BC}
-   = \delta V/V_t$ is imposed at every frequency identically. If you
+   $M$ (vs `diag = 1.0` on $J$) ensures the BC perturbation $\delta u_\mathrm{BC} = \delta V/V_t$ is imposed at every frequency identically. If you
    set `diag = 1.0` on $M$ too, you get spurious $j\omega$ contributions
    at BC DOFs.
 4. **Finite-difference $\epsilon_V$ tradeoff.** Too small ($10^{-7}$):
@@ -377,19 +374,15 @@ GHz frequencies. Explain why `run_ac_sweep` is the right tool and
 
 ### Solutions
 
-**18.1.** Pure capacitor: $J = 0$, $M = C I$. (18.2): $j\omega C\delta u
-= -\partial F/\partial V \delta V$. With $-\partial F/\partial V = 1$
+**18.1.** Pure capacitor: $J = 0$, $M = C I$. (18.2): $j\omega C\delta u = -\partial F/\partial V \delta V$. With $-\partial F/\partial V = 1$
 (unit BC perturbation at the contact), $\delta u = 1/(j\omega C)\delta V$.
 $\delta I = j\omega C\delta u\cdot ?$... Actually, for a parallel-plate
 capacitor in this idealization, $\delta I = j\omega Q' = j\omega C \delta V$,
-so $Y = \delta I/\delta V = j\omega C$. $C(\omega) = \mathrm{Im}(Y)/(2\pi f)
-= \omega C/(2\pi f) = C$. ✓ (independent of $\omega$, as expected for
+so $Y = \delta I/\delta V = j\omega C$. $C(\omega) = \mathrm{Im}(Y)/(2\pi f) = \omega C/(2\pi f) = C$. ✓ (independent of $\omega$, as expected for
 an ideal capacitor).
 
-**18.2.** $V_{bi} = 0.834\,\mathrm{V}$, $W(-1) = W(0)\sqrt{(0.834+1)/0.834}
-= 146.9\,\mathrm{nm}\cdot\sqrt{2.20} = 218\,\mathrm{nm}$.
-$C_\mathrm{dep} = \varepsilon_s/W = 11.7\cdot 8.854\times 10^{-12}/2.18\times 10^{-7}
-= 4.75\times 10^{-4}\,\mathrm{F/m^2}$. Matches the ADR 0011 acceptance
+**18.2.** $V_{bi} = 0.834\,\mathrm{V}$, $W(-1) = W(0)\sqrt{(0.834+1)/0.834} = 146.9\,\mathrm{nm}\cdot\sqrt{2.20} = 218\,\mathrm{nm}$.
+$C_\mathrm{dep} = \varepsilon_s/W = 11.7\cdot 8.854\times 10^{-12}/2.18\times 10^{-7} = 4.75\times 10^{-4}\,\mathrm{F/m^2}$. Matches the ADR 0011 acceptance
 quote.
 
 **18.3.** (a) Analytical $\partial F/\partial V$ requires inspecting

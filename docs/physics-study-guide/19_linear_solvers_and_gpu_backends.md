@@ -15,8 +15,7 @@
 
 ## Physical motivation
 
-Every Newton iteration solves a sparse linear system $J\delta\mathbf{u}
-= -F$. For sub-100k DOF problems, MUMPS LU factorization is robust and
+Every Newton iteration solves a sparse linear system $J\delta\mathbf{u} = -F$. For sub-100k DOF problems, MUMPS LU factorization is robust and
 gives tight error control; for ~1M DOF problems (3D MOSFETs, FinFETs),
 direct LU memory and time both blow up super-linearly and we need
 iterative methods with strong preconditioners. The M15 milestone added
@@ -174,8 +173,7 @@ Typical wall times reported in the M15 acceptance run:
 - GPU AMGX on A100: ~22 s linear solve.
 - Speedup: 5.5×, clears the gate.
 
-Output match: max-norm relative difference $\|\psi_\mathrm{gpu} - \psi_\mathrm{cpu}\|_\infty/\|\psi_\mathrm{cpu}\|_\infty
-\sim 10^{-9}$, comfortably below the $10^{-8}$ rel-L2 acceptance gate.
+Output match: max-norm relative difference $\|\psi_\mathrm{gpu} - \psi_\mathrm{cpu}\|_\infty/\|\psi_\mathrm{cpu}\|_\infty \sim 10^{-9}$, comfortably below the $10^{-8}$ rel-L2 acceptance gate.
 
 ## Code map
 

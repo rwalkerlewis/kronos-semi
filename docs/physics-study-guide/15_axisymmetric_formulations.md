@@ -144,8 +144,7 @@ $$
 The $\int r\,ds$ in the meridian computes the per-unit-radian gate
 "length" that, multiplied by $2\pi$, gives the actual gate area on the
 revolved 3D device. [`semi/runners/mos_cap_ac.py:188-198`](../../semi/runners/mos_cap_ac.py)
-performs this assembly to convert the integrated charge $Q_\mathrm{semi}^{3D}
-= 2\pi q\int\rho r\,dA$ into a per-unit-area $Q_\mathrm{gate}/A_\mathrm{gate}$.
+performs this assembly to convert the integrated charge $Q_\mathrm{semi}^{3D} = 2\pi q\int\rho r\,dA$ into a per-unit-area $Q_\mathrm{gate}/A_\mathrm{gate}$.
 
 ### When axisymmetric is wrong
 
@@ -177,8 +176,7 @@ the meridian's radial extent in this benchmark, because the entire top
 face is the gate. (More general benchmarks could have a smaller gate
 inside a larger meridian.)
 
-Gate area in 3D: $A_\mathrm{gate} = \pi R_\mathrm{gate}^2 = \pi(5\times 10^{-5})^2
-= 7.85\times 10^{-9}\,\mathrm{m^2} = 7.85\times 10^{-5}\,\mathrm{cm^2}$.
+Gate area in 3D: $A_\mathrm{gate} = \pi R_\mathrm{gate}^2 = \pi(5\times 10^{-5})^2 = 7.85\times 10^{-9}\,\mathrm{m^2} = 7.85\times 10^{-5}\,\mathrm{cm^2}$.
 
 Integrate $r$ over the gate facet in the meridian:
 $L_\mathrm{gate}^\mathrm{merid} = \int_0^{R_\mathrm{gate}} r\,dr = R_\mathrm{gate}^2/2$.
@@ -299,8 +297,7 @@ substantially beyond the gate to allow the field to fall off radially.
 divided by $\pi$. That is: when you revolve the meridian around the
 $z$-axis, a meridian-line segment at radius $r$ traces out an annulus
 of circumference $2\pi r$ on the 3D gate; the meridian-line element
-$ds$ traces out an area element $2\pi r\,ds$. So $\int r\,ds_\mathrm{merid}
-= A_\mathrm{gate}^{3D}/(2\pi)$. The radial extent of the gate facet is
+$ds$ traces out an area element $2\pi r\,ds$. So $\int r\,ds_\mathrm{merid} = A_\mathrm{gate}^{3D}/(2\pi)$. The radial extent of the gate facet is
 just $R_\mathrm{gate} - r_\mathrm{inner}$; the area picks up the $r$
 factor.
 

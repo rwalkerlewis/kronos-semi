@@ -179,8 +179,7 @@ $$
    \qquad (1.8)
 $$
    The jump bracket $⟦ f⟧$ denotes $f|_+ - f|_-$ across the
-   interface. Equation (1.8) is the local form of $\nabla\cdot\mathbf{D}
-   = \rho$ when there is no surface charge sheet at the interface; see
+   interface. Equation (1.8) is the local form of $\nabla\cdot\mathbf{D} = \rho$ when there is no surface charge sheet at the interface; see
    Ch. 14 for the proof that the Galerkin form encodes (1.8) automatically.
 
 5. **Axis-of-symmetry (forward reference).** In an axisymmetric problem
@@ -295,8 +294,7 @@ side at a depletion-region point where $n,p \ll N_D - N_A$.
 
 **Exercise 1.1.** Show that for a uniform doping $N_D - N_A = N$ with
 zero applied bias, the Poisson equation has a constant solution
-$\psi(\mathbf{x}) = \psi_\mathrm{eq}$ with $n(\psi_\mathrm{eq}) -
-p(\psi_\mathrm{eq}) = N$. (Hint: bulk charge neutrality.)
+$\psi(\mathbf{x}) = \psi_\mathrm{eq}$ with $n(\psi_\mathrm{eq}) - p(\psi_\mathrm{eq}) = N$. (Hint: bulk charge neutrality.)
 
 **Exercise 1.2.** Verify that for a thin capacitor of thickness $d$,
 plate area $A$, dielectric $\varepsilon_r$, and applied voltage $V$,
@@ -319,8 +317,7 @@ portion. (Hint: integrate by parts and ask which boundary integral
 must vanish for the equation to hold.)
 
 **Exercise 1.5.** At a sharp Si/SiO₂ interface with no surface charge,
-prove that $\nabla\psi$ has a jump $⟦\nabla\psi\cdot\hat{\mathbf{n}}⟧
-= -⟦\varepsilon_r⟧/\varepsilon_r^+\cdot \nabla\psi^+\cdot\hat{\mathbf{n}}$
+prove that $\nabla\psi$ has a jump $⟦\nabla\psi\cdot\hat{\mathbf{n}}⟧ = -⟦\varepsilon_r⟧/\varepsilon_r^+\cdot \nabla\psi^+\cdot\hat{\mathbf{n}}$
 even though $\psi$ is continuous. Estimate the magnitude of this jump
 for the M6 MOS capacitor at $V_g = 1\,\mathrm{V}$.
 
@@ -344,9 +341,7 @@ SiO₂: $3.9 \times 8.854\times 10^{-12} = 3.453\times 10^{-11}\,\mathrm{F/m}$.
 HfO₂: $25.0 \times 8.854\times 10^{-12} = 2.214\times 10^{-10}\,\mathrm{F/m}$.
 
 **1.4.** Integrating $-\nabla\cdot(\varepsilon\nabla\psi)v$ by parts:
-$\int_\Omega \varepsilon\nabla\psi\cdot\nabla v\,dV
-- \int_{\partial\Omega} v\,\varepsilon\,\nabla\psi\cdot\hat{\mathbf{n}}\,dS
-= \int_\Omega \rho v\,dV$. The Galerkin form drops the surface term,
+$\int_\Omega \varepsilon\nabla\psi\cdot\nabla v\,dV - \int_{\partial\Omega} v\,\varepsilon\,\nabla\psi\cdot\hat{\mathbf{n}}\,dS = \int_\Omega \rho v\,dV$. The Galerkin form drops the surface term,
 so unless we replace it with an explicit `ds` integral, we are
 implicitly demanding $\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}=0$
 on the part of $\partial\Omega$ where $v$ is free. ✓
@@ -356,10 +351,8 @@ by the conforming function space; continuity of
 $\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}$ is encoded by the
 bilinear form $\int\varepsilon_r\nabla\psi\cdot\nabla v\,dx$ with the
 piecewise constant $\varepsilon_r(\mathbf{x})$. Solving for the field
-jump: $\varepsilon_r^+(\nabla\psi^+\cdot\hat{\mathbf{n}}) =
-\varepsilon_r^-(\nabla\psi^-\cdot\hat{\mathbf{n}})$, so
-$\nabla\psi^-\cdot\hat{\mathbf{n}} - \nabla\psi^+\cdot\hat{\mathbf{n}}
-= (1 - \varepsilon_r^+/\varepsilon_r^-)\,\nabla\psi^+\cdot\hat{\mathbf{n}}$.
+jump: $\varepsilon_r^+(\nabla\psi^+\cdot\hat{\mathbf{n}}) = \varepsilon_r^-(\nabla\psi^-\cdot\hat{\mathbf{n}})$, so
+$\nabla\psi^-\cdot\hat{\mathbf{n}} - \nabla\psi^+\cdot\hat{\mathbf{n}} = (1 - \varepsilon_r^+/\varepsilon_r^-)\,\nabla\psi^+\cdot\hat{\mathbf{n}}$.
 At Si/SiO₂ with $\varepsilon_r^+ = 3.9$ (oxide), $\varepsilon_r^- = 11.7$
 (silicon), the field is $11.7/3.9 = 3$ times larger in the oxide than in
 the silicon at the interface; this is the quantitative origin of the

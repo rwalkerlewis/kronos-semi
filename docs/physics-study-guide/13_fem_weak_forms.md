@@ -236,8 +236,7 @@ $\int \phi_i'\,\phi_i'\,dx = 2/h$ and $\int \phi_i'\,\phi_{i+1}'\,dx = -1/h$.
 
 Per-element coefficient: $L_D^2\varepsilon_r = 1.67\times 10^{-16}$
 (M1 worked example, Ch. 12). Multiplied:
-- $K_{ii}^\mathrm{interior} = 2\cdot 1.67\times 10^{-16}/h = 3.34\times 10^{-16}/5\times 10^{-9}
-  = 6.68\times 10^{-8}\,\mathrm{m^{-1}}$.
+- $K_{ii}^\mathrm{interior} = 2\cdot 1.67\times 10^{-16}/h = 3.34\times 10^{-16}/5\times 10^{-9} = 6.68\times 10^{-8}\,\mathrm{m^{-1}}$.
 - $K_{i,i+1} = -1.67\times 10^{-16}/h = -3.34\times 10^{-8}$.
 
 (These are the dimensional entries of $K$; the load vector has matching
@@ -337,8 +336,7 @@ typically 6 neighbouring vertices on a uniform triangular mesh, plus
 self.
 
 **13.3.** Modified weak form:
-$\int_\Omega \varepsilon\nabla\psi\cdot\nabla v\,dV
-= \int_\Omega \rho\,v\,dV + \int_{\Gamma_N}\varepsilon h\,v\,dS$.
+$\int_\Omega \varepsilon\nabla\psi\cdot\nabla v\,dV = \int_\Omega \rho\,v\,dV + \int_{\Gamma_N}\varepsilon h\,v\,dS$.
 UFL: add `+ eps * h * v * ds(neumann_tag)` to the form. Currently
 neither the schema nor `semi/bcs.py` exposes non-homogeneous Neumann;
 adding it would be a small extension.

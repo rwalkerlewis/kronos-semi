@@ -76,8 +76,7 @@ trickier; let's derive it from the variational principle.
 
 Consider an interior face $F$ between two cells $K_1$ (silicon) and
 $K_2$ (oxide). Pick a test function $v \in V_h$ with support straddling
-$F$. The contribution of $F$ to the bilinear form $a(\psi, v) = \int_\Omega
-\varepsilon_r\nabla\psi\cdot\nabla v\,dV$ is computed by summing the
+$F$. The contribution of $F$ to the bilinear form $a(\psi, v) = \int_\Omega \varepsilon_r\nabla\psi\cdot\nabla v\,dV$ is computed by summing the
 two cell contributions:
 
 $$
@@ -323,8 +322,7 @@ the JSON to look up $\varepsilon_r$ in [`semi/materials.py:86-88`](../../semi/ma
 **14.2.** Take the gate-side surface integral of the Maxwell flux:
 $\varepsilon_{ox}E_{ox} = \varepsilon_s E_{Si} + Q_f$. Across the oxide,
 $V_{ox} = E_{ox}T_{ox} = (\varepsilon_s E_{Si} + Q_f)T_{ox}/\varepsilon_{ox}$.
-At flat band, $E_{Si} = 0$, so $V_{fb} = \phi_{ms} + Q_f T_{ox}/\varepsilon_{ox}
-= \phi_{ms} + Q_f/C_{ox}$. Wait — sign: $V_{fb}$ is the *gate-side*
+At flat band, $E_{Si} = 0$, so $V_{fb} = \phi_{ms} + Q_f T_{ox}/\varepsilon_{ox} = \phi_{ms} + Q_f/C_{ox}$. Wait — sign: $V_{fb}$ is the *gate-side*
 voltage that produces no band bending, and a positive $Q_f$ at the
 interface (positive charge in the oxide) would attract electrons to the
 silicon, requiring *less negative* gate voltage to invert; equivalently,

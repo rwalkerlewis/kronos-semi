@@ -197,14 +197,11 @@ use.
 For silicon at $T = 300\,\mathrm{K}$, plug Sze's values into (2.6):
 
 - $m_n^* = 1.08\,m_0$ (density-of-states effective mass for the six
-  conduction-band valleys), $kT = 0.02585\,\mathrm{eV} =
-  4.14\times 10^{-21}\,\mathrm{J}$.
+  conduction-band valleys), $kT = 0.02585\,\mathrm{eV} = 4.14\times 10^{-21}\,\mathrm{J}$.
 - $\hbar = 1.0546\times 10^{-34}\,\mathrm{J\,s}$,
   $m_0 = 9.109\times 10^{-31}\,\mathrm{kg}$.
-- $\frac{m_n^* kT}{2\pi\hbar^2} = \frac{1.08 \cdot 9.109\times 10^{-31} \cdot 4.14\times 10^{-21}}{2\pi\cdot 1.112\times 10^{-68}}
-   = \frac{4.07\times 10^{-51}}{6.99\times 10^{-68}} = 5.83\times 10^{16}\,\mathrm{m^{-2}}$.
-- $N_c = 2 \cdot (5.83\times 10^{16})^{3/2} = 2 \cdot 1.41\times 10^{25}
-   = 2.82\times 10^{25}\,\mathrm{m^{-3}}$.
+- $\frac{m_n^* kT}{2\pi\hbar^2} = \frac{1.08 \cdot 9.109\times 10^{-31} \cdot 4.14\times 10^{-21}}{2\pi\cdot 1.112\times 10^{-68}} = \frac{4.07\times 10^{-51}}{6.99\times 10^{-68}} = 5.83\times 10^{16}\,\mathrm{m^{-2}}$.
+- $N_c = 2 \cdot (5.83\times 10^{16})^{3/2} = 2 \cdot 1.41\times 10^{25} = 2.82\times 10^{25}\,\mathrm{m^{-3}}$.
 - Convert to cm⁻³: divide by $10^6$, get $2.82\times 10^{19}\,\mathrm{cm}^{-3}$.
 
 This matches Sze's tabulated $N_c = 2.86\times 10^{19}\,\mathrm{cm}^{-3}$
@@ -214,8 +211,7 @@ Sze's value directly.
 
 For (2.9) with $E_g = 1.12\,\mathrm{eV}$ at 300 K:
 $\exp(-E_g/kT) = \exp(-1.12/0.02585) = \exp(-43.32) = 1.55\times 10^{-19}$.
-Then $n_i^2 = 2.86\times 10^{19} \cdot 3.10\times 10^{19} \cdot 1.55\times 10^{-19}
-= 1.37\times 10^{20}\,\mathrm{cm^{-6}}$, so $n_i \approx 1.17\times 10^{10}\,\mathrm{cm}^{-3}$.
+Then $n_i^2 = 2.86\times 10^{19} \cdot 3.10\times 10^{19} \cdot 1.55\times 10^{-19} = 1.37\times 10^{20}\,\mathrm{cm^{-6}}$, so $n_i \approx 1.17\times 10^{10}\,\mathrm{cm}^{-3}$.
 
 The engine uses $n_i = 1.0\times 10^{10}\,\mathrm{cm}^{-3}$ (Altermatt's
 2003 reassessment; see [`semi/materials.py:58`](../../semi/materials.py)
@@ -301,9 +297,7 @@ Predict whether $n_i$ in GaAs is larger or smaller than in silicon at
 
 ### Solutions
 
-**2.1.** $\frac{m_n^* kT}{2\pi\hbar^2} = \frac{0.56 \cdot 9.109\times 10^{-31} \cdot 4.14\times 10^{-21}}{2\pi\cdot 1.112\times 10^{-68}}
-= 3.02\times 10^{16}\,\mathrm{m^{-2}}$. Then $N_c = 2(3.02\times 10^{16})^{1.5} = 2 \cdot 5.25\times 10^{24} = 1.05\times 10^{25}\,\mathrm{m^{-3}}
-= 1.05\times 10^{19}\,\mathrm{cm^{-3}}$. Sze gives $1.04\times 10^{19}$; matches.
+**2.1.** $\frac{m_n^* kT}{2\pi\hbar^2} = \frac{0.56 \cdot 9.109\times 10^{-31} \cdot 4.14\times 10^{-21}}{2\pi\cdot 1.112\times 10^{-68}} = 3.02\times 10^{16}\,\mathrm{m^{-2}}$. Then $N_c = 2(3.02\times 10^{16})^{1.5} = 2 \cdot 5.25\times 10^{24} = 1.05\times 10^{25}\,\mathrm{m^{-3}} = 1.05\times 10^{19}\,\mathrm{cm^{-3}}$. Sze gives $1.04\times 10^{19}$; matches.
 
 **2.2.** Multiply $n$ and $p$ in (2.8): the $\exp(\pm E_F/kT)$ factors
 cancel, leaving $np = N_c N_v \exp(-(E_c-E_v)/kT) = N_c N_v \exp(-E_g/kT)$,
@@ -332,13 +326,9 @@ for tunneling (M16.6, planned) and breakdown, neither of which the
 shipped engine models, so $E_g$ and $\chi$ for SiO₂ are not loaded into
 any UFL form and are stored as zero by convention.
 
-**2.5.** Compare $n_i$ via (2.9). For silicon: $n_i^2 = N_c N_v \exp(-E_g/kT)
-= 2.86\times 10^{19} \cdot 3.10\times 10^{19} \cdot \exp(-1.12/0.02585)
-= 8.87\times 10^{38} \cdot 1.55\times 10^{-19} = 1.37\times 10^{20}$, so
+**2.5.** Compare $n_i$ via (2.9). For silicon: $n_i^2 = N_c N_v \exp(-E_g/kT) = 2.86\times 10^{19} \cdot 3.10\times 10^{19} \cdot \exp(-1.12/0.02585) = 8.87\times 10^{38} \cdot 1.55\times 10^{-19} = 1.37\times 10^{20}$, so
 $n_i \approx 1.2\times 10^{10}\,\mathrm{cm^{-3}}$. For GaAs:
-$n_i^2 = 4.7\times 10^{17} \cdot 7.0\times 10^{18} \cdot \exp(-1.424/0.02585)
-= 3.29\times 10^{36} \cdot \exp(-55.08) = 3.29\times 10^{36} \cdot 1.16\times 10^{-24}
-= 3.82\times 10^{12}$, so $n_i \approx 1.95\times 10^{6}\,\mathrm{cm^{-3}}$.
+$n_i^2 = 4.7\times 10^{17} \cdot 7.0\times 10^{18} \cdot \exp(-1.424/0.02585) = 3.29\times 10^{36} \cdot \exp(-55.08) = 3.29\times 10^{36} \cdot 1.16\times 10^{-24} = 3.82\times 10^{12}$, so $n_i \approx 1.95\times 10^{6}\,\mathrm{cm^{-3}}$.
 GaAs $n_i$ is about $10^4$ times smaller; this is a generic feature of
 wide-gap materials and explains why GaAs devices are insensitive to
 the SRH-generation reverse-leakage that plagues silicon (Ch. 6).

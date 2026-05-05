@@ -184,9 +184,7 @@ on each side:
 
 - $V_t$ unchanged ($V_t = kT/q = 25.85\,\mathrm{mV}$ at 300 K).
 - $n_i^\mathrm{GaAs} = 2.1\times 10^6\,\mathrm{cm^{-3}}$ instead of $10^{10}$.
-- $V_{bi} = V_t\ln(N_AN_D/n_i^2) = V_t\ln(10^{34}/(2.1\times 10^6)^2)
-  = V_t\ln(10^{34}/4.41\times 10^{12}) = V_t\ln(2.27\times 10^{21})
-  = 0.02585\cdot 49.16 = 1.271\,\mathrm{V}$. Compared to Si's
+- $V_{bi} = V_t\ln(N_AN_D/n_i^2) = V_t\ln(10^{34}/(2.1\times 10^6)^2) = V_t\ln(10^{34}/4.41\times 10^{12}) = V_t\ln(2.27\times 10^{21}) = 0.02585\cdot 49.16 = 1.271\,\mathrm{V}$. Compared to Si's
   0.834 V.
 - $\varepsilon_r^\mathrm{GaAs} = 12.9$ vs Si's 11.7. Slight increase
   in $L_D$, slight decrease in $W$ (wider $V_{bi}$ winning).
@@ -270,22 +268,17 @@ does the engine not already carry $v_\mathrm{sat}$ on `Material`?
 
 ### Solutions
 
-**20.1.** $n_i^2 = N_c N_v\exp(-E_g/kT)
-= 1.04\times 10^{19}\cdot 6\times 10^{18}\cdot\exp(-0.66/0.02585)
-= 6.24\times 10^{37}\cdot \exp(-25.53)
-= 6.24\times 10^{37}\cdot 8.18\times 10^{-12} = 5.10\times 10^{26}\,\mathrm{cm^{-6}}$.
+**20.1.** $n_i^2 = N_c N_v\exp(-E_g/kT) = 1.04\times 10^{19}\cdot 6\times 10^{18}\cdot\exp(-0.66/0.02585) = 6.24\times 10^{37}\cdot \exp(-25.53) = 6.24\times 10^{37}\cdot 8.18\times 10^{-12} = 5.10\times 10^{26}\,\mathrm{cm^{-6}}$.
 $n_i = 2.26\times 10^{13}\,\mathrm{cm^{-3}}$. Stored: $2.0\times 10^{13}$.
 Match within 13% (consistent with the slight effective-mass-value
 discrepancy across Sze tables).
 
-**20.2.** $C_{ox}^\mathrm{HfO_2}(5\,\mathrm{nm}) = 25\cdot 8.854\times 10^{-12}/5\times 10^{-9}
-= 4.43\times 10^{-2}\,\mathrm{F/m^2}$. About 6.4× SiO₂'s value at the same
+**20.2.** $C_{ox}^\mathrm{HfO_2}(5\,\mathrm{nm}) = 25\cdot 8.854\times 10^{-12}/5\times 10^{-9} = 4.43\times 10^{-2}\,\mathrm{F/m^2}$. About 6.4× SiO₂'s value at the same
 thickness.
 Depletion-charge term in $V_T$: same $\sqrt{2\varepsilon_s qN_a\cdot 2|\phi_B|}$
 divided by 6.4× larger $C_{ox}$, so 6.4× smaller. For Hu Fig. 5-18
 ($N_a = 5\times 10^{16}$): original term was 0.333 V; new term is
-$0.333/6.4 = 0.052\,\mathrm{V}$. $V_T = V_{fb} + 2|\phi_B| + 0.052
-= -0.950 + 0.798 + 0.052 = -0.100\,\mathrm{V}$ (negative — the device
+$0.333/6.4 = 0.052\,\mathrm{V}$. $V_T = V_{fb} + 2|\phi_B| + 0.052 = -0.950 + 0.798 + 0.052 = -0.100\,\mathrm{V}$ (negative — the device
 turns on at *negative* gate voltage, which means the p-body MOSCAP is
 in inversion at $V_g = 0$).
 
@@ -307,8 +300,7 @@ $\hat\mu_n^{(\mathrm{region})}/\hat\mu_n^{(\mathrm{ref})}$ ratios.
 Currently every benchmark has one semiconductor material, so this
 distinction doesn't matter; M17 will surface it.
 
-**20.5.** M16.1 Caughey-Thomas adds $v_\mathrm{sat,n}, v_\mathrm{sat,p},
-\beta_n, \beta_p$ as *physics.mobility* JSON fields, not as `Material`
+**20.5.** M16.1 Caughey-Thomas adds $v_\mathrm{sat,n}, v_\mathrm{sat,p}, \beta_n, \beta_p$ as *physics.mobility* JSON fields, not as `Material`
 fields, because they are model parameters rather than material
 constants. (Per-material defaults could go on `Material`, but the
 shipped M16.1 puts them on the schema with global defaults.) M17

@@ -206,8 +206,7 @@ $$
 
 Negative ⟹ generation. The total generation current per unit cross-section
 is $J_\mathrm{gen} = q|R|\cdot W$ where $W$ is the depletion width:
-$J_\mathrm{gen} = 1.602\times 10^{-19}\cdot 5\times 10^{22}\cdot 1.6\times 10^{-7}
-= 1.28\times 10^{-3}\,\mathrm{A/m^2}$
+$J_\mathrm{gen} = 1.602\times 10^{-19}\cdot 5\times 10^{22}\cdot 1.6\times 10^{-7} = 1.28\times 10^{-3}\,\mathrm{A/m^2}$
 (using $W \approx 160\,\mathrm{nm}$ at $V = -1\,\mathrm{V}$ from the
 depletion formula).
 
@@ -302,27 +301,21 @@ regardless of denominator. ✓
 **6.2.** Low-injection: $n_0 = 10^3\,\mathrm{cm^{-3}}$, $p_0 = 10^{17}$;
 $\delta n = 10^{12}$, $\delta p = 10^{12}$ by quasi-neutrality.
 $np = (10^3+10^{12})\cdot(10^{17}+10^{12}) \approx 10^{29}$, $n_i^2 = 10^{20}$.
-$np - n_i^2 \approx 10^{29}$. Denominator: $\tau_p (n + n_i) + \tau_n (p + n_i)
-\approx \tau_n p_0 = 10^{-7}\cdot 10^{17} = 10^{10}$.
+$np - n_i^2 \approx 10^{29}$. Denominator: $\tau_p (n + n_i) + \tau_n (p + n_i) \approx \tau_n p_0 = 10^{-7}\cdot 10^{17} = 10^{10}$.
 $R = 10^{29}/10^{10} = 10^{19}\,\mathrm{cm^{-3}/s}$. Effective lifetime
 $\delta n/R = 10^{12}/10^{19} = 10^{-7}\,\mathrm{s} = \tau_n$. ✓
 
 High-injection: $n = p = 10^{17}$, $np = 10^{34}$, $np-n_i^2 \approx 10^{34}$.
-Denominator: $\tau_p(n+n_i) + \tau_n(p+n_i) \approx 2\tau\cdot 10^{17}
-= 2\times 10^{10}$. $R = 5\times 10^{23}$. Effective lifetime
-$\delta n/R = 10^{17}/(5\times 10^{23}) = 2\times 10^{-7}\,\mathrm{s}
-= \tau_n + \tau_p$. ✓
+Denominator: $\tau_p(n+n_i) + \tau_n(p+n_i) \approx 2\tau\cdot 10^{17} = 2\times 10^{10}$. $R = 5\times 10^{23}$. Effective lifetime
+$\delta n/R = 10^{17}/(5\times 10^{23}) = 2\times 10^{-7}\,\mathrm{s} = \tau_n + \tau_p$. ✓
 
 **6.3.** $n,p \to 0$: $R = -n_i^2/(\tau_p n_1 + \tau_n p_1)$. Mid-gap:
 $n_1 = p_1 = n_i$. With $\tau_n = \tau_p = \tau$:
 $R = -n_i^2/(2\tau n_i) = -n_i/(2\tau)$.
-$|R| = 10^{16}/(2\times 10^{-7}) = 5\times 10^{22}\,\mathrm{m^{-3}/s}
-= 5\times 10^{16}\,\mathrm{cm^{-3}/s}$. ✓ (matches the worked example
+$|R| = 10^{16}/(2\times 10^{-7}) = 5\times 10^{22}\,\mathrm{m^{-3}/s} = 5\times 10^{16}\,\mathrm{cm^{-3}/s}$. ✓ (matches the worked example
 when expressed per cm³).
 
-**6.4.** $E_t/V_t = 0.3/0.02585 = 11.61$. $n_1 = n_i\,e^{11.61} = 10^{10}\cdot 1.10\times 10^5
-= 1.10\times 10^{15}\,\mathrm{cm^{-3}}$. $p_1 = n_i\,e^{-11.61} =
-9.07\times 10^4\,\mathrm{cm^{-3}}$. Far from mid-gap traps are *less*
+**6.4.** $E_t/V_t = 0.3/0.02585 = 11.61$. $n_1 = n_i\,e^{11.61} = 10^{10}\cdot 1.10\times 10^5 = 1.10\times 10^{15}\,\mathrm{cm^{-3}}$. $p_1 = n_i\,e^{-11.61} = 9.07\times 10^4\,\mathrm{cm^{-3}}$. Far from mid-gap traps are *less*
 efficient at recombination because the denominator picks up large
 $\tau_p n_1$ (or $\tau_n p_1$) terms; the SRH rate is maximized when
 $E_t = E_i$ (mid-gap), where $n_1 = p_1 = n_i$ minimize the denominator.

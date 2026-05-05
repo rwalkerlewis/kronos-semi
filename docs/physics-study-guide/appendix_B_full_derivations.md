@@ -54,8 +54,7 @@ N_c = \frac{1}{2\pi^{3/2}}\left(\frac{2m_n^* kT}{\hbar^2}\right)^{3/2}
     = 2\left(\frac{m_n^* kT}{2\pi\hbar^2}\right)^{3/2},
 $$
 
-using $(2/\hbar^2)^{3/2}\cdot 1/(2\pi^{3/2}) = 1/(\pi^{3/2}\hbar^3)\cdot 2^{1/2}
-= 2/(2\pi\hbar^2/m^*kT)^{3/2}$ after rearrangement. (B.1) ✓
+using $(2/\hbar^2)^{3/2}\cdot 1/(2\pi^{3/2}) = 1/(\pi^{3/2}\hbar^3)\cdot 2^{1/2} = 2/(2\pi\hbar^2/m^*kT)^{3/2}$ after rearrangement. (B.1) ✓
 
 The hole expression $N_v = 2(m_p^*kT/(2\pi\hbar^2))^{3/2}$ follows by
 the symmetric integral over the valence band.
@@ -204,8 +203,7 @@ $$
 Goal: derive (11.6), $\mathbf{J}_n = -q\mu_n n\,\nabla\Phi_n$.
 
 Start with (5.5):
-$\mathbf{J}_n = q\mu_n n\,\mathbf{E} + qD_n\,\nabla n
-= -q\mu_n n\,\nabla\psi + q\mu_n V_t\,\nabla n$ (using Einstein $D_n = \mu_n V_t$).
+$\mathbf{J}_n = q\mu_n n\,\mathbf{E} + qD_n\,\nabla n = -q\mu_n n\,\nabla\psi + q\mu_n V_t\,\nabla n$ (using Einstein $D_n = \mu_n V_t$).
 
 Slotboom: $n = n_i\exp((\psi - \Phi_n)/V_t)$, so
 
@@ -276,8 +274,7 @@ $$
 $$
 
 Apply the divergence-theorem identity in cylindrical coordinates:
-$\int_\Omega(\nabla\cdot\mathbf{F})v\,dV = -\int_\Omega \mathbf{F}\cdot\nabla v\,dV
-+ \int_{\partial\Omega}\mathbf{F}\cdot\hat{\mathbf{n}}\,v\,dS$. With
+$\int_\Omega(\nabla\cdot\mathbf{F})v\,dV = -\int_\Omega \mathbf{F}\cdot\nabla v\,dV + \int_{\partial\Omega}\mathbf{F}\cdot\hat{\mathbf{n}}\,v\,dS$. With
 $\mathbf{F} = \varepsilon\nabla\psi$:
 
 $$
@@ -367,8 +364,7 @@ $Jx - \omega My = b_R$
 $\omega Mx + Jy = b_I$.
 
 In matrix form:
-$\begin{bmatrix} J & -\omega M \\ \omega M & J\end{bmatrix}\begin{bmatrix}x\\y\end{bmatrix}
-= \begin{bmatrix}b_R\\b_I\end{bmatrix}$.
+$\begin{bmatrix} J & -\omega M \\ \omega M & J\end{bmatrix}\begin{bmatrix}x\\y\end{bmatrix} = \begin{bmatrix}b_R\\b_I\end{bmatrix}$.
 
 Equation (18.4). ✓
 

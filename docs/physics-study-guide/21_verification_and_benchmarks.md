@@ -158,19 +158,28 @@ This script asserts the basic physics math without dolfinx. Reproducing
 each assertion from formulas in this guide:
 
 **Thermal voltage** (Ch. 3).
-$V_t = kT/q = 1.381\times 10^{-23}\cdot 300/1.602\times 10^{-19}
-= 0.025852\,\mathrm{V}$. Asserted $|V_t - 0.02585| < 0.001$. ✓
+
+$$
+V_t = kT/q = 1.381\times 10^{-23}\cdot 300/1.602\times 10^{-19} = 0.025852\,\mathrm{V}.
+$$
+
+Asserted $|V_t - 0.02585| < 0.001$. ✓
 
 **$\lambda^2$ bare** (Ch. 12).
-$\lambda^2 = \varepsilon_0 V_t/(qC_0L_0^2)
-= 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23}\cdot 4\times 10^{-12})
-= 3.57\times 10^{-6}$. Asserted matches.
+
+$$
+\lambda^2 = \varepsilon_0 V_t/(qC_0L_0^2) = 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23}\cdot 4\times 10^{-12}) = 3.57\times 10^{-6}.
+$$
+
+Asserted matches.
 
 **Debye length in silicon** (Ch. 12).
-$L_D = \sqrt{\varepsilon_r\varepsilon_0V_t/(qC_0)}
-= \sqrt{11.7\cdot 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23})}
-= 1.296\times 10^{-8}\,\mathrm{m} = 12.96\,\mathrm{nm}$. Asserted
-$10 < L_D < 16\,\mathrm{nm}$. ✓
+
+$$
+L_D = \sqrt{\varepsilon_r\varepsilon_0V_t/(qC_0)} = \sqrt{11.7\cdot 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23})} = 1.296\times 10^{-8}\,\mathrm{m} = 12.96\,\mathrm{nm}.
+$$
+
+Asserted $10 < L_D < 16\,\mathrm{nm}$. ✓
 
 **Cross-check $(L_D/L_0)^2 = \lambda^2\varepsilon_r$** (Ch. 12 Exercise).
 $(L_D/L_0)^2 = (1.296\times 10^{-8}/2\times 10^{-6})^2 = 4.20\times 10^{-5}$.
@@ -178,32 +187,40 @@ $\lambda^2\varepsilon_r = 3.57\times 10^{-6}\cdot 11.7 = 4.18\times 10^{-5}$.
 Match within 0.5%. ✓ (Asserted $|...|/(...) < 0.01$.)
 
 **$V_{bi}$ via asinh and via log** (Ch. 7).
-asinh: $V_t[\mathrm{asinh}(N_A/(2n_i)) + \mathrm{asinh}(N_D/(2n_i))]
-= V_t[\mathrm{asinh}(5\times 10^6) + \mathrm{asinh}(5\times 10^6)]
-= V_t\cdot 2\cdot 16.118 = 0.8334\,\mathrm{V}$.
-log: $V_t\ln(N_AN_D/n_i^2) = V_t\ln(10^{14}) = 0.8334\,\mathrm{V}$.
+
+$$
+\text{asinh: }V_t[\mathrm{asinh}(N_A/(2n_i)) + \mathrm{asinh}(N_D/(2n_i))] = V_t[\mathrm{asinh}(5\times 10^6) + \mathrm{asinh}(5\times 10^6)] = V_t\cdot 2\cdot 16.118 = 0.8334\,\mathrm{V}.
+$$
+
+$$
+\text{log: }V_t\ln(N_AN_D/n_i^2) = V_t\ln(10^{14}) = 0.8334\,\mathrm{V}.
+$$
+
 Relative diff $< 0.01$. ✓
 
 **Depletion width $W$, $x_p$, $x_n$** (Ch. 7).
 $N_\mathrm{eff} = N/2 = 5\times 10^{22}\,\mathrm{m^{-3}}$.
-$W = \sqrt{2\varepsilon V_{bi}/(qN_\mathrm{eff})}
-= \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.834/(1.602\times 10^{-19}\cdot 5\times 10^{22})}
-= 1.469\times 10^{-7}\,\mathrm{m} = 146.9\,\mathrm{nm}$.
+
+$$
+W = \sqrt{2\varepsilon V_{bi}/(qN_\mathrm{eff})} = \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.834/(1.602\times 10^{-19}\cdot 5\times 10^{22})} = 1.469\times 10^{-7}\,\mathrm{m} = 146.9\,\mathrm{nm}.
+$$
+
 $x_p = x_n = W/2 = 73.4\,\mathrm{nm}$. Asserted at 1% relative.
 
 **Peak $|E|$** (Ch. 7).
-$|E_\mathrm{max}| = qN_Ax_p/\varepsilon
-= 1.602\times 10^{-19}\cdot 10^{23}\cdot 7.34\times 10^{-8}/1.036\times 10^{-10}
-= 1.135\times 10^{7}\,\mathrm{V/m} = 113.5\,\mathrm{kV/cm}$. Asserted in $[90, 130]$ kV/cm. ✓
+
+$$
+|E_\mathrm{max}| = qN_Ax_p/\varepsilon = 1.602\times 10^{-19}\cdot 10^{23}\cdot 7.34\times 10^{-8}/1.036\times 10^{-10} = 1.135\times 10^{7}\,\mathrm{V/m} = 113.5\,\mathrm{kV/cm}.
+$$
+
+Asserted in $[90, 130]$ kV/cm. ✓
 
 **Charge balance** (Ch. 4).
 $x_pN_A = 7.34\times 10^{-8}\cdot 10^{23} = 7.34\times 10^{15}$;
 $x_nN_D$ same. Match to roundoff. ✓
 
 **Bulk carriers** (Ch. 7).
-$n^R = n_i\exp(\psi_R^\mathrm{eq}/V_t) = 10^{16}\cdot e^{16.12} = 10^{23}\,\mathrm{m^{-3}}$
-($= N_D$, ✓). $p^R = n_i\exp(-\psi_R^\mathrm{eq}/V_t) = 10^{9}\,\mathrm{m^{-3}}
-= 10^3\,\mathrm{cm^{-3}}$.
+$n^R = n_i\exp(\psi_R^\mathrm{eq}/V_t) = 10^{16}\cdot e^{16.12} = 10^{23}\,\mathrm{m^{-3}}$ ($= N_D$, ✓). $p^R = n_i\exp(-\psi_R^\mathrm{eq}/V_t) = 10^{9}\,\mathrm{m^{-3}} = 10^3\,\mathrm{cm^{-3}}$.
 
 **Mass action $np = n_i^2$** (Ch. 3).
 $10^{23}\cdot 10^9 = 10^{32}\,\mathrm{m^{-6}} = n_i^2$. ✓
@@ -407,10 +424,8 @@ clear; if Variant B is fine, the bug is in R; check
 `semi/physics/recombination.py` for sign changes since last green CI.
 
 **21.4.** $V_{bi}^\mathrm{asinh} = V_t[\mathrm{asinh}(N_D/(2n_i)) + \mathrm{asinh}(N_A/(2n_i))]$.
-For $N \gg n_i$: $\mathrm{asinh}(N/(2n_i)) = \ln(N/(2n_i) + \sqrt{(N/(2n_i))^2 + 1})
-\approx \ln(N/n_i)$. Sum: $V_t[\ln(N_D/n_i) + \ln(N_A/n_i)] = V_t\ln(N_AN_D/n_i^2)
-= V_{bi}^\mathrm{log}$. The remainder is
-$O((n_i/N)^2)$, of order $10^{-12}$ for $N/n_i = 10^7$ — well below 0.01%.
+For $N \gg n_i$: $\mathrm{asinh}(N/(2n_i)) = \ln(N/(2n_i) + \sqrt{(N/(2n_i))^2 + 1}) \approx \ln(N/n_i)$. Sum: $V_t[\ln(N_D/n_i) + \ln(N_A/n_i)] = V_t\ln(N_AN_D/n_i^2) = V_{bi}^\mathrm{log}$.
+The remainder is $O((n_i/N)^2)$, of order $10^{-12}$ for $N/n_i = 10^7$ — well below 0.01%.
 
 **21.5.** New benchmark `schottky_1d` will need:
 - **Validation**: thermionic-emission analytical I-V from (8.3); the
