@@ -104,10 +104,8 @@ derivation in Appendix B §B.2), the trap occupancy drops out and one
 gets
 
 $$
-\boxed{
 R_\mathrm{SRH}(n, p)
    = \frac{n p - n_i^2}{\tau_p (n + n_1) + \tau_n (p + p_1)}.
-}
 \tag{6.5}
 $$
 

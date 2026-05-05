@@ -76,11 +76,9 @@ Substitute (3.6) — $\psi = -E_i/q$ — and rearrange (11.1) using
 $E_c - E_i = E_g/2$ at the band-edge convention:
 
 $$
-\boxed{
 n = n_i\,\exp\!\left(\frac{\psi - \Phi_n}{V_t}\right),
 \qquad
 p = n_i\,\exp\!\left(\frac{\Phi_p - \psi}{V_t}\right).
-}
 \tag{11.3}
 $$
 
@@ -149,11 +147,9 @@ The drift and diffusion terms have *cancelled* against each other; the
 remaining structure is
 
 $$
-\boxed{
 \mathbf{J}_n = -q\,\mu_n n\,\nabla\Phi_n,
 \qquad
 \mathbf{J}_p = -q\,\mu_p p\,\nabla\Phi_p,
-}
 \tag{11.7}
 $$
 
