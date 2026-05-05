@@ -36,7 +36,7 @@ shift regularisation.
 
 ### Newton's method
 
-For $F: \mathbb{R}^N \to \mathbb{R}^N$ with $F(\mathbf{u}^*) = 0$,
+For $F: \mathbb{R}^N \to \mathbb{R}^N$ with $F(\mathbf{u}^\ast) = 0$,
 Newton iterates
 
 $$
@@ -45,8 +45,8 @@ $$
 $$
 
 with $J = \partial F/\partial\mathbf{u}$ the Jacobian. The local
-convergence is quadratic ($\|\mathbf{u}^{(k+1)} - \mathbf{u}^*\| \lesssim C\|\mathbf{u}^{(k)} - \mathbf{u}^*\|^2$)
-when $\mathbf{u}^{(0)}$ is close enough to $\mathbf{u}^*$. The radius of
+convergence is quadratic ($\|\mathbf{u}^{(k+1)} - \mathbf{u}^\ast\| \lesssim C\|\mathbf{u}^{(k)} - \mathbf{u}^\ast\|^2$)
+when $\mathbf{u}^{(0)}$ is close enough to $\mathbf{u}^\ast$. The radius of
 quadratic convergence depends on the Lipschitz constant of $J$ — for
 DD with exponential nonlinearities, this radius is small.
 

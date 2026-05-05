@@ -5,7 +5,7 @@
 - Sketch the band diagram of an ideal metal–semiconductor (Schottky)
   junction and identify the barrier height $\phi_B$.
 - Derive the thermionic-emission current density
-  $J = A^* T^2\exp(-\phi_B/V_t)\bigl(\exp(V/V_t)-1\bigr)$.
+  $J = A^\astT^2\exp(-\phi_B/V_t)\bigl(\exp(V/V_t)-1\bigr)$.
 - Distinguish a Schottky-rectifying contact from an ohmic contact and
   state the engine's idealization of the latter.
 - Recognize the ohmic Dirichlet construction in `semi/bcs.py` as the
@@ -75,9 +75,9 @@ energy above $\phi_B$ are emitted from the semiconductor into the
 metal. The rate is governed by the Richardson–Dushman law:
 
 $$
-J_\mathrm{s\to m} = A^* T^2\,\exp(-\phi_B/V_t),
+J_\mathrm{s\to m} = A^\astT^2\,\exp(-\phi_B/V_t),
 \qquad
-A^* = \frac{4\pi q m_n^* k^2}{h^3} \approx 110\,\mathrm{A/cm^2/K^2}\,\mathrm{(for\ Si)}.
+A^\ast= \frac{4\pi q m_n^\astk^2}{h^3} \approx 110\,\mathrm{A/cm^2/K^2}\,\mathrm{(for\ Si)}.
 \qquad (8.2)
 $$
 
@@ -88,13 +88,13 @@ $\phi_B - V$. The reverse current $J_\mathrm{m\to s}$ stays at the value
 in (8.2); the forward $J_\mathrm{s\to m}$ rises by $\exp(V/V_t)$. Net:
 
 $$
-J = A^* T^2\,\exp(-\phi_B/V_t)\bigl(\exp(V/V_t) - 1\bigr).
+J = A^\astT^2\,\exp(-\phi_B/V_t)\bigl(\exp(V/V_t) - 1\bigr).
 \qquad (8.3)
 $$
 
 This is the **thermionic-emission diode equation** for a Schottky
 contact. The shape mirrors the Shockley diode equation (Ch. 7), but
-the saturation current $A^* T^2\exp(-\phi_B/V_t)$ depends on barrier
+the saturation current $A^\astT^2\exp(-\phi_B/V_t)$ depends on barrier
 height rather than on minority-carrier diffusion in a bulk. Schottky
 diodes typically have orders-of-magnitude larger reverse leakage and
 forward currents than pn diodes of comparable size — the saturation
@@ -177,7 +177,7 @@ $$
 \qquad (8.7)
 $$
 
-with $v_R = A^*T^2/(qN_c)$ the Richardson recombination velocity. The
+with $v_R = A^\astT^2/(qN_c)$ the Richardson recombination velocity. The
 schema will accept `type: "schottky"`; the contact pins neither $\psi$
 nor carriers but adds a flux through the boundary integral. Forward
 reference: [`docs/IMPROVEMENT_GUIDE.md` §M16.5](../IMPROVEMENT_GUIDE.md);
@@ -197,7 +197,7 @@ acceptance test is the `schottky_1d` benchmark, planned.
 **Pt on n-Si Schottky barrier.** $\Phi_m \approx 5.65\,\mathrm{eV}$,
 $\chi = 4.05\,\mathrm{eV}$. $\phi_B = 5.65 - 4.05 = 1.60\,\mathrm{eV}$.
 
-Thermionic saturation current at 300 K, $A^* = 110\,\mathrm{A/cm^2/K^2}$:
+Thermionic saturation current at 300 K, $A^\ast= 110\,\mathrm{A/cm^2/K^2}$:
 $J_s = 110\cdot 300^2\cdot \exp(-1.60/0.02585) = 9.9\times 10^6\cdot \exp(-61.89) = 9.9\times 10^6\cdot 1.07\times 10^{-27} = 1.06\times 10^{-20}\,\mathrm{A/cm^2}$.
 
 This is a vanishingly small reverse leakage — Pt-Si is essentially a
@@ -276,7 +276,7 @@ $\Phi_n = \Phi_p = -0.6\,\mathrm{V}$.
 $\Phi_m^\mathrm{Au} = 5.10\,\mathrm{eV}$ and $\chi^\mathrm{GaAs} = 4.07\,\mathrm{eV}$.
 
 **Exercise 8.2.** A Schottky contact has $\phi_B = 0.85\,\mathrm{eV}$
-and $A^* = 110\,\mathrm{A/cm^2/K^2}$. Compute the saturation current at
+and $A^\ast= 110\,\mathrm{A/cm^2/K^2}$. Compute the saturation current at
 300 K and at 400 K. By what factor does $J_s$ increase?
 
 **Exercise 8.3.** Show that the ohmic-Dirichlet construction (8.5)
@@ -291,7 +291,7 @@ is consuming the same `bcs` list as ohmic contacts?
 **Exercise 8.5.** A heavily doped pn junction contact ($N = 10^{20}\,\mathrm{cm^{-3}}$)
 has a depletion region $\sim 5\,\mathrm{nm}$ under the metal. Estimate
 the tunneling probability across this barrier (use the WKB approximation
-$T \approx \exp(-2\sqrt{2 m^*\phi_B}\cdot W/\hbar)$). Why does this make
+$T \approx \exp(-2\sqrt{2 m^\ast\phi_B}\cdot W/\hbar)$). Why does this make
 heavy doping the standard ohmic-contact recipe?
 
 ### Solutions
@@ -315,7 +315,7 @@ electrostatic potential through the interfacial flux-continuity
 condition. This is also why no `phi_n_bc` or `phi_p_bc` is built at
 the gate.
 
-**8.5.** $\sqrt{2 m^*\phi_B} = \sqrt{2\cdot 0.26\cdot 9.11\times 10^{-31}\cdot 1.6\times 10^{-19}\cdot 0.85} \approx 4.0\times 10^{-25}\,\mathrm{kg^{1/2}\,J^{1/2}} = 4.0\times 10^{-25}/\hbar = 4.0\times 10^{-25}/1.055\times 10^{-34} = 3.8\times 10^9\,\mathrm{m^{-1}}$. Then
+**8.5.** $\sqrt{2 m^\ast\phi_B} = \sqrt{2\cdot 0.26\cdot 9.11\times 10^{-31}\cdot 1.6\times 10^{-19}\cdot 0.85} \approx 4.0\times 10^{-25}\,\mathrm{kg^{1/2}\,J^{1/2}} = 4.0\times 10^{-25}/\hbar = 4.0\times 10^{-25}/1.055\times 10^{-34} = 3.8\times 10^9\,\mathrm{m^{-1}}$. Then
 $T \approx \exp(-2\cdot 3.8\times 10^9\cdot 5\times 10^{-9}) = \exp(-38) = 3.1\times 10^{-17}$.
 That is small per electron — but at $10^{20}\,\mathrm{cm^{-3}}$
 electron density and saturation velocity $\sim 10^7\,\mathrm{cm/s}$,

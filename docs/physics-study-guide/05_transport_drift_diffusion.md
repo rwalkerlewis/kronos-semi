@@ -79,7 +79,7 @@ $$
 \qquad (5.3)
 $$
 
-where $\mu_n = q\tau_m/m_n^*$ is the electron mobility (sign absorbed
+where $\mu_n = q\tau_m/m_n^\ast$ is the electron mobility (sign absorbed
 into the velocity convention $\mathbf{v}_n = -\mu_n\mathbf{E}$) and
 $D_n$ is the diffusivity. The signs differ between (5.3a) and (5.3b)
 because electrons drift opposite to $\mathbf{E}$ and holes drift along

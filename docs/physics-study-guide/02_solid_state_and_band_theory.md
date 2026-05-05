@@ -36,7 +36,7 @@ gap $E_g = 1.12\,\mathrm{eV}$. Promoting an electron across the gap
 (thermally, optically, or by injection from a contact) leaves a
 positively charged hole behind in the valence band. Both the electron
 and the hole then act as mobile carriers, with effective masses
-$m_n^*$ and $m_p^*$ that capture the curvature of the band dispersion
+$m_n^\ast$ and $m_p^\ast$ that capture the curvature of the band dispersion
 near its extremum. The drift-diffusion machinery from Ch. 5 onward
 treats $n$, $p$, $E_c$, $E_v$, $\chi$, and $E_g$ as bulk material
 properties whose origin is band structure but whose use is purely
@@ -77,17 +77,17 @@ full derivation.
 
 Near the extremum of a band — the maximum of the valence band or the
 minimum of the conduction band — Taylor-expand $E(\mathbf{k})$ to second
-order. For an isotropic effective mass $m^*$:
+order. For an isotropic effective mass $m^\ast$:
 
 $$
-E(\mathbf{k}) \;\approx\; E_0 + \frac{\hbar^2 |\mathbf{k} - \mathbf{k}_0|^2}{2m^*}.
+E(\mathbf{k}) \;\approx\; E_0 + \frac{\hbar^2 |\mathbf{k} - \mathbf{k}_0|^2}{2m^\ast}.
 \qquad (2.3)
 $$
 
 This is the **effective-mass approximation**: an electron near the
-conduction-band minimum behaves like a free particle with mass $m_n^*$,
+conduction-band minimum behaves like a free particle with mass $m_n^\ast$,
 and a hole near the valence-band maximum behaves like a free particle
-with mass $m_p^*$. The drift-diffusion equations are written for these
+with mass $m_p^\ast$. The drift-diffusion equations are written for these
 quasi-classical particles.
 
 ### Density of states from a parabolic band
@@ -96,7 +96,7 @@ Counting the number of $\mathbf{k}$-states per unit volume between $E$
 and $E + dE$ gives, for a 3D parabolic band,
 
 $$
-g(E) = \frac{1}{2\pi^2}\left(\frac{2m^*}{\hbar^2}\right)^{3/2} \sqrt{E - E_0},
+g(E) = \frac{1}{2\pi^2}\left(\frac{2m^\ast}{\hbar^2}\right)^{3/2} \sqrt{E - E_0},
 \qquad E \geq E_0.
 \qquad (2.4)
 $$
@@ -117,9 +117,9 @@ $$
 with the **effective densities of states**
 
 $$
-N_c = 2\left(\frac{m_n^* kT}{2\pi\hbar^2}\right)^{3/2},
+N_c = 2\left(\frac{m_n^\astkT}{2\pi\hbar^2}\right)^{3/2},
 \qquad
-N_v = 2\left(\frac{m_p^* kT}{2\pi\hbar^2}\right)^{3/2}.
+N_v = 2\left(\frac{m_p^\astkT}{2\pi\hbar^2}\right)^{3/2}.
 \qquad (2.6)
 $$
 
@@ -196,17 +196,17 @@ use.
 
 For silicon at $T = 300\,\mathrm{K}$, plug Sze's values into (2.6):
 
-- $m_n^* = 1.08\,m_0$ (density-of-states effective mass for the six
+- $m_n^\ast= 1.08\,m_0$ (density-of-states effective mass for the six
   conduction-band valleys), $kT = 0.02585\,\mathrm{eV} = 4.14\times 10^{-21}\,\mathrm{J}$.
 - $\hbar = 1.0546\times 10^{-34}\,\mathrm{J\,s}$,
   $m_0 = 9.109\times 10^{-31}\,\mathrm{kg}$.
-- $\frac{m_n^* kT}{2\pi\hbar^2} = \frac{1.08 \cdot 9.109\times 10^{-31} \cdot 4.14\times 10^{-21}}{2\pi\cdot 1.112\times 10^{-68}} = \frac{4.07\times 10^{-51}}{6.99\times 10^{-68}} = 5.83\times 10^{16}\,\mathrm{m^{-2}}$.
+- $\frac{m_n^\astkT}{2\pi\hbar^2} = \frac{1.08 \cdot 9.109\times 10^{-31} \cdot 4.14\times 10^{-21}}{2\pi\cdot 1.112\times 10^{-68}} = \frac{4.07\times 10^{-51}}{6.99\times 10^{-68}} = 5.83\times 10^{16}\,\mathrm{m^{-2}}$.
 - $N_c = 2 \cdot (5.83\times 10^{16})^{3/2} = 2 \cdot 1.41\times 10^{25} = 2.82\times 10^{25}\,\mathrm{m^{-3}}$.
 - Convert to cm⁻³: divide by $10^6$, get $2.82\times 10^{19}\,\mathrm{cm}^{-3}$.
 
 This matches Sze's tabulated $N_c = 2.86\times 10^{19}\,\mathrm{cm}^{-3}$
 to better than 2%. The remaining difference comes from the slightly
-different $m_n^*$ values quoted in different references; the engine uses
+different $m_n^\ast$ values quoted in different references; the engine uses
 Sze's value directly.
 
 For (2.9) with $E_g = 1.12\,\mathrm{eV}$ at 300 K:
@@ -243,8 +243,8 @@ modern TCAD convention.
 1. **Effective mass is not unique.** There are at least three commonly
    quoted "electron effective masses" in silicon: the longitudinal
    $m_l$, the transverse $m_t$, and the density-of-states-effective
-   $m_n^*$. The latter is what enters (2.6). The number Sze tabulates,
-   and the number behind kronos-semi's $N_c$, is $m_n^* = 1.08\,m_0$,
+   $m_n^\ast$. The latter is what enters (2.6). The number Sze tabulates,
+   and the number behind kronos-semi's $N_c$, is $m_n^\ast= 1.08\,m_0$,
    not the conductivity effective mass that enters mobility formulas.
 2. **Boltzmann limit only.** Equation (2.8) assumes $E_F$ sits well
    below $E_c$ (and well above $E_v$). At doping above $\sim 10^{19}\,\mathrm{cm}^{-3}$,
@@ -272,7 +272,7 @@ modern TCAD convention.
 ## Exercises
 
 **Exercise 2.1.** Repeat the $N_c$ calculation for germanium using the
-Sze table value $m_n^* = 0.56\,m_0$ at 300 K. Compare with `semi/materials.py:68`.
+Sze table value $m_n^\ast= 0.56\,m_0$ at 300 K. Compare with `semi/materials.py:68`.
 
 **Exercise 2.2.** Show that $n_i$ in (2.9) is independent of which Fermi
 level $E_F$ you use, despite (2.8) appearing to depend on it.
@@ -297,7 +297,7 @@ Predict whether $n_i$ in GaAs is larger or smaller than in silicon at
 
 ### Solutions
 
-**2.1.** $\frac{m_n^* kT}{2\pi\hbar^2} = \frac{0.56 \cdot 9.109\times 10^{-31} \cdot 4.14\times 10^{-21}}{2\pi\cdot 1.112\times 10^{-68}} = 3.02\times 10^{16}\,\mathrm{m^{-2}}$. Then $N_c = 2(3.02\times 10^{16})^{1.5} = 2 \cdot 5.25\times 10^{24} = 1.05\times 10^{25}\,\mathrm{m^{-3}} = 1.05\times 10^{19}\,\mathrm{cm^{-3}}$. Sze gives $1.04\times 10^{19}$; matches.
+**2.1.** $\frac{m_n^\astkT}{2\pi\hbar^2} = \frac{0.56 \cdot 9.109\times 10^{-31} \cdot 4.14\times 10^{-21}}{2\pi\cdot 1.112\times 10^{-68}} = 3.02\times 10^{16}\,\mathrm{m^{-2}}$. Then $N_c = 2(3.02\times 10^{16})^{1.5} = 2 \cdot 5.25\times 10^{24} = 1.05\times 10^{25}\,\mathrm{m^{-3}} = 1.05\times 10^{19}\,\mathrm{cm^{-3}}$. Sze gives $1.04\times 10^{19}$; matches.
 
 **2.2.** Multiply $n$ and $p$ in (2.8): the $\exp(\pm E_F/kT)$ factors
 cancel, leaving $np = N_c N_v \exp(-(E_c-E_v)/kT) = N_c N_v \exp(-E_g/kT)$,

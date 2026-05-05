@@ -9,7 +9,7 @@ return when you need to verify a step.
 Goal: derive
 
 $$
-N_c = 2\left(\frac{m_n^* kT}{2\pi\hbar^2}\right)^{3/2}.
+N_c = 2\left(\frac{m_n^\astkT}{2\pi\hbar^2}\right)^{3/2}.
 \qquad (B.1)
 $$
 
@@ -22,41 +22,41 @@ $$
 The 3D parabolic-band density of states is (2.4):
 
 $$
-g_c(E) = \frac{1}{2\pi^2}\left(\frac{2m_n^*}{\hbar^2}\right)^{3/2}\sqrt{E - E_c}.
+g_c(E) = \frac{1}{2\pi^2}\left(\frac{2m_n^\ast}{\hbar^2}\right)^{3/2}\sqrt{E - E_c}.
 $$
 
 Multiply by 2 for spin and substitute. In the Boltzmann limit
 $f_\mathrm{FD} \approx \exp(-(E - E_F)/kT)$:
 
 $$
-n = \frac{2}{2\pi^2}\left(\frac{2m_n^*}{\hbar^2}\right)^{3/2}\,e^{(E_F - E_c)/kT}
+n = \frac{2}{2\pi^2}\left(\frac{2m_n^\ast}{\hbar^2}\right)^{3/2}\,e^{(E_F - E_c)/kT}
    \int_{E_c}^\infty \sqrt{E - E_c}\,e^{-(E - E_c)/kT}\,dE.
 $$
 
 Substitute $\eta = (E - E_c)/kT$, $d\eta = dE/kT$:
 
 $$
-n = \frac{1}{\pi^2}\left(\frac{2m_n^*}{\hbar^2}\right)^{3/2}\,(kT)^{3/2}\,e^{(E_F - E_c)/kT}
+n = \frac{1}{\pi^2}\left(\frac{2m_n^\ast}{\hbar^2}\right)^{3/2}\,(kT)^{3/2}\,e^{(E_F - E_c)/kT}
    \int_0^\infty \sqrt\eta\,e^{-\eta}\,d\eta.
 $$
 
 The integral is $\Gamma(3/2) = \sqrt\pi/2$. Combining:
 
 $$
-n = \frac{\sqrt\pi}{2\pi^2}\left(\frac{2m_n^* kT}{\hbar^2}\right)^{3/2}\,e^{(E_F-E_c)/kT}
-   = \frac{1}{2\pi^{3/2}}\left(\frac{2m_n^* kT}{\hbar^2}\right)^{3/2}\,e^{(E_F-E_c)/kT}.
+n = \frac{\sqrt\pi}{2\pi^2}\left(\frac{2m_n^\astkT}{\hbar^2}\right)^{3/2}\,e^{(E_F-E_c)/kT}
+   = \frac{1}{2\pi^{3/2}}\left(\frac{2m_n^\astkT}{\hbar^2}\right)^{3/2}\,e^{(E_F-E_c)/kT}.
 $$
 
 Identifying $n = N_c\exp(-(E_c - E_F)/kT)$:
 
 $$
-N_c = \frac{1}{2\pi^{3/2}}\left(\frac{2m_n^* kT}{\hbar^2}\right)^{3/2}
-    = 2\left(\frac{m_n^* kT}{2\pi\hbar^2}\right)^{3/2},
+N_c = \frac{1}{2\pi^{3/2}}\left(\frac{2m_n^\astkT}{\hbar^2}\right)^{3/2}
+    = 2\left(\frac{m_n^\astkT}{2\pi\hbar^2}\right)^{3/2},
 $$
 
-using $(2/\hbar^2)^{3/2}\cdot 1/(2\pi^{3/2}) = 1/(\pi^{3/2}\hbar^3)\cdot 2^{1/2} = 2/(2\pi\hbar^2/m^*kT)^{3/2}$ after rearrangement. (B.1) ✓
+using $(2/\hbar^2)^{3/2}\cdot 1/(2\pi^{3/2}) = 1/(\pi^{3/2}\hbar^3)\cdot 2^{1/2} = 2/(2\pi\hbar^2/m^\astkT)^{3/2}$ after rearrangement. (B.1) ✓
 
-The hole expression $N_v = 2(m_p^*kT/(2\pi\hbar^2))^{3/2}$ follows by
+The hole expression $N_v = 2(m_p^\astkT/(2\pi\hbar^2))^{3/2}$ follows by
 the symmetric integral over the valence band.
 
 ## B.2 — Full SRH derivation

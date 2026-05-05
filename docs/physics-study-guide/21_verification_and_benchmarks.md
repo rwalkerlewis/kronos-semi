@@ -106,7 +106,7 @@ by the BCs and is mesh-independent; reported but not gated.
 Three (now four with M16.1) variants exercise progressively more of
 the residual:
 
-- **Variant A (psi-only).** $\Phi_n^* = \Phi_p^* = 0$. Continuity rows
+- **Variant A (psi-only).** $\Phi_n^\ast = \Phi_p^\ast = 0$. Continuity rows
   collapse to noise; only the psi block is rate-gated.
 - **Variant B (full coupling, no R).** All three fields nontrivial,
   lifetimes set to $10^{20}\,\mathrm{s}$ to make $R$ negligible.
@@ -121,20 +121,20 @@ $\ge 0.19$ headroom; 1D and 2D paths consistent.
 
 ## Method of Manufactured Solutions
 
-Pick an exact solution $u^*(\mathbf{x})$ that you *know* (e.g.
-$u^*(x) = \sin(\pi x/L)$). Plug it into the strong-form residual:
+Pick an exact solution $u^\ast(\mathbf{x})$ that you *know* (e.g.
+$u^\ast(x) = \sin(\pi x/L)$). Plug it into the strong-form residual:
 
 $$
-F_\mathrm{strong}[u^*] = -\nabla\cdot(\varepsilon\nabla u^*) + (\text{source}) - \rho^*
-\equiv f^*(\mathbf{x}),
+F_\mathrm{strong}[u^\ast] = -\nabla\cdot(\varepsilon\nabla u^\ast) + (\text{source}) - \rho^\ast
+\equiv f^\ast(\mathbf{x}),
 $$
 
-with $f^*$ in general nonzero. Now redefine the right-hand side of
-your PDE to be $\rho^*(u^*) + f^*$. By construction, $u^*$ is the exact
+with $f^\ast$ in general nonzero. Now redefine the right-hand side of
+your PDE to be $\rho^\ast(u^\ast) + f^\ast$. By construction, $u^\ast$ is the exact
 solution of the modified problem.
 
 Discretize the modified problem on a sequence of meshes; compute the
-error $\|u_h - u^*\|$ at each level. The error should scale as
+error $\|u_h - u^\ast\|$ at each level. The error should scale as
 $h^{p+1}$ in $L^2$ and $h^p$ in $H^1$ where $p$ is the polynomial
 degree (P1 → $p=1$). Observed rate $\to 2$ in $L^2$ and $\to 1$ in $H^1$
 with mesh refinement.
@@ -144,9 +144,9 @@ operator is missing a derivative or has a sign error. MMS catches
 silent bugs that single-point validation misses.
 
 The forcing term must be added *in weak form*: do not compute
-$f^* = -\nabla\cdot(\varepsilon\nabla u^*)$ symbolically and then
+$f^\ast = -\nabla\cdot(\varepsilon\nabla u^\ast)$ symbolically and then
 integrate it against $v$ — at coarse mesh resolution, the symbolic
-discretization can collapse to numerical zero. Instead, build $u^*$ as
+discretization can collapse to numerical zero. Instead, build $u^\ast$ as
 a UFL expression and compose the strong form *as UFL*, which the
 assembler then integrates by parts in weak form
 ([`semi/verification/mms_poisson.py`](../../semi/verification/mms_poisson.py)
@@ -348,7 +348,7 @@ would cause spurious CI failures.
 
 ## Common pitfalls
 
-1. **MMS forcing in strong form.** Computing $f^* = -\nabla\cdot(\varepsilon\nabla u^*)$
+1. **MMS forcing in strong form.** Computing $f^\ast = -\nabla\cdot(\varepsilon\nabla u^\ast)$
    symbolically and then integrating against $v$ in the discrete form
    can produce spurious zeros at coarse mesh. Always inject the
    manufactured solution into the weak form via UFL composition; let
@@ -359,7 +359,7 @@ would cause spurious CI failures.
    reference's own error, not the engine's. The Cauchy ratio gate is
    the proper convergence check; the depletion-error comparison is
    informational only.
-3. **Variant A's continuity rows are noise.** When $\Phi_n^* = \Phi_p^* = 0$,
+3. **Variant A's continuity rows are noise.** When $\Phi_n^\ast = \Phi_p^\ast = 0$,
    the continuity terms collapse to machine-roundoff residuals. The
    reported "rates" on those rows are meaningless. ADR 0006 documents
    that Variant A gates only the psi block.
@@ -376,9 +376,9 @@ would cause spurious CI failures.
 
 ## Exercises
 
-**Exercise 21.1.** Pick a manufactured solution $\psi^*(x) = \sin(2\pi x/L)$
+**Exercise 21.1.** Pick a manufactured solution $\psi^\ast(x) = \sin(2\pi x/L)$
 on a 1D Poisson problem with $\varepsilon = 1$. Compute the strong-form
-residual $f^*$. Plug the modified problem into the engine and predict
+residual $f^\ast$. Plug the modified problem into the engine and predict
 the observed L² rate.
 
 **Exercise 21.2.** Derive the SNS recombination current correction in
@@ -399,9 +399,9 @@ MMS? mesh convergence? conservation? validation?
 
 ### Solutions
 
-**21.1.** $\psi^* = \sin(2\pi x/L)$. $\nabla\psi^* = (2\pi/L)\cos(...)$.
-$\nabla\cdot(\varepsilon\nabla\psi^*) = -(2\pi/L)^2\sin(...)$.
-$f^* = -(-1\cdot(2\pi/L)^2\sin(...)) = (2\pi/L)^2\sin(2\pi x/L) = (2\pi/L)^2\psi^*$.
+**21.1.** $\psi^\ast = \sin(2\pi x/L)$. $\nabla\psi^\ast = (2\pi/L)\cos(...)$.
+$\nabla\cdot(\varepsilon\nabla\psi^\ast) = -(2\pi/L)^2\sin(...)$.
+$f^\ast = -(-1\cdot(2\pi/L)^2\sin(...)) = (2\pi/L)^2\sin(2\pi x/L) = (2\pi/L)^2\psi^\ast$.
 Inject into the runner. Observed L² rate should be 2.0 (P1 Lagrange,
 smooth solution).
 

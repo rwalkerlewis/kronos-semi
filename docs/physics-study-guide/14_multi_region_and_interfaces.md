@@ -283,8 +283,8 @@ and the flux is enforced by the variational principle, not by hand.
    engine sets $Q_f = 0$ in the analytic helpers; the FEM form does
    not yet expose interface-charge BCs.
 5. **MMS for multi-region needs eps-flux-continuous manufactured
-   solutions.** Constructing a manufactured $\psi^*(\mathbf{x})$ that
-   is $C^0$ across the interface and has continuous $\varepsilon\nabla\psi^*\cdot\hat{\mathbf{n}}$
+   solutions.** Constructing a manufactured $\psi^\ast(\mathbf{x})$ that
+   is $C^0$ across the interface and has continuous $\varepsilon\nabla\psi^\ast\cdot\hat{\mathbf{n}}$
    is non-trivial. See `mos_derivation.md` §7 for the construction
    used by the M6 multi-region MMS gate.
 

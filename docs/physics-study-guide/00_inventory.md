@@ -102,7 +102,7 @@ itself, see `01_classical_em_and_poisson.md` through
 | Concept | Code | Schema | Existing docs | Gap |
 |---|---|---|---|---|
 | Flat-band voltage $V_{fb}$ | `semi/cv.py:127-128` (`MoscapAnalytic.V_fb`) | – | `docs/theory/moscap_cv.md` | Derivation from $\phi_{ms}$ and oxide charge |
-| Threshold voltage $V_t^*$ | `semi/cv.py:135-139` | – | `docs/theory/moscap_cv.md` | Strong-inversion condition |
+| Threshold voltage $V_t^\ast$ | `semi/cv.py:135-139` | – | `docs/theory/moscap_cv.md` | Strong-inversion condition |
 | Oxide capacitance $C_{ox}$ | `semi/cv.py:126` | – | `docs/theory/moscap_cv.md` | Parallel-plate derivation |
 | Maximum depletion $W_\mathrm{dmax}$ | `semi/cv.py:131` | – | `docs/theory/moscap_cv.md` | Pinned at $\psi_s = 2\phi_B$ |
 | LF / HF C–V | `semi/cv.py:159-360` | – | `docs/theory/moscap_cv.md` | Pedagogical contrast |

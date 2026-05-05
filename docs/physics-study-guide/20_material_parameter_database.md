@@ -54,9 +54,9 @@ Material(
   $\phi_{ms}$ for gate contacts (Ch. 9) and in Schottky barrier height
   (Ch. 8).
 - **$N_c = 2.86\times 10^{19}\,\mathrm{cm^{-3}}$.** Sze 3rd ed. Table 7,
-  derived from $m_n^*\approx 1.08\,m_0$ via (2.6).
+  derived from $m_n^\ast\approx 1.08\,m_0$ via (2.6).
 - **$N_v = 3.10\times 10^{19}\,\mathrm{cm^{-3}}$.** Sze Table 7,
-  $m_p^*\approx 1.15\,m_0$.
+  $m_p^\ast\approx 1.15\,m_0$.
 - **$n_i = 1.0\times 10^{10}\,\mathrm{cm^{-3}}$.** Altermatt et al.
   2003 consensus value; supersedes the older Sze 1.45×10¹⁰. Modern
   TCAD tools (Sentaurus, Atlas) match this; comparing against legacy
@@ -97,7 +97,7 @@ Material("GaAs", role="semiconductor",
   ($\sim 2\times 10^6$) because the gap is wider and indirect-gap
   thermal generation isn't available.
 - $N_c = 4.7\times 10^{17}\,\mathrm{cm^{-3}}$ — *much* smaller than Si
-  because $m_n^*\approx 0.067\,m_0$ in GaAs (light electrons). This is
+  because $m_n^\ast\approx 0.067\,m_0$ in GaAs (light electrons). This is
   the hallmark of direct-gap semiconductors.
 - $\mu_n = 8500\,\mathrm{cm^2/Vs}$ — about 6× silicon's. Drives the
   HEMT mobility advantage.
