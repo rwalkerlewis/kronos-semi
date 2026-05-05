@@ -282,6 +282,73 @@ ADR 0004 (Slotboom variables) is preserved because the substitution
 acts pointwise on the diffusion coefficient and does not modify the
 primary unknowns or their boundary conditions.
 
+**Variant E -- Lombardi composite surface mobility (M16.2).**
+Variant C electronics (full coupling, Si lifetimes), but the constant
+`fem.Constant(mu_n / mu0)` is replaced by the resistor-sum composite
+
+```
+1 / mu_n_hat = 1 / mu_bulk_n_hat + 1 / mu_AC_n_hat + 1 / mu_sr_n_hat
+1 / mu_p_hat = 1 / mu_bulk_p_hat + 1 / mu_AC_p_hat + 1 / mu_sr_p_hat
+```
+
+with `mu_bulk = mu_n_over_mu0` (constant bulk branch for the MMS),
+`mu_AC = B / E_perp + C * N_total^lambda / (E_perp^(1/3) * T)`
+acoustic-phonon term, and `mu_sr = delta / E_perp^2` surface-roughness
+term. The perpendicular-field expression is
+
+```
+E_perp = sqrt((grad(psi) . n_hat)^2 + eps)
+```
+
+where `n_hat` is the unit vector along axis 0 (the manufactured
+"interface" is the line x = 0; same convention for both 1D and 2D).
+The continuity-block weak source picks up the same substitution
+evaluated at the manufactured potential gradient
+`E_perp_e = sqrt((grad(psi_e) . e_x)^2 + eps)`, so
+
+```
+mu_n_eff = lombardi_compose(
+    mu_bulk_n,
+    lombardi_mu_AC(B_n, C_n_eff, N_total_e, E_perp_e, lambda_n, T),
+    lombardi_mu_sr(delta_n, E_perp_e),
+)
+mu_p_eff = lombardi_compose(
+    mu_bulk_p,
+    lombardi_mu_AC(B_p, C_p_eff, N_total_e, E_perp_e, lambda_p, T),
+    lombardi_mu_sr(delta_p, E_perp_e),
+)
+
+f_n_weak = L0^2 * mu_n_eff * n_e * inner(grad(phi_n_e), grad(v_n)) * dx
+           - R_e * v_n * dx
+f_p_weak = L0^2 * mu_p_eff * p_e * inner(grad(phi_p_e), grad(v_p)) * dx
+           + R_e * v_p * dx
+```
+
+Variant E uses a non-zero constant `N_hat = MMS_E_N_HAT_CONST = 1.0`
+so the Lombardi C-term sees a well-defined `N_total^lambda`; the
+manufactured Poisson source absorbs the resulting constant
+`(p - n + N_hat) v_psi` term (`f_psi_weak` in
+`semi/verification/mms_dd.py::_build_weak_sources`). The `MMS_E_*`
+for-form constants are engineered so each surface term shifts the
+composite mu by ~20 % at the typical manufactured perpendicular
+gradient (mu reduction ~30 % vs mu_bulk), matching the M16.1
+Variant D design anchor. Variant E is gated at the M16.2 acceptance
+floor L^2 >= 1.99 and H^1 >= 0.99 on every block
+(`docs/IMPROVEMENT_GUIDE.md` § M16.2 Acceptance test 1; pytest
+module `tests/fem/test_mms_lombardi.py`). The closed-form
+mobility is the same `lombardi_compose` evaluated in the production
+form, with the JSON Lombardi parameters reverse-engineered from the
+MMS_E_*_FOR_FORM values via the inverse of
+`semi/physics/mobility.py::lombardi_unit_conversions`. ADR 0004
+(Slotboom variables) is preserved for the same reason as Variant D:
+the substitution acts pointwise on the diffusion coefficient.
+
+A 3D MMS variant with a fully-distributed signed-distance field is
+out of scope for M16.2 (the project ships in 1D and 2D today; a 3D
+MOSFET capstone is M19). The factorization above isolates the
+surface-normal direction as a separate input so a future 3D variant
+can extend it without re-deriving the resistor-sum composition.
+
 ## 4. Boundary conditions
 
 All three fields vanish identically on `boundary(Omega)` by construction

@@ -10,17 +10,32 @@ three coupled blocks in Slotboom form:
     Hole:      -div( L_0^2 mu_p_hat p_hat grad phi_p_hat ) + R_hat                   = 0
 
 with Slotboom `n_hat = ni_hat exp(psi - phi_n)`, `p_hat = ni_hat exp(phi_p - psi)`
-and SRH `R_hat`. For MMS we set `N_hat = 0` and subtract a weak-form
-manufactured source from each block so that a chosen smooth exact triple
+and SRH `R_hat`. For MMS we set `N_hat = 0` (Variants A through D) or a
+constant value (Variant E) and subtract a weak-form manufactured source
+from each block so that a chosen smooth exact triple
 `(psi_e, phi_n_e, phi_p_e)` is the solution of the modified coupled
 system. Each block's discretization error then decays at the FE rate.
 
-Four variants exercise progressively more of the residual:
+Five variants exercise progressively more of the residual:
 
     A  `phi_n_e = phi_p_e = 0`, `tau_hat = infinity`:   Poisson block only
     B  full triple, `tau_hat = infinity`:               full coupling, R ~ 0
     C  full triple, Si lifetimes:                       full coupling with SRH
     D  Variant C plus Caughey-Thomas field-dependent mobility (M16.1).
+    E  Variant C plus Lombardi composite surface mobility (M16.2). The
+       composite is the resistor sum
+           1/mu = 1/mu_bulk + 1/mu_AC + 1/mu_sr
+       with mu_bulk = mu_n_over_mu0 (constant), mu_AC the Lombardi
+       acoustic-phonon term, and mu_sr the surface-roughness term.
+       The perpendicular-field expression is
+           E_perp_for_form = abs(grad(psi_e) . n_hat)
+       with n_hat the unit vector along the configured
+       `interface_normal_axis` (axis 0 for both 1D and 2D MMS so the
+       manufactured "interface" is at x = 0 on the boundary; the
+       direction matches the prompt's MMS Variant E geometry).
+       N_hat is held at a constant `MMS_E_N_HAT_CONST` so the
+       Lombardi C-term sees a non-zero N_total^lambda; the manufactured
+       Poisson source absorbs the constant N contribution.
 
 Variant D substitutes the closed-form
     mu(F) = mu0 / (1 + (mu0 * F_par / vsat)^beta)^(1/beta)
@@ -32,6 +47,18 @@ the production form sees (ADR 0004). The MMS uses engineered
 different from 1 at the typical gradient of the manufactured solution
 (~30 % mu reduction near the midplane); see
 `MMS_D_VSAT_N_FOR_FORM` and `MMS_D_BETA_N` below.
+
+Variant E substitutes the Lombardi composite (closed-form, see
+`semi/physics/mobility.py::lombardi_compose`) for `mu_n_eff` and
+`mu_p_eff` in both the production form and the manufactured weak
+source. The MMS_E_* constants in this module are engineered so the
+acoustic-phonon and surface-roughness terms each shift the composite
+mobility by a few percent at the typical manufactured perpendicular
+gradient, matching the O(0.3) reduction target M16.1 used for
+Variant D. The JSON Lombardi parameters fed to
+`build_mobility_expressions` are reverse-engineered from these
+for-form constants so the production form sees the identical closed
+form (matches the M16.1 Variant D vsat reverse-engineering pattern).
 
 See `docs/mms_dd_derivation.md` for the approved derivation; every weak
 source below tracks the sections of that document.
@@ -56,7 +83,7 @@ from .mms_poisson import (
 # ---------------------------------------------------------------------------
 # Module-level constants. See derivation Section 2.
 # ---------------------------------------------------------------------------
-VARIANTS: tuple[str, ...] = ("A", "B", "C", "D")
+VARIANTS: tuple[str, ...] = ("A", "B", "C", "D", "E")
 
 #: Default amplitude triple `(A_psi, A_n, A_p)` used by the pytest gate.
 #: `A_p = -A_n` ensures Variant C's SRH numerator
@@ -94,6 +121,36 @@ MMS_D_VSAT_N_FOR_FORM: float = 1.5e6
 MMS_D_VSAT_P_FOR_FORM: float = 1.5e6
 MMS_D_BETA_N: float = 2.0
 MMS_D_BETA_P: float = 1.0
+
+#: Variant E Lombardi parameters in for-form (scaled) units.
+#: Engineered so each surface term shifts the composite mu by a few
+#: percent at the typical manufactured perpendicular gradient. With
+#: amplitudes (A_psi=0.5) and L = L_0_REF = 2 um, the typical
+#: |grad(psi_e) . e_x| at x close to the interface is
+#: A_psi * pi / L ~ 7.85e5 m^-1; mu_AC ~ B/E ~ 5 (so 1/mu_AC ~ 0.2
+#: contributes ~20% of 1/mu_bulk), mu_sr ~ delta/E^2 ~ 5 likewise.
+#: The Lombardi composite then reduces mu by ~30% vs the bulk branch
+#: (matching the M16.1 Variant D design anchor).
+MMS_E_B_FOR_FORM_N: float = 3.93e6
+MMS_E_B_FOR_FORM_P: float = 3.93e6
+MMS_E_C_EFF_FOR_FORM_N: float = 92.0
+MMS_E_C_EFF_FOR_FORM_P: float = 92.0
+MMS_E_LAMBDA_N: float = 0.125
+MMS_E_LAMBDA_P: float = 0.0317
+MMS_E_DELTA_FOR_FORM_N: float = 3.08e12
+MMS_E_DELTA_FOR_FORM_P: float = 3.08e12
+MMS_E_T_K: float = 300.0
+
+#: Variant E constant N_hat. The Lombardi C-term reads
+#: `N_total_hat^lambda`; we hold N_hat at this constant value so the
+#: per-cell N_total^lambda is well-defined and non-trivial. The
+#: manufactured Poisson source absorbs the resulting (p - n + N_hat)
+#: with N_hat = MMS_E_N_HAT_CONST.
+MMS_E_N_HAT_CONST: float = 1.0
+
+#: Variant E interface normal axis. Axis 0 corresponds to the line
+#: x = 0 (the boundary) for both 1D and 2D MMS meshes; n_hat = e_x.
+MMS_E_INTERFACE_NORMAL_AXIS: int = 0
 
 
 @dataclass(frozen=True)
@@ -154,10 +211,11 @@ def _exact_triple_ufl(mesh, dim: int, L: float,
     """
     import ufl
 
-    # Variant D shares the Variant B/C smooth-sin triple; the difference
-    # lives entirely in the mobility evaluation in `_build_weak_sources`
-    # and the production-form mobility_cfg in `run_one_level`.
-    full_triple = variant in ("B", "C", "D")
+    # Variants D and E share the Variant B/C smooth-sin triple; the
+    # mobility branch is what differs (CT for D, Lombardi for E),
+    # evaluated in `_build_weak_sources` and dispatched into the
+    # production form via `run_one_level`.
+    full_triple = variant in ("B", "C", "D", "E")
     x = ufl.SpatialCoordinate(mesh)
     if dim == 1:
         psi_e = A_psi * ufl.sin(2.0 * ufl.pi * x[0] / L)
@@ -206,6 +264,7 @@ def _build_weak_sources(
     psi_e,
     phi_n_e,
     phi_p_e,
+    N_hat_const: float = 0.0,
 ):
     """
     Build the three weak-form manufactured sources.
@@ -288,13 +347,60 @@ def _build_weak_sources(
         )
         mu_n_eff = caughey_thomas_mu(mu_n, F_par_n_e, vsat_n_c, beta_n_c)
         mu_p_eff = caughey_thomas_mu(mu_p, F_par_p_e, vsat_p_c, beta_p_c)
+    elif variant == "E":
+        # Lombardi composite: substitute
+        #   1/mu = 1/mu_bulk + 1/mu_AC + 1/mu_sr
+        # evaluated at the manufactured E_perp = abs(grad(psi_e) . e_x)
+        # and at the constant manufactured N_total = MMS_E_N_HAT_CONST.
+        # The reverse-engineered Lombardi JSON parameters in
+        # run_one_level make build_mobility_expressions produce the
+        # identical closed form, so the weak source matches the
+        # production residual at (psi_e, phi_n_e, phi_p_e) exactly.
+        from semi.physics.mobility import (
+            lombardi_compose,
+            lombardi_mu_AC,
+            lombardi_mu_sr,
+        )
+
+        gdim = mesh.geometry.dim
+        normal_components = [0.0] * gdim
+        normal_components[MMS_E_INTERFACE_NORMAL_AXIS] = 1.0
+        n_hat_vec = ufl.as_vector([
+            fem.Constant(mesh, PETSc.ScalarType(c)) for c in normal_components
+        ])
+        eps_perp = fem.Constant(mesh, PETSc.ScalarType(1.0e-30))
+        E_perp_signed = ufl.dot(ufl.grad(psi_e), n_hat_vec)
+        E_perp_e = ufl.sqrt(E_perp_signed * E_perp_signed + eps_perp)
+
+        T_const = fem.Constant(mesh, PETSc.ScalarType(MMS_E_T_K))
+        N_total_const = fem.Constant(mesh, PETSc.ScalarType(N_hat_const))
+        B_n_c = fem.Constant(mesh, PETSc.ScalarType(MMS_E_B_FOR_FORM_N))
+        B_p_c = fem.Constant(mesh, PETSc.ScalarType(MMS_E_B_FOR_FORM_P))
+        C_n_c = fem.Constant(mesh, PETSc.ScalarType(MMS_E_C_EFF_FOR_FORM_N))
+        C_p_c = fem.Constant(mesh, PETSc.ScalarType(MMS_E_C_EFF_FOR_FORM_P))
+        lam_n_c = fem.Constant(mesh, PETSc.ScalarType(MMS_E_LAMBDA_N))
+        lam_p_c = fem.Constant(mesh, PETSc.ScalarType(MMS_E_LAMBDA_P))
+        delta_n_c = fem.Constant(mesh, PETSc.ScalarType(MMS_E_DELTA_FOR_FORM_N))
+        delta_p_c = fem.Constant(mesh, PETSc.ScalarType(MMS_E_DELTA_FOR_FORM_P))
+
+        mu_AC_n = lombardi_mu_AC(B_n_c, C_n_c, N_total_const, E_perp_e, lam_n_c, T_const)
+        mu_AC_p = lombardi_mu_AC(B_p_c, C_p_c, N_total_const, E_perp_e, lam_p_c, T_const)
+        mu_sr_n = lombardi_mu_sr(delta_n_c, E_perp_e)
+        mu_sr_p = lombardi_mu_sr(delta_p_c, E_perp_e)
+        mu_n_eff = lombardi_compose(mu_n, mu_AC_n, mu_sr_n)
+        mu_p_eff = lombardi_compose(mu_p, mu_AC_p, mu_sr_p)
     else:
         mu_n_eff = mu_n
         mu_p_eff = mu_p
 
+    # Constant-N contribution to the manufactured Poisson source: the
+    # production residual carries `+ N_hat_fn * v_psi` so the weak
+    # forcing must mirror it. Variants A through D set N_hat_fn = 0
+    # and `N_hat_const` defaults to 0; Variant E sets a constant.
+    N_hat_const_c = fem.Constant(mesh, PETSc.ScalarType(N_hat_const))
     f_psi_weak = (
         L_D2 * eps_r * ufl.inner(ufl.grad(psi_e), ufl.grad(v_psi))
-        - (p_e - n_e) * v_psi
+        - (p_e - n_e + N_hat_const_c) * v_psi
     ) * ufl.dx
     f_n_weak = (
         L0_sq * mu_n_eff * n_e * ufl.inner(ufl.grad(phi_n_e), ufl.grad(v_n))
@@ -342,9 +448,16 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
     mesh = _build_mesh(case.dim, case.N, case.L, case.cell_kind)
     spaces = make_dd_block_spaces(mesh)
 
-    # N_hat = 0 for MMS; see derivation preamble.
-    N_hat_fn = fem.Function(spaces.V_psi, name="N_hat_zero")
-    N_hat_fn.x.array[:] = 0.0
+    # N_hat = 0 for MMS Variants A-D; Variant E uses a constant
+    # MMS_E_N_HAT_CONST so the Lombardi C-term sees a non-trivial
+    # N_total^lambda. The manufactured Poisson source is adjusted
+    # accordingly inside _build_weak_sources.
+    N_hat_fn = fem.Function(spaces.V_psi, name="N_hat_const")
+    N_hat_const_value = (
+        MMS_E_N_HAT_CONST if case.variant == "E" else 0.0
+    )
+    N_hat_fn.x.array[:] = N_hat_const_value
+    N_hat_fn.x.scatter_forward()
 
     # Initial guess: zero everywhere. Trivially satisfies the
     # homogeneous Dirichlet BC and the charge-neutrality identity
@@ -354,9 +467,9 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
         fn.x.scatter_forward()
 
     # Per-variant lifetime choice (derivation Section 2, SRH row).
-    # Variants C and D both use Si lifetimes (Variant D adds CT mobility
-    # on top of the C electronics).
-    if case.variant in ("C", "D"):
+    # Variants C, D, and E use Si lifetimes (D adds CT mobility, E
+    # adds the Lombardi composite, both on top of the C electronics).
+    if case.variant in ("C", "D", "E"):
         tau_n_hat = tau_p_hat = TAU_SI_S / sc.t0
     else:
         tau_n_hat = tau_p_hat = TAU_OFF_HAT
@@ -377,8 +490,69 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
             "beta_n": MMS_D_BETA_N,
             "beta_p": MMS_D_BETA_P,
         }
+    elif case.variant == "E":
+        # Reverse-engineer the JSON Lombardi parameters so
+        # `lombardi_unit_conversions` returns the same for-form values
+        # the manufactured weak source uses
+        # (MMS_E_*_FOR_FORM). The conversions in
+        # semi/physics/mobility.py::lombardi_unit_conversions are:
+        #   B_for_form    = B_cm * 1e-2 / (V_t * mu0_ref)
+        #   delta_for_form = delta_cm * 1e-4 / (V_t**2 * mu0_ref)
+        #   C_for_form_geom = C_cm * 1e-(10/3) / (V_t**(1/3) * mu0_ref)
+        #   C_eff = C_for_form_geom * sc.C0**lambda
+        # Inverting:
+        cm_to_m = 1.0e-2
+        cm5_3 = cm_to_m ** (5.0 / 3.0)
+        cm2 = cm_to_m ** 2
+
+        def _to_cm_B(B_for_form: float) -> float:
+            return B_for_form * sc.V0 * sc.mu0 / cm_to_m
+
+        def _to_cm_delta(delta_for_form: float) -> float:
+            return delta_for_form * (sc.V0 ** 2) * sc.mu0 / cm2
+
+        def _to_cm_C(C_eff_for_form: float, lam: float) -> float:
+            C_geom = C_eff_for_form / (sc.C0 ** lam)
+            return C_geom * (sc.V0 ** (1.0 / 3.0)) * sc.mu0 / cm5_3
+
+        mobility_cfg = {
+            "model": "lombardi",
+            "bulk_model": "constant",
+            "interface_facet_tag": 1,
+            "interface_normal_axis": MMS_E_INTERFACE_NORMAL_AXIS,
+            "temperature_K": MMS_E_T_K,
+            "lombardi": {
+                "B_n": _to_cm_B(MMS_E_B_FOR_FORM_N),
+                "B_p": _to_cm_B(MMS_E_B_FOR_FORM_P),
+                "C_n": _to_cm_C(MMS_E_C_EFF_FOR_FORM_N, MMS_E_LAMBDA_N),
+                "C_p": _to_cm_C(MMS_E_C_EFF_FOR_FORM_P, MMS_E_LAMBDA_P),
+                "lambda_n": MMS_E_LAMBDA_N,
+                "lambda_p": MMS_E_LAMBDA_P,
+                "delta_n": _to_cm_delta(MMS_E_DELTA_FOR_FORM_N),
+                "delta_p": _to_cm_delta(MMS_E_DELTA_FOR_FORM_P),
+            },
+        }
     else:
         mobility_cfg = None
+
+    # Variant E needs a `facet_tags` MeshTags so the lombardi UFL
+    # dispatch passes the runner-wiring guard. The MMS doesn't have a
+    # geometrically meaningful Si/SiO2 interface; `_build_lombardi`
+    # only consults `interface_normal_axis` for the normal direction,
+    # so we tag every boundary facet with value 1 as a sentinel.
+    variant_facet_tags = None
+    if case.variant == "E":
+        from dolfinx import mesh as _mesh_mod
+
+        fdim_local = mesh.topology.dim - 1
+        mesh.topology.create_connectivity(fdim_local, mesh.topology.dim)
+        boundary_facets_local = _all_boundary_facets(mesh, fdim_local)
+        indices = np.asarray(boundary_facets_local, dtype=np.int32)
+        values = np.ones(indices.shape, dtype=np.int32)
+        order = np.argsort(indices)
+        variant_facet_tags = _mesh_mod.meshtags(
+            mesh, fdim_local, indices[order], values[order]
+        )
 
     # Production residual, per-block.
     F_prod = build_dd_block_residual(
@@ -386,6 +560,7 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
         case.eps_r, MU_N_OVER_MU0, MU_P_OVER_MU0,
         tau_n_hat, tau_p_hat, 0.0,   # E_t / V_t = 0 (mid-gap traps)
         mobility_cfg=mobility_cfg,
+        facet_tags=variant_facet_tags,
     )
 
     # Manufactured weak sources.
@@ -404,6 +579,7 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
         psi_e=psi_e,
         phi_n_e=phi_n_e,
         phi_p_e=phi_p_e,
+        N_hat_const=N_hat_const_value,
     )
     F_psi = F_prod[0] - f_psi_weak
     if case.variant == "A":
@@ -635,14 +811,15 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
     Artifact-production sweep used by `scripts/run_verification.py`.
 
     Runs twelve studies in total:
-      - `1d_<variant>_linear`     for variant in A,B,C,D (default amps, Ns=CLI_NS_1D)
-      - `1d_<variant>_nonlinear`  for variant in A,B,C,D (NONLINEAR_AMPS, Ns=CLI_NS_1D)
-      - `2d_<variant>`            for variant in A,B,C,D (default amps, Ns=CLI_NS_2D)
+      - `1d_<variant>_linear`     for variant in A-E (default amps, Ns=CLI_NS_1D)
+      - `1d_<variant>_nonlinear`  for variant in A-E (NONLINEAR_AMPS, Ns=CLI_NS_1D)
+      - `2d_<variant>`            for variant in A-E (default amps, Ns=CLI_NS_2D)
 
     Variant D activates the M16.1 Caughey-Thomas mobility dispatch on
-    top of the Variant C electronics; see module docstring for the
-    engineered `MMS_D_VSAT_*_FOR_FORM` parameters that put the closed
-    form in a non-trivial regime.
+    top of the Variant C electronics; Variant E activates the M16.2
+    Lombardi composite. Both share the residual-floor sensitivity and
+    boundary-layer behavior so Variant E reuses Variant D's N
+    sequence overrides.
 
     Each study writes `convergence.csv` and `convergence.png` into
     `out_dir/<label>/`, mirroring the Poisson MMS artifact layout.
@@ -662,8 +839,10 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
         # level so SNES converges cleanly; the discretization rate is
         # already demonstrated at N=160 with rate ~ 2.000 (rates 1.999
         # at N=80 and 2.000 at N=160 in the linear-amp run).
-        ns_1d = CLI_NS_1D[:-1] if variant == "D" else CLI_NS_1D
-        ns_1d_d_nonlinear = CLI_NS_1D[:-1] if variant == "D" else CLI_NS_1D
+        ns_1d = CLI_NS_1D[:-1] if variant in ("D", "E") else CLI_NS_1D
+        ns_1d_d_nonlinear = (
+            CLI_NS_1D[:-1] if variant in ("D", "E") else CLI_NS_1D
+        )
         res = run_convergence_study(
             dim=1, variant=variant, Ns=ns_1d,
             A_psi=DEFAULT_AMPS[0], A_n=DEFAULT_AMPS[1], A_p=DEFAULT_AMPS[2],
@@ -704,7 +883,7 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
         # (rate >= 1.99); the [16, 32, 64] sequence used by A/B/C
         # bottoms out at ~1.99 from triangle-mesh boundary-layer
         # effects. See CLI_NS_2D_D for the rationale.
-        ns_2d = CLI_NS_2D_D if variant == "D" else CLI_NS_2D
+        ns_2d = CLI_NS_2D_D if variant in ("D", "E") else CLI_NS_2D
         res = run_convergence_study(
             dim=2, variant=variant, Ns=ns_2d,
             A_psi=DEFAULT_AMPS[0], A_n=DEFAULT_AMPS[1], A_p=DEFAULT_AMPS[2],
