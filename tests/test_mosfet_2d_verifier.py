@@ -111,7 +111,7 @@ def test_pao_sah_linear_formula_above_threshold(benchmark_cfg):
     assert I_D_per_W[1] == pytest.approx(expected, rel=1e-9)
 
 
-def _fabricated_result(cfg: dict, *, scale: float = 1.0):
+def _fabricated_result(cfg: dict, *, scale: float = 1.0, V_max: float = 2.0):
     """Build a fake SimulationResult whose recorded J_drain matches Pao-Sah
     times `scale`. scale = 1.0 -> verifier passes; scale far from 1.0 ->
     verifier fails on the relative-error check.
@@ -122,7 +122,7 @@ def _fabricated_result(cfg: dict, *, scale: float = 1.0):
     mat = get_material(cfg["regions"]["silicon"]["material"])
     dp = rb._mosfet_device_params(cfg, mat)
 
-    V_GS_arr = np.linspace(0.0, 1.5, 16)
+    V_GS_arr = np.linspace(0.0, V_max, max(16, int(V_max / 0.05) + 1))
     iv = []
     for V in V_GS_arr:
         if V <= dp["V_T"]:
@@ -153,7 +153,59 @@ def test_verifier_fails_when_simulation_diverges(benchmark_cfg):
         c for c in checks if "I_D_PaoSah" in c[0]
     )
     assert rel_err_check[1] is False, (
-        "verifier should reject 50 % over-estimate as outside 20 % tolerance"
+        "verifier should reject 50 % over-estimate as outside the tolerance"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# M16.2 Lombardi verifier-window dispatch
+# --------------------------------------------------------------------------- #
+
+
+def test_pao_sah_window_dispatch_on_model():
+    """The verifier window and tolerance dispatch on
+    `physics.mobility.model`: the constant and caughey_thomas branches
+    keep the M14.3 / M16.1 window [V_T + 0.2, V_T + 0.6] V at 20 %; the
+    lombardi branch widens to [V_T + 0.4, V_T + 1.0] V and tightens to
+    10 % per docs/IMPROVEMENT_GUIDE.md § M16.2."""
+    rb = _import_run_benchmark()
+    lo, hi, tol = rb._mosfet_2d_pao_sah_window("constant")
+    assert (lo, hi, tol) == pytest.approx((0.2, 0.6, 0.20))
+    lo, hi, tol = rb._mosfet_2d_pao_sah_window("caughey_thomas")
+    assert (lo, hi, tol) == pytest.approx((0.2, 0.6, 0.20))
+    lo, hi, tol = rb._mosfet_2d_pao_sah_window("lombardi")
+    assert (lo, hi, tol) == pytest.approx((0.4, 1.0, 0.10))
+
+
+def test_verifier_lombardi_window_passes_on_perfect_match(benchmark_cfg):
+    """With the shipped lombardi config (model='lombardi') and a
+    fabricated I_D matching Pao-Sah exactly, the M16.2 window
+    [V_T + 0.4, V_T + 1.0] V at 10 % must pass."""
+    rb = _import_run_benchmark()
+    cfg = json.loads(json.dumps(benchmark_cfg))
+    cfg.setdefault("physics", {}).setdefault("mobility", {})["model"] = "lombardi"
+    result = _fabricated_result(cfg, scale=1.0, V_max=2.0)
+    checks = rb.verify_mosfet_2d(result)
+    failed = [c for c in checks if not c[1]]
+    assert not failed, f"lombardi verifier rejected exact match: {failed}"
+    rel_err_check = next(c for c in checks if "I_D_PaoSah" in c[0])
+    assert "10 %" in rel_err_check[0]
+    assert "lombardi" in rel_err_check[0]
+
+
+def test_verifier_lombardi_rejects_15pct_overestimate(benchmark_cfg):
+    """The M16.2 lombardi tolerance is 10 %; a fabricated 15 %
+    overestimate must fail (the M16.1 20 % gate would have passed
+    silently, which is the failure mode the tightening prevents)."""
+    rb = _import_run_benchmark()
+    cfg = json.loads(json.dumps(benchmark_cfg))
+    cfg.setdefault("physics", {}).setdefault("mobility", {})["model"] = "lombardi"
+    result = _fabricated_result(cfg, scale=1.15, V_max=2.0)
+    checks = rb.verify_mosfet_2d(result)
+    rel_err_check = next(c for c in checks if "I_D_PaoSah" in c[0])
+    assert rel_err_check[1] is False, (
+        "lombardi 10 % gate must reject a 15 % overestimate that would "
+        "have passed the M16.1 20 % gate"
     )
 
 

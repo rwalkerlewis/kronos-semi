@@ -4,7 +4,18 @@ A 2D n-channel MOSFET on a uniform 50 x 21 builtin mesh. P-type Si body
 (N_A = 1e16 cm^-3) with a 5 nm SiO2 gate stack; n+ source and drain
 implants are Gaussian (peak 5e19 cm^-3, sigma = (0.4 um, 0.15 um)).
 
-The bias_sweep runner sweeps V_GS from 0 to 1.5 V in 0.05 V steps with
+As of M16.2, the JSON ships with `physics.mobility.model: lombardi`
+on a `bulk_model: caughey_thomas` foundation. The composite is the
+resistor sum `1/mu = 1/mu_bulk + 1/mu_AC + 1/mu_sr` of the M16.1
+bulk velocity-saturation branch and the Lombardi acoustic-phonon /
+surface-roughness terms; `interface_facet_tag` points at the gate
+facet (tag 4) as a sentinel and `interface_normal_axis` defaults to
+the last geometric axis (y, axis 1). The Lombardi correction is
+naturally localized to the inversion layer because the resistor-sum
+reduces to the bulk branch where the perpendicular electrostatic
+gradient vanishes. See `docs/IMPROVEMENT_GUIDE.md` § M16.2.
+
+The bias_sweep runner sweeps V_GS from 0 to 2.0 V in 0.05 V steps with
 V_DS held at 0.05 V (drain ohmic, static). The smaller step size is
 needed because the surface-potential transition through onset of
 strong depletion (V_GS ~ 0.2 to 0.3 V) is sharp enough to defeat
@@ -40,21 +51,30 @@ J_drain by the drain line length to obtain I_D / W and compares.
 
 ## Verifier window
 
-V_GS in [V_T + 0.2, V_T + 0.6] V at V_DS = 0.05 V; tolerance 20 %.
+The verifier dispatches on `physics.mobility.model`:
+
+- `constant` / `caughey_thomas`: V_GS in [V_T + 0.2, V_T + 0.6] V,
+  tolerance 20 % (the M14.3 / M16.1 window).
+- `lombardi` (M16.2 default): V_GS in [V_T + 0.4, V_T + 1.0] V,
+  tolerance 10 % (`docs/IMPROVEMENT_GUIDE.md` § M16.2).
+
+For the constant / caughey_thomas window:
 
 - The lower bound (V_T + 0.2) sits clear of subthreshold so the
   Boltzmann-tail correction does not dominate. The strict-Pao-Sah
   square-law form needs V_GS - V_T well above kT/q (~0.026 V at 300 K).
 - The upper bound (V_T + 0.6) keeps V_DS / (V_GS - V_T) small so
   saturation and velocity-saturation corrections are still negligible.
-  M16.1 (Caughey-Thomas field-dependent mobility) widens the window
-  upward; in the meantime the 20 % tolerance absorbs the residual
-  high-field deviation.
 - The 20 % tolerance further covers the long-channel approximation
   (L_ch as the gate-oxide lateral extent rather than the
   implant-corrected effective channel length), ohmic source-and-drain
   series resistance (small at V_DS = 0.05 V on a 5 um body), and
   the 50 x 21 mesh discretisation error.
+
+The Lombardi window widens upward because the surface-mobility
+correction suppresses the over-predicted bulk-mobility current that
+the M16.1 window had to absorb in its 20 % tolerance. The tighter
+10 % gate is the M16.2 acceptance signature.
 
 ## Run
 

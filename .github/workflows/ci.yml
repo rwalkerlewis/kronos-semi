@@ -147,6 +147,13 @@ jobs:
           # onset (~0.08 V) where the Newton step direction is poor for this
           # 2D MOSFET configuration. continue-on-error: true while a deeper
           # SNES line-search / Gummel-fallback fix is investigated.
+          # M16.2 (Lombardi surface mobility): the JSON now ships with
+          # model='lombardi' / bulk_model='caughey_thomas' and the verifier
+          # window widens to [V_T + 0.4, V_T + 1.0] V at 10 %; the
+          # allow-failure flag is intentionally retained because retiring
+          # it depends on an independent SNES line-search audit. If the
+          # Lombardi run happens to clear the SNES stagnation it is a
+          # happy side effect; a separate follow-up PR retires this flag.
           - name: mosfet_2d
             args: mosfet_2d
             allow-failure: "true"

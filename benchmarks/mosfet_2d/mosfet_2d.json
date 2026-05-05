@@ -1,7 +1,7 @@
 {
-  "schema_version": "2.0.0",
+  "schema_version": "2.2.0",
   "name": "mosfet_2d",
-  "description": "2D n-channel MOSFET. P-type Si body (5 um x 2 um, N_A=1e16 cm^-3) with SiO2 gate oxide (5 nm). n+ source and drain implants (Gaussian, peak 5e19 cm^-3). Gate sweeps 0 to 1.5 V at V_DS=0.05 V. Drain current verified within +-20% of a long-channel MOSFET analytical estimate.",
+  "description": "2D n-channel MOSFET. P-type Si body (5 um x 2 um, N_A=1e16 cm^-3) with SiO2 gate oxide (5 nm). n+ source and drain implants (Gaussian, peak 5e19 cm^-3). Gate sweeps 0 to 2.0 V at V_DS=0.05 V. Lombardi composite surface mobility (M16.2) layered on a Caughey-Thomas bulk branch (M16.1). Drain current verified within +-10% of the Pao-Sah long-channel analytical reference in the inversion-regime window [V_T + 0.4, V_T + 1.0] V.",
   "dimension": 2,
   "mesh": {
     "source": "builtin",
@@ -157,7 +157,7 @@
       "workfunction": 0.0,
       "voltage_sweep": {
         "start": 0.0,
-        "stop": 1.5,
+        "stop": 2.0,
         "step": 0.05
       }
     }
@@ -166,8 +166,11 @@
     "temperature": 300.0,
     "statistics": "boltzmann",
     "mobility": {
+      "model": "lombardi",
+      "bulk_model": "caughey_thomas",
       "mu_n": 1400.0,
-      "mu_p": 450.0
+      "mu_p": 450.0,
+      "interface_facet_tag": 4
     },
     "recombination": {
       "srh": true,

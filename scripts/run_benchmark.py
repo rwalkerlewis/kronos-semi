@@ -1158,6 +1158,30 @@ def _pao_sah_linear_I_D_per_W(V_GS_arr, dp):
     return out
 
 
+def _mosfet_2d_pao_sah_window(model: str) -> tuple[float, float, float]:
+    """
+    Pao-Sah verifier window and tolerance, dispatched on the
+    `physics.mobility.model` of the input config.
+
+    Returns `(window_lo_offset, window_hi_offset, rel_tol)` where the
+    actual window is `[V_T + lo, V_T + hi]` and the verifier asserts
+    `|I_D_sim - I_D_PaoSah| / I_D_PaoSah < rel_tol`.
+
+      constant       (M14.3, M16.1): [V_T + 0.2, V_T + 0.6] V, 20 %
+      caughey_thomas (M16.1):        same window / same tolerance
+      lombardi       (M16.2):        [V_T + 0.4, V_T + 1.0] V, 10 %
+
+    The M16.2 inversion-regime window is the regime where the Pao-Sah
+    long-channel approximation is least sensitive to the band-bending
+    transition near V_T, so the tighter 10 % tolerance is achievable
+    once the Lombardi surface mobility correctly suppresses the
+    over-predicted bulk-mobility current.
+    """
+    if model == "lombardi":
+        return 0.4, 1.0, 0.10
+    return 0.2, 0.6, 0.20
+
+
 @register("mosfet_2d")
 def verify_mosfet_2d(result) -> list[tuple[str, bool, str]]:
     """
@@ -1168,15 +1192,16 @@ def verify_mosfet_2d(result) -> list[tuple[str, bool, str]]:
     reference is
             I_D / W = (mu_n / L_ch) * C_ox * (V_GS - V_T) * V_DS
     (Pao-Sah linear, Hu Eq. 6.3.3 in the V_DS << V_GS - V_T limit).
-    Verifier window: V_GS in [V_T + 0.2, V_T + 0.6] V; tolerance 20 %.
+
+    Window and tolerance dispatch on `physics.mobility.model`:
+      - constant / caughey_thomas: [V_T + 0.2, V_T + 0.6] V, 20 %.
+      - lombardi (M16.2):          [V_T + 0.4, V_T + 1.0] V, 10 %.
 
     The 2D simulation reports current per unit z-width through the
     drain facet line, so I_D_sim_per_W = J_drain_reported * L_drain_line.
     The legacy `iv_row["J"]` is the gate's J (~0 in DC); the sweep
     runner additionally records `J_drain` per step, which is what we
-    consume here. A 20 % tolerance absorbs the long-channel
-    approximation, the implant-tail corrections to L_ch, and the
-    Boltzmann-tail residual on the low edge of the window.
+    consume here.
     """
     from semi.materials import get_material
 
@@ -1188,6 +1213,11 @@ def verify_mosfet_2d(result) -> list[tuple[str, bool, str]]:
         return [("mosfet_2d: iv table non-empty", False, "no iv rows recorded")]
 
     dp = _mosfet_device_params(cfg, mat)
+    model = (
+        cfg.get("physics", {}).get("mobility", {}).get("model", "constant")
+    )
+    lo_off, hi_off, rel_tol = _mosfet_2d_pao_sah_window(model)
+    pct_label = f"{int(rel_tol * 100)}"
 
     V_GS = np.array([r["V"] for r in iv], dtype=float)
     if not all("J_drain" in r for r in iv):
@@ -1206,23 +1236,24 @@ def verify_mosfet_2d(result) -> list[tuple[str, bool, str]]:
     I_D_per_W_sim = J_drain * dp["L_dc"]
     I_D_per_W_th = _pao_sah_linear_I_D_per_W(V_GS, dp)
 
-    window_lo = dp["V_T"] + 0.2
-    window_hi = dp["V_T"] + 0.6
+    window_lo = dp["V_T"] + lo_off
+    window_hi = dp["V_T"] + hi_off
 
     mask = (V_GS >= window_lo - 1.0e-9) & (V_GS <= window_hi + 1.0e-9) & np.isfinite(I_D_per_W_th)
 
     checks: list[tuple[str, bool, str]] = []
 
     checks.append((
-        f"mosfet_2d: sweep covers V_GS = {V_GS.min():+.3f} to {V_GS.max():+.3f} V "
-        f"with V_T = {dp['V_T']:+.3f} V",
-        bool(V_GS.min() <= dp["V_T"] - 0.1) and bool(V_GS.max() >= dp["V_T"] + 0.6),
-        f"V_T = {dp['V_T']:+.3f} V; need [V_T - 0.1, V_T + 0.6] inside the sweep",
+        f"mosfet_2d ({model}): sweep covers V_GS = {V_GS.min():+.3f} to "
+        f"{V_GS.max():+.3f} V with V_T = {dp['V_T']:+.3f} V",
+        bool(V_GS.min() <= dp["V_T"] - 0.1) and bool(V_GS.max() >= dp["V_T"] + hi_off),
+        f"V_T = {dp['V_T']:+.3f} V; need [V_T - 0.1, V_T + {hi_off:.1f}] inside the sweep",
     ))
 
     n_window = int(mask.sum())
     checks.append((
-        f"mosfet_2d: verifier window [V_T + 0.2, V_T + 0.6] = "
+        f"mosfet_2d ({model}): verifier window "
+        f"[V_T + {lo_off:.1f}, V_T + {hi_off:.1f}] = "
         f"[{window_lo:.3f}, {window_hi:.3f}] V has >=3 samples",
         n_window >= 3,
         f"{n_window} samples in window",
@@ -1238,9 +1269,9 @@ def verify_mosfet_2d(result) -> list[tuple[str, bool, str]]:
     th_worst = float(I_D_per_W_th[mask][worst])
 
     checks.append((
-        f"mosfet_2d: |I_D_sim - I_D_PaoSah|/I_D_PaoSah < 20 % in "
+        f"mosfet_2d ({model}): |I_D_sim - I_D_PaoSah|/I_D_PaoSah < {pct_label} % in "
         f"[{window_lo:.3f}, {window_hi:.3f}] V",
-        bool(rel_err.max() < 0.20),
+        bool(rel_err.max() < rel_tol),
         f"worst {rel_err.max() * 100:.2f}% at V_GS = {V_worst:+.3f} V "
         f"(I_D_sim/W = {sim_worst:.3e} A/m, I_D_th/W = {th_worst:.3e} A/m, "
         f"V_DS = {dp['V_DS']:.3f} V, L_ch = {dp['L_ch']*1e6:.2f} um, "

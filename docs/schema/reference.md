@@ -26,8 +26,8 @@ the full annotated source of truth is the JSON file.
   contact / mesh / solver fields fail validation rather than being
   silently dropped).
 - Minor/patch skew is accepted silently within a major.
-- Current schema version: **2.1.0** (M16.1 caughey_thomas mobility dispatch);
-  v2.0.0 inputs continue to validate (additive minor).
+- Current schema version: **2.2.0** (M16.2 lombardi surface mobility dispatch);
+  v2.0.0 and v2.1.0 inputs continue to validate (additive minors).
 
 Schemas are published to
 `https://rwalkerlewis.github.io/kronos-semi/schemas/` on every release
@@ -53,6 +53,13 @@ History:
   object node); v1 deprecated.
 - **2.1.0** (M16.1) — added `physics.mobility.model: caughey_thomas` plus
   `vsat_n`, `vsat_p`, `beta_n`, `beta_p`. v2.0.0 inputs continue to validate.
+- **2.2.0** (M16.2): additive Lombardi surface mobility. Adds
+  `physics.mobility.model: lombardi`, the `bulk_model` selector
+  (`constant` / `caughey_thomas`), the `lombardi` sub-object
+  (`B_n`, `B_p`, `C_n`, `C_p`, `lambda_n`, `lambda_p`, `delta_n`,
+  `delta_p`), and `interface_facet_tag` (declared `["integer", "null"]`
+  in JSON Schema; the loader enforces non-null when
+  `model == "lombardi"`). v2.0.0 and v2.1.0 inputs continue to validate.
 
 ## Top-level fields
 

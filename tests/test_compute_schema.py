@@ -51,9 +51,10 @@ def minimal_cfg():
 def test_supported_minor_resets_for_v2():
     """v2.0.0 reset SCHEMA_SUPPORTED_MINOR to 0 per M14.3.
     M16.1 bumped it to 1 (v2.1.0 caughey_thomas mobility dispatch);
-    the M14.3 reset semantics survive (no major bump means no minor
+    M16.2 bumped it to 2 (v2.2.0 lombardi surface mobility); the
+    M14.3 reset semantics survive (no major bump means no minor
     reset)."""
-    assert schema.SCHEMA_SUPPORTED_MINOR == 1
+    assert schema.SCHEMA_SUPPORTED_MINOR == 2
 
 
 def test_schema_version_140_accepted_with_deprecation(minimal_cfg):

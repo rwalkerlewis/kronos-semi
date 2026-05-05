@@ -616,6 +616,21 @@ in weak form:
   Gated at L^2 >= 1.99 / H^1 >= 0.99 per the M16.1 acceptance gate
   in `docs/IMPROVEMENT_GUIDE.md` § M16.1; pytest module
   `tests/fem/test_mms_caughey_thomas.py`.
+- **Variant E (Lombardi surface mobility, M16.2).** Variant C
+  electronics plus the closed-form Lombardi composite
+  `1/mu = 1/mu_bulk + 1/mu_AC + 1/mu_sr` substituted for the
+  constant `fem.Constant(mu_n_over_mu0)`. The perpendicular field is
+  `E_perp = abs(grad(psi) . n_hat)` with `n_hat` along the
+  manufactured-interface axis (axis 0; the line x = 0). The MMS
+  engineers `MMS_E_*_FOR_FORM` so each surface term shifts the
+  composite mu by ~20 % at the typical manufactured perpendicular
+  gradient (mu reduction ~30 % vs the bulk branch), the same O(0.3)
+  reduction target Variant D used. The Lombardi C-term sees a
+  constant `MMS_E_N_HAT_CONST = 1.0` for `N_total^lambda`, with the
+  manufactured Poisson source absorbing the constant N contribution.
+  Gated at L^2 >= 1.99 / H^1 >= 0.99 per the M16.2 acceptance gate
+  in `docs/IMPROVEMENT_GUIDE.md` § M16.2; pytest module
+  `tests/fem/test_mms_lombardi.py`.
 
 Finest-pair rates (N = 320 for 1D, N = 64 for 2D), default
 amplitudes (A_psi, A_n, A_p) = (0.5, 0.3, -0.3):
@@ -642,10 +657,16 @@ amplitudes (A_psi, A_n, A_p) = (0.5, 0.3, -0.3):
 | 2D D (M16.1)         | psi    | ~1.997   | ~0.998   |
 | 2D D (M16.1)         | phi_n  | ~1.997   | ~1.000   |
 | 2D D (M16.1)         | phi_p  | ~1.997   | ~1.000   |
+| 1D E (linear, M16.2) | psi    | 2.000    | 1.000    |
+| 1D E (linear, M16.2) | phi_n  | 1.999    | 1.000    |
+| 1D E (linear, M16.2) | phi_p  | 2.000    | 1.000    |
+| 2D E (M16.2)         | psi    | 1.997    | 0.999    |
+| 2D E (M16.2)         | phi_n  | 1.995    | 1.002    |
+| 2D E (M16.2)         | phi_p  | 1.998    | 1.000    |
 
 Every gated rate clears the L^2 >= 1.75 / H^1 >= 0.80 floor with
 >= 0.19 of headroom (Variants A/B/C), or the L^2 >= 1.99 / H^1 >= 0.99
-floor (Variant D, M16.1 acceptance gate), matching theoretical P1
+floor (Variants D and E, M16.1 / M16.2 acceptance gates), matching theoretical P1
 Lagrange rates to within roundoff. The derivation
 (`mms_dd_derivation.md`) documents the block-residual scale-disparity
 issue that forced the SNES tolerance tweak to `atol = 0.0` with
