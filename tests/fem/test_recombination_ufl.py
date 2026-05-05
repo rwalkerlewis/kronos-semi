@@ -11,7 +11,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from semi.physics.recombination import srh_rate, srh_rate_np
+from semi.physics.recombination import (
+    auger_rate,
+    auger_rate_np,
+    srh_rate,
+    srh_rate_np,
+)
 
 
 def _project_to_constant_value(expr, msh):
@@ -79,5 +84,36 @@ def test_srh_rate_ufl_off_midgap_trap_matches_np():
     R_np = srh_rate_np(
         np.array(args["n_hat_val"]), np.array(args["p_hat_val"]),
         args["n_i_hat_val"], args["tau_n"], args["tau_p"], args["E_t"],
+    )
+    assert R_ufl == pytest.approx(float(R_np), rel=1e-10)
+
+
+def test_auger_rate_ufl_matches_np_at_uniform_state():
+    """Build constant n_hat, p_hat fields on a 1D interval and assemble
+    `auger_rate * dx`; compare to the NumPy formula at the same
+    densities."""
+    from dolfinx import fem, mesh
+    from mpi4py import MPI
+    from petsc4py import PETSc
+
+    msh = mesh.create_interval(MPI.COMM_WORLD, 8, [0.0, 1.0])
+
+    n_hat_val = 5.0
+    p_hat_val = 0.2
+    n_i_hat_val = 1.0
+    C_n_hat_val = 0.01
+    C_p_hat_val = 0.005
+
+    n_hat = fem.Constant(msh, PETSc.ScalarType(n_hat_val))
+    p_hat = fem.Constant(msh, PETSc.ScalarType(p_hat_val))
+    n_i_hat = fem.Constant(msh, PETSc.ScalarType(n_i_hat_val))
+    C_n_hat = fem.Constant(msh, PETSc.ScalarType(C_n_hat_val))
+    C_p_hat = fem.Constant(msh, PETSc.ScalarType(C_p_hat_val))
+
+    expr = auger_rate(n_hat, p_hat, n_i_hat, C_n_hat, C_p_hat)
+    R_ufl = _project_to_constant_value(expr, msh)
+    R_np = auger_rate_np(
+        np.array(n_hat_val), np.array(p_hat_val),
+        n_i_hat_val, C_n_hat_val, C_p_hat_val,
     )
     assert R_ufl == pytest.approx(float(R_np), rel=1e-10)
