@@ -23,10 +23,10 @@ itself, see `01_classical_em_and_poisson.md` through
 |---|---|---|---|---|
 | Maxwell's equations → electrostatic limit | `semi/physics/poisson.py:25-79` (`build_equilibrium_poisson_form`) | n/a | `docs/PHYSICS.md` §1.1 (final form only) | First-principles derivation of why we drop $\partial \mathbf{B}/\partial t$ and $\partial \mathbf{D}/\partial t$ |
 | Permittivity and displacement field | `semi/materials.py:38-40` (`Material.epsilon`) | `regions[*].material` | `docs/PHYSICS.md` §1.1 | Microscopic origin of ε; why insulators carry only $\varepsilon_r$ |
-| Poisson PDE in matter $-\nabla\!\cdot\!(\varepsilon\nabla\psi)=\rho$ | `semi/physics/poisson.py:73-79` | n/a | `docs/PHYSICS.md` §1.1, `docs/PHYSICS_INTRO.md` §2.1 | Why we solve for $\psi$, not $\mathbf{E}$ |
+| Poisson PDE in matter $-\nabla\cdot(\varepsilon\nabla\psi)=\rho$ | `semi/physics/poisson.py:73-79` | n/a | `docs/PHYSICS.md` §1.1, `docs/PHYSICS_INTRO.md` §2.1 | Why we solve for $\psi$, not $\mathbf{E}$ |
 | Dirichlet BC (ohmic, gate) | `semi/bcs.py:145-196` | `contacts[*].type == "ohmic"`, `"gate"` | `docs/PHYSICS.md` §3.1, §3.2 | First-principles motivation for "infinite recombination velocity" interpretation of ohmic |
 | Homogeneous Neumann BC (insulating) | `semi/bcs.py:34, 100` (skipped); natural in weak form | `contacts[*].type == "insulating"` | `docs/PHYSICS.md` §3.3 | Why this is the natural BC of the variational principle |
-| Interface flux continuity (Si/SiO₂) | `semi/physics/poisson.py:82-118` (`build_equilibrium_poisson_form_mr`) | `regions` with multiple `material` | `docs/PHYSICS.md` §6.2 | Derivation that the Galerkin form encodes $[\![\,\varepsilon\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,]\!]=0$ for free |
+| Interface flux continuity (Si/SiO₂) | `semi/physics/poisson.py:82-118` (`build_equilibrium_poisson_form_mr`) | `regions` with multiple `material` | `docs/PHYSICS.md` §6.2 | Derivation that the Galerkin form encodes $\llbracket\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket=0$ for free |
 | Symmetry-axis natural BC ($r=0$) | `semi/physics/axisymmetric.py:24-27`, schema cross-validator | `coordinate_system: "axisymmetric"` | `docs/theory/axisymmetric.md` | Forward reference from Ch. 1 to Ch. 15 |
 
 ## B. Solid state and band theory (Ch. 2)
@@ -63,7 +63,7 @@ itself, see `01_classical_em_and_poisson.md` through
 |---|---|---|---|---|
 | Boltzmann transport equation | conceptual; not in code | n/a | (mentioned) | Reduction BTE → moment equations → DD |
 | Einstein relation $D = \mu V_t$ | `semi/diode_analytical.py:32-33` | n/a | `docs/PHYSICS.md` §1.3 | Derivation from detailed balance |
-| Continuity equations $\nabla\!\cdot\!\mathbf{J}_n = qR$ | `semi/physics/drift_diffusion.py:158-169` | n/a | `docs/PHYSICS.md` §1.3 | Sign convention proof |
+| Continuity equations $\nabla\cdot\mathbf{J}_n = qR$ | `semi/physics/drift_diffusion.py:158-169` | n/a | `docs/PHYSICS.md` §1.3 | Sign convention proof |
 | Drift-diffusion currents | `semi/postprocess.py:97-99` | n/a | `docs/PHYSICS_INTRO.md` §2.3 | Péclet number / non-monotonicity discussion |
 | Mobility (constant) | `semi/physics/mobility.py:87-93` | `physics.mobility.mu_n`, `mu_p` | `docs/PHYSICS.md` §4.2 | Microscopic origin (scattering rates) |
 | Mobility (Caughey–Thomas, M16.1) | `semi/physics/mobility.py:57-84, 119-217` | `physics.mobility.model: "caughey_thomas"` | `docs/M16_1_STARTER_PROMPT.md` | Velocity-saturation derivation |

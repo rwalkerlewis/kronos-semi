@@ -108,9 +108,9 @@ valence-band maximum) — the **non-degenerate** regime — the
 Fermi–Dirac integral collapses to a Boltzmann factor and the result is
 
 $$
-n = N_c\,\exp\!\left(-\frac{E_c - E_F}{kT}\right),
+n = N_c\,\exp\left(-\frac{E_c - E_F}{kT}\right),
 \qquad
-p = N_v\,\exp\!\left(-\frac{E_F - E_v}{kT}\right),
+p = N_v\,\exp\left(-\frac{E_F - E_v}{kT}\right),
 \tag{2.5}
 $$
 
@@ -171,14 +171,14 @@ flat-band voltage shifts (Ch. 9).
 ## Key results
 
 $$
-n = N_c\,\exp\!\left(-\frac{E_c - E_F}{kT}\right),
+n = N_c\,\exp\left(-\frac{E_c - E_F}{kT}\right),
 \qquad
-p = N_v\,\exp\!\left(-\frac{E_F - E_v}{kT}\right)
+p = N_v\,\exp\left(-\frac{E_F - E_v}{kT}\right)
 \tag{2.8}
 $$
 
 $$
-n_i^2 = N_c N_v\,\exp\!\left(-\frac{E_g}{kT}\right)
+n_i^2 = N_c N_v\,\exp\left(-\frac{E_g}{kT}\right)
 \tag{2.9}
 $$
 
@@ -326,7 +326,7 @@ $\phi_{ms} = 4.05 - 5.01 = -0.96\,\mathrm{V}$, matching `semi/cv.py:69`.
 
 **2.4.** The engine uses the SiO₂ region only as a Laplacian dielectric:
 no carriers, no doping, no bandgap-driven recombination. The Poisson
-equation in the oxide reduces to $-\nabla\!\cdot\!(\varepsilon_r\nabla\psi) = 0$
+equation in the oxide reduces to $-\nabla\cdot(\varepsilon_r\nabla\psi) = 0$
 which depends only on $\varepsilon_r$. The 9 eV bandgap of SiO₂ matters
 for tunneling (M16.6, planned) and breakdown, neither of which the
 shipped engine models, so $E_g$ and $\chi$ for SiO₂ are not loaded into

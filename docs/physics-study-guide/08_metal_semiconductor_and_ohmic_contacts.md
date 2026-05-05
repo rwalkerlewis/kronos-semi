@@ -173,7 +173,7 @@ M16.5's deliverable adds a Robin-style contact form to the continuity
 rows:
 
 $$
-\mathbf{J}_n\!\cdot\!\hat{\mathbf{n}}\,\big|_\mathrm{contact}
+\mathbf{J}_n\cdot\hat{\mathbf{n}}\,\big|_\mathrm{contact}
    = q v_R\,(n - n_0\exp(V/V_t)),
 \tag{8.7}
 $$

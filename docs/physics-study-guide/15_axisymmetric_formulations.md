@@ -66,7 +66,7 @@ $$
 \nabla\psi = \frac{\partial\psi}{\partial r}\hat{\mathbf{e}}_r
            + \frac{\partial\psi}{\partial z}\hat{\mathbf{e}}_z,
 \qquad
-\nabla\!\cdot\!\mathbf{F} = \frac{1}{r}\frac{\partial(rF_r)}{\partial r}
+\nabla\cdot\mathbf{F} = \frac{1}{r}\frac{\partial(rF_r)}{\partial r}
                           + \frac{\partial F_z}{\partial z}.
 \tag{15.3}
 $$
@@ -75,12 +75,12 @@ The Laplacian is $\nabla^2\psi = (1/r)\partial_r(r\partial_r\psi) + \partial_z^2
 
 ### r-weighted Poisson weak form
 
-Strong form: $-\nabla\!\cdot\!(\varepsilon\nabla\psi) = \rho$ on the
-meridian half-plane (with the cylindrical $\nabla\!\cdot$ from (15.3)).
+Strong form: $-\nabla\cdot(\varepsilon\nabla\psi) = \rho$ on the
+meridian half-plane (with the cylindrical $\nabla\cdot$ from (15.3)).
 Multiply by a test function $v(r, z)$ and integrate against $r\,dr\,dz$:
 
 $$
--\int_\Omega \nabla\!\cdot\!(\varepsilon\nabla\psi)\,v\,r\,dr\,dz
+-\int_\Omega \nabla\cdot(\varepsilon\nabla\psi)\,v\,r\,dr\,dz
 = \int_\Omega \rho v\,r\,dr\,dz.
 $$
 
@@ -88,7 +88,7 @@ Use the cylindrical divergence identity to integrate by parts. The
 result is the **r-weighted Galerkin weak form**:
 
 $$
-\int_\Omega \varepsilon\,\nabla\psi\!\cdot\!\nabla v\,r\,dr\,dz
+\int_\Omega \varepsilon\,\nabla\psi\cdot\nabla v\,r\,dr\,dz
 = \int_\Omega \rho\,v\,r\,dr\,dz.
 \tag{15.4}
 $$
@@ -124,7 +124,7 @@ The meridian half-plane has four kinds of boundary:
 The same recipe applies to the continuity equations:
 
 $$
-\int_\Omega L_0^2\,\hat\mu_n\,\hat n\,\nabla\hat\Phi_n\!\cdot\!\nabla v_n\,r\,dr\,dz
+\int_\Omega L_0^2\,\hat\mu_n\,\hat n\,\nabla\hat\Phi_n\cdot\nabla v_n\,r\,dr\,dz
 - \int_\Omega \hat R\,v_n\,r\,dr\,dz = 0,
 \tag{15.5}
 $$
@@ -279,7 +279,7 @@ the entire $z = 0$ edge. The symmetry axis is the left edge $r = 0$.
 
 **15.2.** Far from $r = 0$, $r$ varies slowly over a P1 element.
 Approximate $r$ by its element midpoint $\bar r$; the integrand factors
-as $\bar r\,\varepsilon\nabla\psi\!\cdot\!\nabla v$ for the stiffness term,
+as $\bar r\,\varepsilon\nabla\psi\cdot\nabla v$ for the stiffness term,
 and similarly for the source. The $\bar r$ cancels on both sides of
 any *local* (per-element) test of the equation, leaving the Cartesian
 form. Validity: $r$ must vary by $\ll 1$ across an element, i.e.

@@ -36,7 +36,7 @@ temperature $T$ and Fermi level $E_F$, the occupancy probability is
 
 $$
 f_\mathrm{FD}(E; E_F, T)
-   = \frac{1}{1 + \exp\!\big((E - E_F)/kT\big)}.
+   = \frac{1}{1 + \exp\big((E - E_F)/kT\big)}.
 \tag{3.1}
 $$
 
@@ -70,9 +70,9 @@ denominator can be replaced by $e^{\eta_F - \eta}$. The integral
 collapses to $F_{1/2}(\eta_F) \approx e^{\eta_F}$, giving
 
 $$
-n = N_c \exp\!\left(\frac{E_F - E_c}{kT}\right),
+n = N_c \exp\left(\frac{E_F - E_c}{kT}\right),
 \qquad
-p = N_v \exp\!\left(\frac{E_v - E_F}{kT}\right).
+p = N_v \exp\left(\frac{E_v - E_F}{kT}\right).
 \tag{3.4}
 $$
 
@@ -89,9 +89,9 @@ which $n = p$ in an undoped sample. Setting $n = p$ in (3.4) and
 solving:
 
 $$
-E_i = \frac{E_c + E_v}{2} + \frac{kT}{2}\ln\!\left(\frac{N_v}{N_c}\right),
+E_i = \frac{E_c + E_v}{2} + \frac{kT}{2}\ln\left(\frac{N_v}{N_c}\right),
 \qquad
-n_i = \sqrt{N_c N_v}\,\exp\!\left(-\frac{E_g}{2kT}\right).
+n_i = \sqrt{N_c N_v}\,\exp\left(-\frac{E_g}{2kT}\right).
 \tag{3.5}
 $$
 
@@ -107,8 +107,8 @@ the contacts.) Then $E_c = -q\psi - q\chi - E_g/2 + \mathrm{const}$ in
 the bulk, and substituting (3.6) into (3.4):
 
 $$
-n = N_c\,\exp\!\left(\frac{E_F - E_c}{kT}\right)
-   = n_i\,\exp\!\left(\frac{q\psi - (E_i - E_F)}{kT}\right).
+n = N_c\,\exp\left(\frac{E_F - E_c}{kT}\right)
+   = n_i\,\exp\left(\frac{q\psi - (E_i - E_F)}{kT}\right).
 $$
 
 Define the **electron quasi-Fermi potential** $\Phi_n$ by $E_F \equiv -q\Phi_n$
@@ -117,9 +117,9 @@ single global constant, and the engine's convention pins it to zero).
 Then
 
 $$
-n = n_i\,\exp\!\left(\frac{\psi - \Phi_n}{V_t}\right),
+n = n_i\,\exp\left(\frac{\psi - \Phi_n}{V_t}\right),
 \qquad
-p = n_i\,\exp\!\left(\frac{\Phi_p - \psi}{V_t}\right),
+p = n_i\,\exp\left(\frac{\Phi_p - \psi}{V_t}\right),
 \tag{3.7}
 $$
 

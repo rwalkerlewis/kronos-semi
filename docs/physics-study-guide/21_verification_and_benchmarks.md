@@ -125,7 +125,7 @@ Pick an exact solution $u^*(\mathbf{x})$ that you *know* (e.g.
 $u^*(x) = \sin(\pi x/L)$). Plug it into the strong-form residual:
 
 $$
-F_\mathrm{strong}[u^*] = -\nabla\!\cdot\!(\varepsilon\nabla u^*) + (\text{source}) - \rho^*
+F_\mathrm{strong}[u^*] = -\nabla\cdot(\varepsilon\nabla u^*) + (\text{source}) - \rho^*
 \equiv f^*(\mathbf{x}),
 $$
 
@@ -144,7 +144,7 @@ operator is missing a derivative or has a sign error. MMS catches
 silent bugs that single-point validation misses.
 
 The forcing term must be added *in weak form*: do not compute
-$f^* = -\nabla\!\cdot\!(\varepsilon\nabla u^*)$ symbolically and then
+$f^* = -\nabla\cdot(\varepsilon\nabla u^*)$ symbolically and then
 integrate it against $v$ — at coarse mesh resolution, the symbolic
 discretization can collapse to numerical zero. Instead, build $u^*$ as
 a UFL expression and compose the strong form *as UFL*, which the
@@ -331,7 +331,7 @@ would cause spurious CI failures.
 
 ## Common pitfalls
 
-1. **MMS forcing in strong form.** Computing $f^* = -\nabla\!\cdot\!(\varepsilon\nabla u^*)$
+1. **MMS forcing in strong form.** Computing $f^* = -\nabla\cdot(\varepsilon\nabla u^*)$
    symbolically and then integrating against $v$ in the discrete form
    can produce spurious zeros at coarse mesh. Always inject the
    manufactured solution into the weak form via UFL composition; let

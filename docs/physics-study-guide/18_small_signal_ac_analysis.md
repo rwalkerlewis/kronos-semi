@@ -164,8 +164,8 @@ The total terminal current at the swept contact is
 
 $$
 I_\mathrm{total} = I_\mathrm{cond} + I_\mathrm{disp}
-= \int_\Gamma \mathbf{J}_\mathrm{cond}\!\cdot\!\hat{\mathbf{n}}\,dS
-+ \int_\Gamma \frac{\partial\mathbf{D}}{\partial t}\!\cdot\!\hat{\mathbf{n}}\,dS,
+= \int_\Gamma \mathbf{J}_\mathrm{cond}\cdot\hat{\mathbf{n}}\,dS
++ \int_\Gamma \frac{\partial\mathbf{D}}{\partial t}\cdot\hat{\mathbf{n}}\,dS,
 $$
 
 with $\mathbf{D} = \varepsilon\mathbf{E} = -\varepsilon\nabla\psi$ the
@@ -174,7 +174,7 @@ displacement field. In the small-signal limit:
 $$
 \delta I_\mathrm{cond} = \int_\Gamma\frac{\partial\mathbf{J}_\mathrm{cond}}{\partial u}\,\delta u\,\hat{\mathbf{n}}\,dS,
 \qquad
-\delta I_\mathrm{disp} = -j\omega\int_\Gamma\varepsilon\nabla(\delta\psi)\!\cdot\!\hat{\mathbf{n}}\,dS.
+\delta I_\mathrm{disp} = -j\omega\int_\Gamma\varepsilon\nabla(\delta\psi)\cdot\hat{\mathbf{n}}\,dS.
 \tag{18.6}
 $$
 

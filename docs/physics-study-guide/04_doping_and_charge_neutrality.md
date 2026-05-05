@@ -81,7 +81,7 @@ $$
 so
 
 $$
-\psi_\mathrm{eq} = V_t\,\mathrm{asinh}\!\left(\frac{N_D - N_A}{2\,n_i}\right).
+\psi_\mathrm{eq} = V_t\,\mathrm{asinh}\left(\frac{N_D - N_A}{2\,n_i}\right).
 \tag{4.2}
 $$
 
@@ -93,7 +93,7 @@ For $N_\mathrm{net} \gg n_i$ (heavily doped),
 $\mathrm{asinh}(x) \approx \ln(2x)$, so
 
 $$
-\psi_\mathrm{eq} \approx V_t\,\ln\!\left(\frac{N_\mathrm{net}}{n_i}\right)
+\psi_\mathrm{eq} \approx V_t\,\ln\left(\frac{N_\mathrm{net}}{n_i}\right)
 \quad (N_\mathrm{net} \gg n_i),
 \tag{4.3}
 $$

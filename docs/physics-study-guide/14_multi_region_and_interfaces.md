@@ -4,7 +4,7 @@
 
 - Construct a cellwise (DG0) relative-permittivity function $\varepsilon_r(\mathbf{x})$
   for a multi-region device.
-- Show that the natural flux-continuity condition $[\![\,\varepsilon\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,]\!] = 0$
+- Show that the natural flux-continuity condition $\llbracket\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket = 0$
   at a Si/SiO₂ interface is encoded automatically by the Galerkin
   weak form with piecewise $\varepsilon_r$.
 - Explain why carriers (Slotboom $\Phi_n, \Phi_p$) live on a
@@ -62,46 +62,46 @@ At a sharp Si/SiO₂ interface with no surface charge, the electrostatic
 boundary condition is
 
 $$
-[\![\,\psi\,]\!] = 0,
+\llbracket\psi\rrbracket = 0,
 \qquad
-[\![\,\varepsilon_0\varepsilon_r\,\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,]\!] = 0.
+\llbracket\varepsilon_0\varepsilon_r\,\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket = 0.
 \tag{14.1}
 $$
 
 (Continuity of $\psi$, continuity of normal $\mathbf{D}$.) The
 P1 Lagrange function space is **conforming** in $H^1$ — values are
-continuous across element edges by construction — so $[\![\,\psi\,]\!] = 0$
+continuous across element edges by construction — so $\llbracket\psi\rrbracket = 0$
 is built into the discrete unknown. The flux-continuity condition is
 trickier; let's derive it from the variational principle.
 
 Consider an interior face $F$ between two cells $K_1$ (silicon) and
 $K_2$ (oxide). Pick a test function $v \in V_h$ with support straddling
 $F$. The contribution of $F$ to the bilinear form $a(\psi, v) = \int_\Omega
-\varepsilon_r\nabla\psi\!\cdot\!\nabla v\,dV$ is computed by summing the
+\varepsilon_r\nabla\psi\cdot\nabla v\,dV$ is computed by summing the
 two cell contributions:
 
 $$
-a_{K_1\cup K_2}(\psi, v) = \int_{K_1}\varepsilon_r^\mathrm{Si}\nabla\psi\!\cdot\!\nabla v
-+ \int_{K_2}\varepsilon_r^\mathrm{ox}\nabla\psi\!\cdot\!\nabla v.
+a_{K_1\cup K_2}(\psi, v) = \int_{K_1}\varepsilon_r^\mathrm{Si}\nabla\psi\cdot\nabla v
++ \int_{K_2}\varepsilon_r^\mathrm{ox}\nabla\psi\cdot\nabla v.
 $$
 
 Apply the divergence theorem to each cell separately. Each interior
 piece collects a boundary integral on $F$:
 
 $$
--\int_F\bigl(\varepsilon_r^\mathrm{Si}\nabla\psi^\mathrm{Si}\!\cdot\!\hat{\mathbf{n}}_1
-       - \varepsilon_r^\mathrm{ox}\nabla\psi^\mathrm{ox}\!\cdot\!\hat{\mathbf{n}}_1\bigr)\,v\,dS,
+-\int_F\bigl(\varepsilon_r^\mathrm{Si}\nabla\psi^\mathrm{Si}\cdot\hat{\mathbf{n}}_1
+       - \varepsilon_r^\mathrm{ox}\nabla\psi^\mathrm{ox}\cdot\hat{\mathbf{n}}_1\bigr)\,v\,dS,
 $$
 
 with $\hat{\mathbf{n}}_1$ the outward normal to $K_1$. Combining the
 two cell-integrated-by-parts contributions, the interior surface term
-collapses to $-\int_F\,[\![\,\varepsilon_r\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,]\!]\,v\,dS$
+collapses to $-\int_F\,\llbracket\varepsilon_r\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket\,v\,dS$
 (the jump in normal flux). For the weak Galerkin equation
 $a(\psi, v) = (f, v)$ to hold for *every* test $v$, including those
 supported across the interface, the jump must satisfy
 
 $$
-[\![\,\varepsilon_r\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,]\!] = (\text{surface charge density})/\varepsilon_0.
+\llbracket\varepsilon_r\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket = (\text{surface charge density})/\varepsilon_0.
 \tag{14.2}
 $$
 
@@ -285,7 +285,7 @@ and the flux is enforced by the variational principle, not by hand.
    not yet expose interface-charge BCs.
 5. **MMS for multi-region needs eps-flux-continuous manufactured
    solutions.** Constructing a manufactured $\psi^*(\mathbf{x})$ that
-   is $C^0$ across the interface and has continuous $\varepsilon\nabla\psi^*\!\cdot\!\hat{\mathbf{n}}$
+   is $C^0$ across the interface and has continuous $\varepsilon\nabla\psi^*\cdot\hat{\mathbf{n}}$
    is non-trivial. See `mos_derivation.md` §7 for the construction
    used by the M6 multi-region MMS gate.
 
@@ -337,7 +337,7 @@ the interface.
 **14.3.** In the oxide, $n_i^\mathrm{ox} \to 0$ (the oxide has no
 carriers; its band gap is so large that thermal generation is
 negligible). $n = n_i\exp(...) \to 0$ regardless of $\Phi_n$. The
-electron continuity equation $\nabla\!\cdot\!(q\mu_n n\nabla\Phi_n) = qR$
+electron continuity equation $\nabla\cdot(q\mu_n n\nabla\Phi_n) = qR$
 in the oxide collapses to $0 = 0$, which is trivially true for any
 $\Phi_n$. The discrete Jacobian for $\Phi_n$ on oxide DOFs has zero
 entries (rank-deficient rows). MUMPS reports null pivots; SNES diverges.

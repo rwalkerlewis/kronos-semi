@@ -7,7 +7,7 @@
 - State the Einstein relation $D = \mu V_t$ and derive it from detailed
   balance at thermal equilibrium.
 - Write the steady-state continuity equations
-  $\nabla\!\cdot\!\mathbf{J}_n = qR$, $\nabla\!\cdot\!\mathbf{J}_p = -qR$
+  $\nabla\cdot\mathbf{J}_n = qR$, $\nabla\cdot\mathbf{J}_p = -qR$
   and explain the sign convention.
 - Recognize why naive Galerkin discretization of $\mathbf{J} = \mu n\mathbf{E}
   + D\nabla n$ fails when drift dominates diffusion (the Péclet
@@ -47,8 +47,8 @@ $f(\mathbf{r}, \mathbf{k}, t)$:
 
 $$
 \frac{\partial f}{\partial t}
-+ \mathbf{v}_\mathbf{k}\!\cdot\!\nabla_\mathbf{r} f
-+ \frac{q}{\hbar}\,\mathbf{E}\!\cdot\!\nabla_\mathbf{k} f
++ \mathbf{v}_\mathbf{k}\cdot\nabla_\mathbf{r} f
++ \frac{q}{\hbar}\,\mathbf{E}\cdot\nabla_\mathbf{k} f
 = \left.\frac{\partial f}{\partial t}\right|_\mathrm{coll}.
 \tag{5.1}
 $$
@@ -65,7 +65,7 @@ and assuming the distribution stays close to local equilibrium $f_0$.
 The zeroth $\mathbf{k}$-moment of (5.1) gives the continuity equation:
 
 $$
-\frac{\partial n}{\partial t} + \nabla\!\cdot\!(n\mathbf{v}_n) = G - R,
+\frac{\partial n}{\partial t} + \nabla\cdot(n\mathbf{v}_n) = G - R,
 \tag{5.2}
 $$
 
@@ -133,9 +133,9 @@ In steady state, (5.2) drops the time derivative, and combining with the
 hole equation:
 
 $$
-\nabla\!\cdot\!\mathbf{J}_n = +q\,R(n,p),
+\nabla\cdot\mathbf{J}_n = +q\,R(n,p),
 \qquad
-\nabla\!\cdot\!\mathbf{J}_p = -q\,R(n,p),
+\nabla\cdot\mathbf{J}_p = -q\,R(n,p),
 \tag{5.6}
 $$
 
@@ -147,7 +147,7 @@ matches the rate of electron *removal* with a $+q$ sign, while
 divergence of $\mathbf{J}_p$ matches the rate of hole *removal* with a
 $-q$ sign.
 
-Adding (5.6a) and (5.6b) gives $\nabla\!\cdot\!(\mathbf{J}_n + \mathbf{J}_p) = 0$,
+Adding (5.6a) and (5.6b) gives $\nabla\cdot(\mathbf{J}_n + \mathbf{J}_p) = 0$,
 which is the **total-current conservation** law that the V&V suite
 checks per-target-bias to within 5% forward / 15% reverse
 ([`docs/PHYSICS.md` §5.3](../PHYSICS.md)).
@@ -335,7 +335,7 @@ $\mu = \mu_0/2$ for electrons in silicon, with $\beta_n = 2$ and
 $v_\mathrm{sat} = 10^7\,\mathrm{cm/s}$?
 
 **Exercise 5.5.** Show that adding the two continuities (5.6) gives
-$\nabla\!\cdot\!(\mathbf{J}_n + \mathbf{J}_p) = 0$ — total current is
+$\nabla\cdot(\mathbf{J}_n + \mathbf{J}_p) = 0$ — total current is
 divergence-free, i.e. has the same value on every cross-section of a
 1D device.
 
@@ -365,7 +365,7 @@ so $1 + (\mu_0 F/v_s)^2 = 4$, $\mu_0 F/v_s = \sqrt 3$, $F = \sqrt 3\,v_s/\mu_0$.
 With $v_s = 10^5\,\mathrm{m/s}$ and $\mu_0 = 0.14\,\mathrm{m^2/Vs}$:
 $F = 1.732\cdot 10^5/0.14 = 1.24\times 10^6\,\mathrm{V/m} = 12.4\,\mathrm{kV/cm}$.
 
-**5.5.** Add (5.6a) and (5.6b): $\nabla\!\cdot\!(\mathbf{J}_n + \mathbf{J}_p)
+**5.5.** Add (5.6a) and (5.6b): $\nabla\cdot(\mathbf{J}_n + \mathbf{J}_p)
 = +qR + (-qR) = 0$. The recombination is equal-and-opposite on the two
 rows, so it cancels. In 1D, this means $J_n(x) + J_p(x)$ is constant in
 $x$ across the device — the **total-current conservation** that the

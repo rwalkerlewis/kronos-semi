@@ -229,19 +229,19 @@ The drift and diffusion terms cancelled. ✓
 Goal: derive (12.1).
 
 Start with the dimensional Poisson (1.9):
-$-\nabla\!\cdot\!(\varepsilon_0\varepsilon_r\,\nabla\psi) = q(p - n + N)$.
+$-\nabla\cdot(\varepsilon_0\varepsilon_r\,\nabla\psi) = q(p - n + N)$.
 
 Substitute $\psi = V_t\hat\psi$, $n = C_0\hat n$, $p = C_0\hat p$,
 $N = C_0\hat N$:
 
 $$
--\nabla\!\cdot\!(\varepsilon_0\varepsilon_r V_t\,\nabla\hat\psi) = qC_0(\hat p - \hat n + \hat N).
+-\nabla\cdot(\varepsilon_0\varepsilon_r V_t\,\nabla\hat\psi) = qC_0(\hat p - \hat n + \hat N).
 $$
 
 Divide both sides by $qC_0$:
 
 $$
--\nabla\!\cdot\!\left(\frac{\varepsilon_0 V_t}{qC_0}\,\varepsilon_r\,\nabla\hat\psi\right)
+-\nabla\cdot\left(\frac{\varepsilon_0 V_t}{qC_0}\,\varepsilon_r\,\nabla\hat\psi\right)
 = \hat p - \hat n + \hat N.
 $$
 
@@ -265,30 +265,30 @@ The cylindrical divergence of a $\theta$-independent vector field
 $\mathbf{F} = F_r\hat{\mathbf{e}}_r + F_z\hat{\mathbf{e}}_z$ is
 
 $$
-\nabla\!\cdot\!\mathbf{F} = \frac{1}{r}\frac{\partial(rF_r)}{\partial r} + \frac{\partial F_z}{\partial z}.
+\nabla\cdot\mathbf{F} = \frac{1}{r}\frac{\partial(rF_r)}{\partial r} + \frac{\partial F_z}{\partial z}.
 $$
 
-The strong Poisson is $-\nabla\!\cdot\!(\varepsilon\nabla\psi) = \rho$.
+The strong Poisson is $-\nabla\cdot(\varepsilon\nabla\psi) = \rho$.
 Multiply by $v(r,z)$ and integrate against $r\,dr\,dz$:
 
 $$
--\int\nabla\!\cdot\!(\varepsilon\nabla\psi)\cdot v\cdot r\,dr\,dz = \int\rho v r\,dr\,dz.
+-\int\nabla\cdot(\varepsilon\nabla\psi)\cdot v\cdot r\,dr\,dz = \int\rho v r\,dr\,dz.
 $$
 
 Apply the divergence-theorem identity in cylindrical coordinates:
-$\int_\Omega(\nabla\!\cdot\!\mathbf{F})v\,dV = -\int_\Omega \mathbf{F}\!\cdot\!\nabla v\,dV
-+ \int_{\partial\Omega}\mathbf{F}\!\cdot\!\hat{\mathbf{n}}\,v\,dS$. With
+$\int_\Omega(\nabla\cdot\mathbf{F})v\,dV = -\int_\Omega \mathbf{F}\cdot\nabla v\,dV
++ \int_{\partial\Omega}\mathbf{F}\cdot\hat{\mathbf{n}}\,v\,dS$. With
 $\mathbf{F} = \varepsilon\nabla\psi$:
 
 $$
-\int_\Omega\varepsilon\nabla\psi\!\cdot\!\nabla v\,dV - \int_{\partial\Omega}\varepsilon\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,v\,dS
+\int_\Omega\varepsilon\nabla\psi\cdot\nabla v\,dV - \int_{\partial\Omega}\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}\,v\,dS
 = \int_\Omega\rho v\,dV.
 $$
 
 Substituting $dV = r\,dr\,d\theta\,dz$ and dropping the $2\pi$:
 
 $$
-\int\varepsilon\nabla\psi\!\cdot\!\nabla v\,r\,dr\,dz - (\text{boundary terms})
+\int\varepsilon\nabla\psi\cdot\nabla v\,r\,dr\,dz - (\text{boundary terms})
 = \int\rho v\,r\,dr\,dz.
 $$
 

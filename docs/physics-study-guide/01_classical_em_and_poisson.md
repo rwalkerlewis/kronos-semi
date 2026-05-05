@@ -4,7 +4,7 @@
 
 By the end of this chapter you will be able to:
 
-- Derive Poisson's equation $-\nabla\!\cdot\!(\varepsilon\nabla\psi) = \rho$ in matter from Maxwell's equations and the electrostatic limit.
+- Derive Poisson's equation $-\nabla\cdot(\varepsilon\nabla\psi) = \rho$ in matter from Maxwell's equations and the electrostatic limit.
 - Explain why kronos-semi solves for the electrostatic potential $\psi$ rather than the electric field $\mathbf{E}$.
 - Identify the four standard boundary conditions used in the engine — Dirichlet (ohmic, gate), homogeneous Neumann (insulating), interface flux continuity (Si/SiO₂), and the natural axis-of-symmetry BC at $r=0$ — and recognize them in the JSON schema and in `semi/bcs.py`.
 - Recognize the dielectric materials shipped in `semi/materials.py` and connect their $\varepsilon_r$ to a microscopic picture of polarization.
@@ -29,7 +29,7 @@ Why isn't the magnetic field part of the picture? Inside a typical
 device the operating-frequency wavelengths ($\sim$10 cm at 1 GHz) are
 many orders of magnitude longer than the device dimensions ($\sim$1 µm
 to 1 mm), so $\partial\mathbf{B}/\partial t$ contributes negligibly to
-$\nabla\!\times\!\mathbf{E}$. We will make this rigorous below; the
+$\nabla\times\mathbf{E}$. We will make this rigorous below; the
 upshot is the **quasi-electrostatic** approximation, in which $\mathbf{E}$
 is curl-free and admits a scalar potential.
 
@@ -38,14 +38,14 @@ is curl-free and admits a scalar potential.
 Start from Maxwell's equations in matter, in SI units:
 
 $$
-\nabla\!\cdot\!\mathbf{D} = \rho_\mathrm{free},
-\qquad \nabla\!\cdot\!\mathbf{B} = 0,
+\nabla\cdot\mathbf{D} = \rho_\mathrm{free},
+\qquad \nabla\cdot\mathbf{B} = 0,
 \tag{1.1}
 $$
 
 $$
-\nabla\!\times\!\mathbf{E} = -\,\frac{\partial \mathbf{B}}{\partial t},
-\qquad \nabla\!\times\!\mathbf{H} = \mathbf{J}_\mathrm{free}
+\nabla\times\mathbf{E} = -\,\frac{\partial \mathbf{B}}{\partial t},
+\qquad \nabla\times\mathbf{H} = \mathbf{J}_\mathrm{free}
                                    + \frac{\partial\mathbf{D}}{\partial t}.
 \tag{1.2}
 $$
@@ -71,7 +71,7 @@ characteristic timescale (say $1/(2\pi f)$ for AC at frequency $f$).
 The order-of-magnitude balance in Faraday's law is
 
 $$
-|\nabla\!\times\!\mathbf{E}| \;\sim\; \frac{|\mathbf{E}|}{L},
+|\nabla\times\mathbf{E}| \;\sim\; \frac{|\mathbf{E}|}{L},
 \qquad \left|\frac{\partial\mathbf{B}}{\partial t}\right|
    \;\sim\; \frac{|\mathbf{B}|}{T}.
 $$
@@ -88,10 +88,10 @@ $$
 
 For $L = 10\,\mu\mathrm{m}$ and $f = 1\,\mathrm{GHz}$ this ratio is
 about $2\times 10^{-4}$. We drop $\partial\mathbf{B}/\partial t$ from
-$\nabla\!\times\!\mathbf{E}$, which gives
+$\nabla\times\mathbf{E}$, which gives
 
 $$
-\nabla\!\times\!\mathbf{E} = 0 \;\;\Longrightarrow\;\;
+\nabla\times\mathbf{E} = 0 \;\;\Longrightarrow\;\;
 \mathbf{E} = -\nabla\psi
 \tag{1.4}
 $$
@@ -105,10 +105,10 @@ bias-sweep runners, $\partial\mathbf{D}/\partial t = 0$ as well.
 ### Substituting the constitutive relation
 
 Combining $\mathbf{D} = \varepsilon_0\varepsilon_r\mathbf{E}$ with (1.4)
-and the divergence equation $\nabla\!\cdot\!\mathbf{D} = \rho_\mathrm{free}$:
+and the divergence equation $\nabla\cdot\mathbf{D} = \rho_\mathrm{free}$:
 
 $$
--\nabla\!\cdot\!\bigl(\varepsilon_0\varepsilon_r(\mathbf{x})\,\nabla\psi\bigr)
+-\nabla\cdot\bigl(\varepsilon_0\varepsilon_r(\mathbf{x})\,\nabla\psi\bigr)
 = q\,(p - n + N_D^+ - N_A^-).
 \tag{1.5}
 $$
@@ -125,7 +125,7 @@ handles.
 Two reasons. First, $\psi$ is a scalar field; $\mathbf{E}$ is a vector
 field. The number of unknowns in the discrete linear system is smaller
 by a factor of the spatial dimension. Second, the curl-free condition
-$\nabla\!\times\!\mathbf{E}=0$ is automatic if $\mathbf{E}$ is the
+$\nabla\times\mathbf{E}=0$ is automatic if $\mathbf{E}$ is the
 gradient of a single-valued scalar; if you discretize $\mathbf{E}$ as
 the primary unknown you have to enforce the curl-free constraint
 separately (e.g. via Nédélec elements), which is heavier machinery than
@@ -146,7 +146,7 @@ The four BCs the engine uses are:
    (see Ch. 8 for the derivation):
    $$
    \psi_\mathrm{ohmic} \;=\;
-       V_t\,\mathrm{asinh}\!\left(\frac{N_D - N_A}{2\,n_i}\right)
+       V_t\,\mathrm{asinh}\left(\frac{N_D - N_A}{2\,n_i}\right)
        + V_\mathrm{applied}.
    \tag{1.6}
 $$
@@ -174,12 +174,12 @@ $$
    $\psi$ is continuous and the normal component of the displacement
    field $\mathbf{D}$ is continuous:
    $$
-   [\![\,\psi\,]\!] = 0,
-   \qquad [\![\,\varepsilon_0\varepsilon_r\,\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,]\!] = 0.
+   \llbracket\psi\rrbracket = 0,
+   \qquad \llbracket\varepsilon_0\varepsilon_r\,\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket = 0.
    \tag{1.8}
 $$
-   The jump bracket $[\![\,f\,]\!]$ denotes $f|_+ - f|_-$ across the
-   interface. Equation (1.8) is the local form of $\nabla\!\cdot\!\mathbf{D}
+   The jump bracket $\llbracket f\rrbracket$ denotes $f|_+ - f|_-$ across the
+   interface. Equation (1.8) is the local form of $\nabla\cdot\mathbf{D}
    = \rho$ when there is no surface charge sheet at the interface; see
    Ch. 14 for the proof that the Galerkin form encodes (1.8) automatically.
 
@@ -194,7 +194,7 @@ $$
 ## Key results
 
 $$
--\nabla\!\cdot\!\bigl(\varepsilon_0\varepsilon_r(\mathbf{x})\,\nabla\psi\bigr)
+-\nabla\cdot\bigl(\varepsilon_0\varepsilon_r(\mathbf{x})\,\nabla\psi\bigr)
    = q\,(p - n + N_D^+ - N_A^-)
 \tag{1.9}
 $$
@@ -270,8 +270,8 @@ side at a depletion-region point where $n,p \ll N_D - N_A$.
    (`cm3_to_m3`). If you insert a number directly into one of the UFL
    forms without the helper you will be off by $10^6$.
 2. **Sign of $\rho$ in the displayed equation.** Some textbooks write
-   $\nabla\!\cdot\!(\varepsilon\nabla\psi) = -\rho$ (with the minus on the
-   right), others write $-\nabla\!\cdot\!(\varepsilon\nabla\psi) = \rho$
+   $\nabla\cdot(\varepsilon\nabla\psi) = -\rho$ (with the minus on the
+   right), others write $-\nabla\cdot(\varepsilon\nabla\psi) = \rho$
    (with the minus on the left). Both are correct; they differ by a
    notational choice for which side absorbs the negation. kronos-semi
    uses the second form, matching `build_equilibrium_poisson_form`'s
@@ -285,7 +285,7 @@ side at a depletion-region point where $n,p \ll N_D - N_A$.
 4. **Why insulators carry only $\varepsilon_r$.** In the SiO₂ region of
    a MOS capacitor there are no mobile carriers and no doping, so
    $\rho = 0$ inside the oxide. The Poisson equation reduces to
-   Laplace's equation $-\nabla\!\cdot\!(\varepsilon_r\nabla\psi)=0$,
+   Laplace's equation $-\nabla\cdot(\varepsilon_r\nabla\psi)=0$,
    and the only material datum the oxide needs to provide is its
    relative permittivity. This is why `Material` instances with
    `role="insulator"` set every other field to zero
@@ -319,8 +319,8 @@ portion. (Hint: integrate by parts and ask which boundary integral
 must vanish for the equation to hold.)
 
 **Exercise 1.5.** At a sharp Si/SiO₂ interface with no surface charge,
-prove that $\nabla\psi$ has a jump $[\![\,\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,]\!]
-= -[\![\,\varepsilon_r\,]\!]/\varepsilon_r^+\cdot \nabla\psi^+\!\cdot\!\hat{\mathbf{n}}$
+prove that $\nabla\psi$ has a jump $\llbracket\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket
+= -\llbracket\varepsilon_r\rrbracket/\varepsilon_r^+\cdot \nabla\psi^+\cdot\hat{\mathbf{n}}$
 even though $\psi$ is continuous. Estimate the magnitude of this jump
 for the M6 MOS capacitor at $V_g = 1\,\mathrm{V}$.
 
@@ -343,12 +343,12 @@ dividing by $V^2$ leaves $\varepsilon_r\varepsilon_0 A/d = C$. ✓
 SiO₂: $3.9 \times 8.854\times 10^{-12} = 3.453\times 10^{-11}\,\mathrm{F/m}$.
 HfO₂: $25.0 \times 8.854\times 10^{-12} = 2.214\times 10^{-10}\,\mathrm{F/m}$.
 
-**1.4.** Integrating $-\nabla\!\cdot\!(\varepsilon\nabla\psi)v$ by parts:
-$\int_\Omega \varepsilon\nabla\psi\!\cdot\!\nabla v\,dV
-- \int_{\partial\Omega} v\,\varepsilon\,\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,dS
+**1.4.** Integrating $-\nabla\cdot(\varepsilon\nabla\psi)v$ by parts:
+$\int_\Omega \varepsilon\nabla\psi\cdot\nabla v\,dV
+- \int_{\partial\Omega} v\,\varepsilon\,\nabla\psi\cdot\hat{\mathbf{n}}\,dS
 = \int_\Omega \rho v\,dV$. The Galerkin form drops the surface term,
 so unless we replace it with an explicit `ds` integral, we are
-implicitly demanding $\varepsilon\nabla\psi\!\cdot\!\hat{\mathbf{n}}=0$
+implicitly demanding $\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}=0$
 on the part of $\partial\Omega$ where $v$ is free. ✓
 
 **1.5.** Continuity of $\psi$ across the interface is imposed
@@ -356,10 +356,10 @@ by the conforming function space; continuity of
 $\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}$ is encoded by the
 bilinear form $\int\varepsilon_r\nabla\psi\cdot\nabla v\,dx$ with the
 piecewise constant $\varepsilon_r(\mathbf{x})$. Solving for the field
-jump: $\varepsilon_r^+(\nabla\psi^+\!\cdot\!\hat{\mathbf{n}}) =
-\varepsilon_r^-(\nabla\psi^-\!\cdot\!\hat{\mathbf{n}})$, so
-$\nabla\psi^-\!\cdot\!\hat{\mathbf{n}} - \nabla\psi^+\!\cdot\!\hat{\mathbf{n}}
-= (1 - \varepsilon_r^+/\varepsilon_r^-)\,\nabla\psi^+\!\cdot\!\hat{\mathbf{n}}$.
+jump: $\varepsilon_r^+(\nabla\psi^+\cdot\hat{\mathbf{n}}) =
+\varepsilon_r^-(\nabla\psi^-\cdot\hat{\mathbf{n}})$, so
+$\nabla\psi^-\cdot\hat{\mathbf{n}} - \nabla\psi^+\cdot\hat{\mathbf{n}}
+= (1 - \varepsilon_r^+/\varepsilon_r^-)\,\nabla\psi^+\cdot\hat{\mathbf{n}}$.
 At Si/SiO₂ with $\varepsilon_r^+ = 3.9$ (oxide), $\varepsilon_r^- = 11.7$
 (silicon), the field is $11.7/3.9 = 3$ times larger in the oxide than in
 the silicon at the interface; this is the quantitative origin of the

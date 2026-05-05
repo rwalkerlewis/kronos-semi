@@ -39,15 +39,15 @@ plagued the original (n, p) primary-form attempt.
 The full transient continuity equation is
 
 $$
-\frac{\partial n}{\partial t} + \nabla\!\cdot\!\mathbf{J}_n/(-q) = G - R,
+\frac{\partial n}{\partial t} + \nabla\cdot\mathbf{J}_n/(-q) = G - R,
 \qquad
-\frac{\partial p}{\partial t} + \nabla\!\cdot\!\mathbf{J}_p/(+q) = G - R,
+\frac{\partial p}{\partial t} + \nabla\cdot\mathbf{J}_p/(+q) = G - R,
 \tag{17.1}
 $$
 
 with the same drift-diffusion currents (5.3) and recombination (Ch. 6).
 Poisson is purely algebraic in time (instantaneous):
-$-\nabla\!\cdot\!(\varepsilon\nabla\psi) = \rho(t)$.
+$-\nabla\cdot(\varepsilon\nabla\psi) = \rho(t)$.
 
 In Slotboom variables, $n$ and $p$ are *functions* of $\psi, \Phi_n, \Phi_p$.
 The time derivative becomes
@@ -79,7 +79,7 @@ $$
 The residual at $t^{n+1}$ is
 
 $$
-F_n^\mathrm{BDF1} = \frac{n^{n+1} - n^n}{dt} + \nabla\!\cdot\!\mathbf{J}_n^{n+1}/(-q) + R^{n+1} = 0.
+F_n^\mathrm{BDF1} = \frac{n^{n+1} - n^n}{dt} + \nabla\cdot\mathbf{J}_n^{n+1}/(-q) + R^{n+1} = 0.
 \tag{17.4}
 $$
 

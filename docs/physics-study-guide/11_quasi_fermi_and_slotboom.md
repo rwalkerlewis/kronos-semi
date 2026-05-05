@@ -46,9 +46,9 @@ and $E_{F,p}(\mathbf{x})$ such that the carrier densities still take the
 Boltzmann form, but with each carrier-type's own quasi-Fermi level:
 
 $$
-n(\mathbf{x}) = N_c\,\exp\!\left(\frac{E_{F,n}(\mathbf{x}) - E_c(\mathbf{x})}{kT}\right),
+n(\mathbf{x}) = N_c\,\exp\left(\frac{E_{F,n}(\mathbf{x}) - E_c(\mathbf{x})}{kT}\right),
 \quad
-p(\mathbf{x}) = N_v\,\exp\!\left(\frac{E_v(\mathbf{x}) - E_{F,p}(\mathbf{x})}{kT}\right).
+p(\mathbf{x}) = N_v\,\exp\left(\frac{E_v(\mathbf{x}) - E_{F,p}(\mathbf{x})}{kT}\right).
 \tag{11.1}
 $$
 
@@ -76,9 +76,9 @@ Substitute (3.6) — $\psi = -E_i/q$ — and rearrange (11.1) using
 $E_c - E_i = E_g/2$ at the band-edge convention:
 
 $$
-n = n_i\,\exp\!\left(\frac{\psi - \Phi_n}{V_t}\right),
+n = n_i\,\exp\left(\frac{\psi - \Phi_n}{V_t}\right),
 \qquad
-p = n_i\,\exp\!\left(\frac{\Phi_p - \psi}{V_t}\right).
+p = n_i\,\exp\left(\frac{\Phi_p - \psi}{V_t}\right).
 \tag{11.3}
 $$
 
@@ -157,11 +157,11 @@ a **pure gradient times a coefficient**. This is the magic of Slotboom.
 
 ### Why this fixes the discretization
 
-The continuity equation $\nabla\!\cdot\!\mathbf{J}_n = qR$ with (11.7)
+The continuity equation $\nabla\cdot\mathbf{J}_n = qR$ with (11.7)
 becomes
 
 $$
--\nabla\!\cdot\!(q\mu_n n\,\nabla\Phi_n) = qR,
+-\nabla\cdot(q\mu_n n\,\nabla\Phi_n) = qR,
 \tag{11.8}
 $$
 
@@ -280,7 +280,7 @@ Why is `n_hat = n_from_slotboom(psi, phi_n, ni_hat)` evaluated in the
 form expression rather than precomputed? What does this buy?
 
 **Exercise 11.5.** A naive $(\psi, n, p)$ Galerkin discretization
-gives $\nabla\!\cdot\!(q\mu_n n\mathbf{E})$ as a primary term, which has a
+gives $\nabla\cdot(q\mu_n n\mathbf{E})$ as a primary term, which has a
 mixed-derivative structure. Show that this is *not* coercive in $H^1$,
 i.e. the discrete operator can have negative or zero eigenvalues at
 high Péclet number.

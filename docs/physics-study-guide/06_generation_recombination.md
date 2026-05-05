@@ -176,7 +176,7 @@ tunnel through the bandgap into empty conduction-band states across the
 junction. Kane's model gives
 
 $$
-G_\mathrm{BBT} = A\,\frac{|E|^\alpha}{\sqrt{E_g}}\,\exp\!\left(-\frac{B\,E_g^{3/2}}{|E|}\right),
+G_\mathrm{BBT} = A\,\frac{|E|^\alpha}{\sqrt{E_g}}\,\exp\left(-\frac{B\,E_g^{3/2}}{|E|}\right),
 \tag{6.8}
 $$
 

@@ -70,7 +70,7 @@ For $N \gg n_i$, $\mathrm{asinh}(x) \approx \ln(2x)$, giving
 
 $$
 V_{bi} \approx V_t\bigl[\ln(N_D/n_i) + \ln(N_A/n_i)\bigr]
-        = V_t\,\ln\!\left(\frac{N_A N_D}{n_i^2}\right).
+        = V_t\,\ln\left(\frac{N_A N_D}{n_i^2}\right).
 \tag{7.2}
 $$
 

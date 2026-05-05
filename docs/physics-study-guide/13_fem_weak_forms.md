@@ -33,33 +33,33 @@ terms.
 
 ### Strong form to weak form: Poisson example
 
-Strong form (1.5): $-\nabla\!\cdot\!(\varepsilon\nabla\psi) = \rho$ on
-$\Omega$, with $\psi = g$ on $\Gamma_D$ and $\nabla\psi\!\cdot\!\hat{\mathbf{n}} = 0$
+Strong form (1.5): $-\nabla\cdot(\varepsilon\nabla\psi) = \rho$ on
+$\Omega$, with $\psi = g$ on $\Gamma_D$ and $\nabla\psi\cdot\hat{\mathbf{n}} = 0$
 on $\Gamma_N$ (homogeneous Neumann).
 
 Multiply by a test function $v$ that vanishes on $\Gamma_D$ and
 integrate over $\Omega$:
 
 $$
--\int_\Omega \nabla\!\cdot\!(\varepsilon\nabla\psi)\,v\,dV = \int_\Omega \rho\,v\,dV.
+-\int_\Omega \nabla\cdot(\varepsilon\nabla\psi)\,v\,dV = \int_\Omega \rho\,v\,dV.
 $$
 
 Integrate the left side by parts:
 
 $$
-\int_\Omega \varepsilon\nabla\psi\!\cdot\!\nabla v\,dV
-- \int_{\partial\Omega} \varepsilon\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,v\,dS
+\int_\Omega \varepsilon\nabla\psi\cdot\nabla v\,dV
+- \int_{\partial\Omega} \varepsilon\nabla\psi\cdot\hat{\mathbf{n}}\,v\,dS
 = \int_\Omega \rho\,v\,dV.
 $$
 
 The boundary integral splits into $\Gamma_D \cup \Gamma_N$. On
 $\Gamma_D$, $v = 0$ (test function vanishes); the integral drops. On
-$\Gamma_N$, $\nabla\psi\!\cdot\!\hat{\mathbf{n}} = 0$ (homogeneous Neumann);
+$\Gamma_N$, $\nabla\psi\cdot\hat{\mathbf{n}} = 0$ (homogeneous Neumann);
 the integral is zero. Both pieces vanish; the surface term *disappears*.
 The Galerkin **weak form** is
 
 $$
-\int_\Omega \varepsilon\nabla\psi\!\cdot\!\nabla v\,dV
+\int_\Omega \varepsilon\nabla\psi\cdot\nabla v\,dV
 = \int_\Omega \rho\,v\,dV
 \quad\forall v \in H^1_0(\Omega).
 \tag{13.1}
@@ -93,7 +93,7 @@ basis $\{\phi_i\}$, and require (13.1) to hold for $v = \phi_j$ at each
 interior DOF $j$:
 
 $$
-\sum_i u_i \underbrace{\int_\Omega \varepsilon\,\nabla\phi_i\!\cdot\!\nabla\phi_j\,dV}_{K_{ji}}
+\sum_i u_i \underbrace{\int_\Omega \varepsilon\,\nabla\phi_i\cdot\nabla\phi_j\,dV}_{K_{ji}}
    = \underbrace{\int_\Omega \rho\,\phi_j\,dV}_{f_j}.
 $$
 
@@ -119,11 +119,11 @@ FEM.
 
 ### Neumann ("natural") BCs
 
-$\nabla\psi\!\cdot\!\hat{\mathbf{n}} = h$ on $\Gamma_N$ is *not* an extra
+$\nabla\psi\cdot\hat{\mathbf{n}} = h$ on $\Gamma_N$ is *not* an extra
 constraint to impose; instead, it modifies the boundary integral term:
 
 $$
-\int_\Omega \varepsilon\nabla\psi\!\cdot\!\nabla v\,dV
+\int_\Omega \varepsilon\nabla\psi\cdot\nabla v\,dV
 - \int_{\Gamma_N} \varepsilon h\,v\,dS = \int_\Omega\rho v\,dV.
 $$
 
@@ -197,7 +197,7 @@ F = (
 
 Term by term:
 - `L_D2 * eps_r_ufl * ufl.inner(grad(psi), grad(v)) * dx`:
-  the stiffness term $\int L_D^2\varepsilon_r\nabla\hat\psi\!\cdot\!\nabla v\,dV$
+  the stiffness term $\int L_D^2\varepsilon_r\nabla\hat\psi\cdot\nabla v\,dV$
   from (12.1).
 - `- rho_hat * v * ufl.dx`: the source term, sign-flipped because the
   engine writes the form as $F = 0$ residual rather than $a = L$
@@ -207,7 +207,7 @@ Term by term:
 
 Compare to the multi-region path (`build_equilibrium_poisson_form_mr`,
 [`semi/physics/poisson.py:107-117`](../../semi/physics/poisson.py)):
-- Stiffness: $\int_{\Omega} L_D^2\varepsilon_r(\mathbf{x})\nabla\hat\psi\!\cdot\!\nabla v\,dV$
+- Stiffness: $\int_{\Omega} L_D^2\varepsilon_r(\mathbf{x})\nabla\hat\psi\cdot\nabla v\,dV$
   with $\varepsilon_r$ a cellwise DG0 Function (Ch. 14).
 - Source: $\int_{\Omega_\mathrm{Si}} \hat\rho\,v\,dV$, restricted to
   silicon via `dx_semi`.
@@ -304,7 +304,7 @@ in 1D and 2D. How many neighbouring DOFs is $\phi_i$ "non-orthogonal
 to" in the stiffness matrix?
 
 **Exercise 13.3.** A user wants to impose a non-homogeneous Neumann BC
-$\nabla\psi\!\cdot\!\hat{\mathbf{n}} = h$ on a facet. Write the
+$\nabla\psi\cdot\hat{\mathbf{n}} = h$ on a facet. Write the
 modification to (13.1) and identify what UFL `ds` integral would need
 to be added to the form.
 
@@ -321,7 +321,7 @@ for the answer.
 ### Solutions
 
 **13.1.** With $v$ free on $\Gamma_D$, the surface term
-$\int_{\Gamma_D}\varepsilon\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,v\,dS$
+$\int_{\Gamma_D}\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}\,v\,dS$
 remains. The dolfinx assembler imposes the Dirichlet condition by row
 replacement *after* assembly: the DOFs at $\Gamma_D$ are set to $g$
 and the corresponding rows of $K$ become identity. The test space is
@@ -337,7 +337,7 @@ typically 6 neighbouring vertices on a uniform triangular mesh, plus
 self.
 
 **13.3.** Modified weak form:
-$\int_\Omega \varepsilon\nabla\psi\!\cdot\!\nabla v\,dV
+$\int_\Omega \varepsilon\nabla\psi\cdot\nabla v\,dV
 = \int_\Omega \rho\,v\,dV + \int_{\Gamma_N}\varepsilon h\,v\,dS$.
 UFL: add `+ eps * h * v * ds(neumann_tag)` to the form. Currently
 neither the schema nor `semi/bcs.py` exposes non-homogeneous Neumann;

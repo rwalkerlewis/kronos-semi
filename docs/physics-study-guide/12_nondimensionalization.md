@@ -34,7 +34,7 @@ as a cautionary note — illustrates vividly.
 ### The conditioning problem
 
 Plug typical numbers into the dimensional Poisson equation
-$-\nabla\!\cdot\!(\varepsilon\nabla\psi) = q(p - n + N)$:
+$-\nabla\cdot(\varepsilon\nabla\psi) = q(p - n + N)$:
 - $\varepsilon \sim 10^{-11}\,\mathrm{F/m}$
 - $q \sim 10^{-19}\,\mathrm{C}$
 - $N \sim 10^{23}\,\mathrm{m^{-3}}$
@@ -70,13 +70,13 @@ remains $\mathbf{x}$ in meters; this is **Invariant 3** in `PLAN.md`.
 Substitute $\psi = V_t\hat\psi$, $n = C_0\hat n$, etc. into (1.9):
 
 $$
--\nabla\!\cdot\!(\varepsilon\,V_t\,\nabla\hat\psi) = q\,C_0\,(\hat p - \hat n + \hat N).
+-\nabla\cdot(\varepsilon\,V_t\,\nabla\hat\psi) = q\,C_0\,(\hat p - \hat n + \hat N).
 $$
 
 Divide both sides by $qC_0$:
 
 $$
--\nabla\!\cdot\!(L_D^2\,\varepsilon_r\,\nabla\hat\psi) = \hat p - \hat n + \hat N,
+-\nabla\cdot(L_D^2\,\varepsilon_r\,\nabla\hat\psi) = \hat p - \hat n + \hat N,
 \qquad
 L_D^2 \equiv \frac{\varepsilon_0 V_t}{q C_0}.
 \tag{12.1}
@@ -142,17 +142,17 @@ Following the same recipe for the continuity rows, all the algebra in
 [`docs/PHYSICS.md` §2.5](../PHYSICS.md):
 
 $$
--\nabla\!\cdot\!(L_D^2\varepsilon_r\nabla\hat\psi) = \hat p - \hat n + \hat N
+-\nabla\cdot(L_D^2\varepsilon_r\nabla\hat\psi) = \hat p - \hat n + \hat N
 \tag{12.2a}
 $$
 
 $$
--\nabla\!\cdot\!(L_0^2\,\hat\mu_n\,\hat n\,\nabla\hat\Phi_n) = +\hat R
+-\nabla\cdot(L_0^2\,\hat\mu_n\,\hat n\,\nabla\hat\Phi_n) = +\hat R
 \tag{12.2b}
 $$
 
 $$
--\nabla\!\cdot\!(L_0^2\,\hat\mu_p\,\hat p\,\nabla\hat\Phi_p) = -\hat R
+-\nabla\cdot(L_0^2\,\hat\mu_p\,\hat p\,\nabla\hat\Phi_p) = -\hat R
 \tag{12.2c}
 $$
 
@@ -191,7 +191,7 @@ doping, while quasi-neutral bulk regions can be hundreds of microns.
   $L_D^2 = \lambda^2 L_0^2 = \varepsilon_0 V_t/(qC_0)$.
 - Scaled DD residual: (12.2).
 - Singular-perturbation bound: width of transition regions $\sim L_D$.
-- Mesh-in-meters convention: every $\nabla\!\cdot\!\nabla$ picks up an
+- Mesh-in-meters convention: every $\nabla\cdot\nabla$ picks up an
   explicit $L_0^2$.
 
 ## Worked numerical example
@@ -283,7 +283,7 @@ $10^{17}\,\mathrm{cm^{-3}}$, matching the [`tests/check_analytical_math.py:30-33
 assertion.
 
 **Exercise 12.3.** Derive (12.2b) from the dimensional electron
-continuity equation $\nabla\!\cdot\!(q\mu_n n\,\nabla\Phi_n) = qR$ by
+continuity equation $\nabla\cdot(q\mu_n n\,\nabla\Phi_n) = qR$ by
 substituting $\Phi_n = V_t\hat\Phi_n$, $n = C_0\hat n$, $\mu_n = \mu_0\hat\mu_n$,
 and dividing by $qC_0/t_0$.
 
@@ -312,10 +312,10 @@ $\varepsilon_r = 11.7$: $6.69\times 10^{-4}$.
 = \sqrt{1.679\times 10^{-16}} = 1.296\times 10^{-8}\,\mathrm{m} = 12.96\,\mathrm{nm}$. ✓
 The test asserts $10 < L_D/\mathrm{nm} < 16$.
 
-**12.3.** Substitute: $\nabla\!\cdot\!(q\mu_0\hat\mu_n C_0\hat n V_t\nabla\hat\Phi_n)
-= qR$. Pull constants out: $q\mu_0 V_t C_0\nabla\!\cdot\!(\hat\mu_n\hat n\nabla\hat\Phi_n) = qR$.
-Divide by $qC_0/t_0 = qC_0D_0/L_0^2$: $\mu_0 V_t/(D_0/L_0^2)\cdot\nabla\!\cdot\!(\hat\mu_n\hat n\nabla\hat\Phi_n) = \hat R$.
-With $D_0 = V_t\mu_0$: $L_0^2\nabla\!\cdot\!(\hat\mu_n\hat n\nabla\hat\Phi_n) = \hat R$. ✓
+**12.3.** Substitute: $\nabla\cdot(q\mu_0\hat\mu_n C_0\hat n V_t\nabla\hat\Phi_n)
+= qR$. Pull constants out: $q\mu_0 V_t C_0\nabla\cdot(\hat\mu_n\hat n\nabla\hat\Phi_n) = qR$.
+Divide by $qC_0/t_0 = qC_0D_0/L_0^2$: $\mu_0 V_t/(D_0/L_0^2)\cdot\nabla\cdot(\hat\mu_n\hat n\nabla\hat\Phi_n) = \hat R$.
+With $D_0 = V_t\mu_0$: $L_0^2\nabla\cdot(\hat\mu_n\hat n\nabla\hat\Phi_n) = \hat R$. ✓
 
 **12.4.** $\lambda^2 \to 0$ means the stiffness term in (12.1)
 vanishes; the equation reduces to $\hat\rho = \hat p - \hat n + \hat N = 0$
