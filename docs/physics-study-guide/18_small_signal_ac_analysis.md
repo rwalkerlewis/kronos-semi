@@ -66,9 +66,7 @@ Defining $J = \partial F/\partial u$ (the steady-state Jacobian),
 rearranging gives the **AC small-signal system**:
 
 $$
-\boxed{
 (J + j\omega M)\,\delta u = -\frac{\partial F}{\partial V}\,\delta V.
-}
 \tag{18.2}
 $$
 

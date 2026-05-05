@@ -76,11 +76,9 @@ $$
 Divide both sides by $qC_0$:
 
 $$
-\boxed{
 -\nabla\!\cdot\!(L_D^2\,\varepsilon_r\,\nabla\hat\psi) = \hat p - \hat n + \hat N,
 \qquad
 L_D^2 \equiv \frac{\varepsilon_0 V_t}{q C_0}.
-}
 \tag{12.1}
 $$
 

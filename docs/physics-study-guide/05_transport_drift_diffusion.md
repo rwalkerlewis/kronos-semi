@@ -105,13 +105,11 @@ $$
 so $D_n = \mu_n V_t$. This is the **Einstein relation**:
 
 $$
-\boxed{
 D_n = \mu_n V_t,
 \qquad
 D_p = \mu_p V_t,
 \qquad
 V_t = kT/q.
-}
 \tag{5.4}
 $$
 
@@ -135,11 +133,9 @@ In steady state, (5.2) drops the time derivative, and combining with the
 hole equation:
 
 $$
-\boxed{
 \nabla\!\cdot\!\mathbf{J}_n = +q\,R(n,p),
 \qquad
 \nabla\!\cdot\!\mathbf{J}_p = -q\,R(n,p),
-}
 \tag{5.6}
 $$
 

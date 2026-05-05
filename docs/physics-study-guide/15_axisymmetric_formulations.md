@@ -88,10 +88,8 @@ Use the cylindrical divergence identity to integrate by parts. The
 result is the **r-weighted Galerkin weak form**:
 
 $$
-\boxed{
 \int_\Omega \varepsilon\,\nabla\psi\!\cdot\!\nabla v\,r\,dr\,dz
 = \int_\Omega \rho\,v\,r\,dr\,dz.
-}
 \tag{15.4}
 $$
 

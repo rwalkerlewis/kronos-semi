@@ -70,11 +70,9 @@ denominator can be replaced by $e^{\eta_F - \eta}$. The integral
 collapses to $F_{1/2}(\eta_F) \approx e^{\eta_F}$, giving
 
 $$
-\boxed{
 n = N_c \exp\!\left(\frac{E_F - E_c}{kT}\right),
 \qquad
 p = N_v \exp\!\left(\frac{E_v - E_F}{kT}\right).
-}
 \tag{3.4}
 $$
 
@@ -119,11 +117,9 @@ single global constant, and the engine's convention pins it to zero).
 Then
 
 $$
-\boxed{
 n = n_i\,\exp\!\left(\frac{\psi - \Phi_n}{V_t}\right),
 \qquad
 p = n_i\,\exp\!\left(\frac{\Phi_p - \psi}{V_t}\right),
-}
 \tag{3.7}
 $$
 
@@ -133,10 +129,8 @@ $\Phi_n = \Phi_p = 0$ identically, so $n p = n_i^2$ falls out — that is
 the **mass-action law** in disguise:
 
 $$
-\boxed{
 n p \;=\; n_i^2 \;=\; N_c N_v \exp(-E_g/kT)
 \quad\text{at thermal equilibrium}.
-}
 \tag{3.8}
 $$
 

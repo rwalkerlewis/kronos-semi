@@ -89,9 +89,7 @@ $\phi_B - V$. The reverse current $J_\mathrm{m\to s}$ stays at the value
 in (8.2); the forward $J_\mathrm{s\to m}$ rises by $\exp(V/V_t)$. Net:
 
 $$
-\boxed{
 J = A^* T^2\,\exp(-\phi_B/V_t)\bigl(\exp(V/V_t) - 1\bigr).
-}
 \tag{8.3}
 $$
 

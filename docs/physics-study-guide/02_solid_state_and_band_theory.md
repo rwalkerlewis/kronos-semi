@@ -117,11 +117,9 @@ $$
 with the **effective densities of states**
 
 $$
-\boxed{
 N_c = 2\left(\frac{m_n^* kT}{2\pi\hbar^2}\right)^{3/2},
 \qquad
 N_v = 2\left(\frac{m_p^* kT}{2\pi\hbar^2}\right)^{3/2}.
-}
 \tag{2.6}
 $$
 

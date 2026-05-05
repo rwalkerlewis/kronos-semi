@@ -149,7 +149,7 @@ The four BCs the engine uses are:
        V_t\,\mathrm{asinh}\!\left(\frac{N_D - N_A}{2\,n_i}\right)
        + V_\mathrm{applied}.
    \tag{1.6}
-   $$
+$$
    Code: [`semi/bcs.py:181-189`](../../semi/bcs.py).
 
 2. **Gate Dirichlet.** At a gate-over-oxide contact, $\psi$ is fixed to
@@ -158,7 +158,7 @@ The four BCs the engine uses are:
    $$
    \psi_\mathrm{gate} \;=\; V_\mathrm{gate} - \phi_{ms}.
    \tag{1.7}
-   $$
+$$
    Code: [`semi/bcs.py:186-189`](../../semi/bcs.py). The work function
    originates in the band alignment at the metal–semiconductor interface
    (Ch. 2 for $\chi$, Ch. 9 for $\phi_{ms}$).
@@ -177,7 +177,7 @@ The four BCs the engine uses are:
    [\![\,\psi\,]\!] = 0,
    \qquad [\![\,\varepsilon_0\varepsilon_r\,\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,]\!] = 0.
    \tag{1.8}
-   $$
+$$
    The jump bracket $[\![\,f\,]\!]$ denotes $f|_+ - f|_-$ across the
    interface. Equation (1.8) is the local form of $\nabla\!\cdot\!\mathbf{D}
    = \rho$ when there is no surface charge sheet at the interface; see
@@ -194,10 +194,8 @@ The four BCs the engine uses are:
 ## Key results
 
 $$
-\boxed{
 -\nabla\!\cdot\!\bigl(\varepsilon_0\varepsilon_r(\mathbf{x})\,\nabla\psi\bigr)
    = q\,(p - n + N_D^+ - N_A^-)
-}
 \tag{1.9}
 $$
 
@@ -206,9 +204,7 @@ $[\mathrm{F/m}] \cdot [\mathrm{V/m^2}] = [\mathrm{C/m^3}]$; the right
 side is $[\mathrm{C}] \cdot [\mathrm{m^{-3}}] = [\mathrm{C/m^3}]$. ✓
 
 $$
-\boxed{
 \mathbf{E} = -\nabla\psi
-}
 \tag{1.10}
 $$
 

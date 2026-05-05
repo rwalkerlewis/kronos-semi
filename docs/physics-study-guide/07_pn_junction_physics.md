@@ -137,9 +137,7 @@ $$
 The peak field at $x = 0$:
 
 $$
-\boxed{
 |E_\mathrm{max}| = \frac{q N_A x_p}{\varepsilon} = \frac{q N_D x_n}{\varepsilon}.
-}
 \tag{7.6}
 $$
 
@@ -163,10 +161,8 @@ the built-in barrier).
 Combining charge balance (7.4) and the integrated potential (7.7):
 
 $$
-\boxed{
 W(V) = x_n + x_p
     = \sqrt{\frac{2\varepsilon (V_{bi} - V)(N_A + N_D)}{q\,N_A N_D}},
-}
 \tag{7.8}
 $$
 

@@ -81,9 +81,7 @@ $$
 so
 
 $$
-\boxed{
 \psi_\mathrm{eq} = V_t\,\mathrm{asinh}\!\left(\frac{N_D - N_A}{2\,n_i}\right).
-}
 \tag{4.2}
 $$
 

@@ -59,11 +59,9 @@ the integral is zero. Both pieces vanish; the surface term *disappears*.
 The Galerkin **weak form** is
 
 $$
-\boxed{
 \int_\Omega \varepsilon\nabla\psi\!\cdot\!\nabla v\,dV
 = \int_\Omega \rho\,v\,dV
 \quad\forall v \in H^1_0(\Omega).
-}
 \tag{13.1}
 $$
 
