@@ -78,7 +78,7 @@ intrinsic level). So
 
 $$
 V_{fb} = \phi_{ms} + (-|\phi_B|) - (-|\phi_B|) = \phi_{ms}\quad\text{(textbook)}.
-\tag{9.1a}
+\qquad (9.1a)
 $$
 
 But the engine's body-ohmic BC pins $\psi_\mathrm{body} = \psi_b = -|\phi_B|$
@@ -87,7 +87,7 @@ on the back contact. The flat-band condition is then $\psi_\mathrm{gate}
 
 $$
 V_{fb} = \phi_{ms} - \phi_F,
-\tag{9.1b}
+\qquad (9.1b)
 $$
 
 where $\phi_F = -|\phi_B|$ on a p-body, so $V_{fb} = \phi_{ms} + |\phi_B|$
@@ -112,7 +112,7 @@ support the depletion charge and bend the bands by $2|\phi_B|$:
 
 $$
 V_T = V_{fb} + 2|\phi_B| + \frac{\sqrt{2\varepsilon_s q N_a (2|\phi_B|)}}{C_{ox}},
-\tag{9.2}
+\qquad (9.2)
 $$
 
 with $C_{ox} = \varepsilon_{ox}/T_{ox}$ the per-area oxide capacitance.
@@ -126,7 +126,7 @@ At strong inversion the depletion region freezes at:
 
 $$
 W_\mathrm{dmax} = \sqrt{\frac{2\varepsilon_s\cdot 2|\phi_B|}{q N_a}}.
-\tag{9.3}
+\qquad (9.3)
 $$
 
 (Same form as the pn-junction depletion-width formula, with
@@ -138,7 +138,7 @@ The oxide is a thin parallel-plate capacitor:
 
 $$
 C_{ox} = \varepsilon_{ox}/T_{ox}.
-\tag{9.4}
+\qquad (9.4)
 $$
 
 The depletion region acts like a second capacitor in series, with
@@ -148,7 +148,7 @@ $$
 \frac{1}{C(V_g)} = \frac{1}{C_{ox}} + \frac{1}{C_\mathrm{dep}(V_g)},
 \qquad
 C_\mathrm{dep} = \frac{\varepsilon_s}{W_\mathrm{dep}}.
-\tag{9.5}
+\qquad (9.5)
 $$
 
 In accumulation, $W_\mathrm{dep} \to 0$ and $C \to C_{ox}$.
@@ -160,7 +160,7 @@ At inversion, the inversion layer at the surface either
   $W_\mathrm{dep}$ stays at $W_\mathrm{dmax}$, $C$ stays at
 $$
 C_\mathrm{min} = \frac{1}{1/C_{ox} + W_\mathrm{dmax}/\varepsilon_s}.
-\tag{9.6}
+\qquad (9.6)
 $$
 
 This is the LF–HF distinction that the C–V community lives by.
@@ -193,7 +193,7 @@ nonlinear Poisson equation:
 
 $$
 K(\psi_0)\,\delta\psi = -\frac{\partial F}{\partial V_g}\,\delta V_g,
-\tag{9.7}
+\qquad (9.7)
 $$
 
 with $K = \partial F/\partial\psi$ the discrete Jacobian at the
@@ -207,7 +207,7 @@ $$
 \frac{dQ_\mathrm{gate}}{dV_g}
    = -\frac{q}{W_\mathrm{lat}}\int_\mathrm{Si}
        n_i\bigl(e^{-\psi_0/V_t} + e^{\psi_0/V_t}\bigr)\,\delta\psi\,dV.
-\tag{9.8}
+\qquad (9.8)
 $$
 
 (With an r-weighted integrand in the axisymmetric case; see Ch. 15.)

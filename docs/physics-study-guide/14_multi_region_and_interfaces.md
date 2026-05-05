@@ -65,7 +65,7 @@ $$
 \llbracket\psi\rrbracket = 0,
 \qquad
 \llbracket\varepsilon_0\varepsilon_r\,\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket = 0.
-\tag{14.1}
+\qquad (14.1)
 $$
 
 (Continuity of $\psi$, continuity of normal $\mathbf{D}$.) The
@@ -102,7 +102,7 @@ supported across the interface, the jump must satisfy
 
 $$
 \llbracket\varepsilon_r\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket = (\text{surface charge density})/\varepsilon_0.
-\tag{14.2}
+\qquad (14.2)
 $$
 
 When there is no surface charge ($\sigma = 0$), the natural condition
@@ -186,7 +186,7 @@ by integrating the silicon space charge:
 
 $$
 Q_\mathrm{gate}(V_g) = -\frac{q}{W_\mathrm{lat}}\int_{\Omega_\mathrm{Si}}\rho(\mathbf{x})\,dA,
-\tag{14.3}
+\qquad (14.3)
 $$
 
 (2D mesh; divide by lateral extent $W_\mathrm{lat}$ to get charge per

@@ -52,7 +52,7 @@ semiconductor conduction band right at the interface, called the
 
 $$
 \phi_B = \Phi_m - \chi.
-\tag{8.1}
+\qquad (8.1)
 $$
 
 (Idealized; in real interfaces the barrier is also affected by surface
@@ -79,7 +79,7 @@ $$
 J_\mathrm{s\to m} = A^* T^2\,\exp(-\phi_B/V_t),
 \qquad
 A^* = \frac{4\pi q m_n^* k^2}{h^3} \approx 110\,\mathrm{A/cm^2/K^2}\,\mathrm{(for\ Si)}.
-\tag{8.2}
+\qquad (8.2)
 $$
 
 Under applied bias $V$ with the metal positive, the barrier seen from
@@ -90,7 +90,7 @@ in (8.2); the forward $J_\mathrm{s\to m}$ rises by $\exp(V/V_t)$. Net:
 
 $$
 J = A^* T^2\,\exp(-\phi_B/V_t)\bigl(\exp(V/V_t) - 1\bigr).
-\tag{8.3}
+\qquad (8.3)
 $$
 
 This is the **thermionic-emission diode equation** for a Schottky
@@ -109,7 +109,7 @@ image charge in the metal which lowers the effective barrier:
 
 $$
 \Delta\phi_B = \sqrt{\frac{q|E|}{4\pi\varepsilon_s}},
-\tag{8.4}
+\qquad (8.4)
 $$
 
 where $|E|$ is the field at the interface. This adds a few tens of mV
@@ -134,7 +134,7 @@ $$
 \psi|_\mathrm{contact} = V_t\,\mathrm{asinh}(N_\mathrm{net}/(2n_i)) + V_\mathrm{applied},
 \qquad
 \Phi_n|_\mathrm{contact} = \Phi_p|_\mathrm{contact} = V_\mathrm{applied}.
-\tag{8.5}
+\qquad (8.5)
 $$
 
 The first equation is local charge neutrality plus the applied bias,
@@ -158,7 +158,7 @@ the metal–semiconductor work function difference:
 
 $$
 \psi_\mathrm{gate} = V_g - \phi_{ms}.
-\tag{8.6}
+\qquad (8.6)
 $$
 
 Carriers are not defined in the oxide (Slotboom variables are
@@ -175,7 +175,7 @@ rows:
 $$
 \mathbf{J}_n\cdot\hat{\mathbf{n}}\,\big|_\mathrm{contact}
    = q v_R\,(n - n_0\exp(V/V_t)),
-\tag{8.7}
+\qquad (8.7)
 $$
 
 with $v_R = A^*T^2/(qN_c)$ the Richardson recombination velocity. The

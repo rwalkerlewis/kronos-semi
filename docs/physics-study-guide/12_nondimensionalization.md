@@ -79,7 +79,7 @@ $$
 -\nabla\cdot(L_D^2\,\varepsilon_r\,\nabla\hat\psi) = \hat p - \hat n + \hat N,
 \qquad
 L_D^2 \equiv \frac{\varepsilon_0 V_t}{q C_0}.
-\tag{12.1}
+\qquad (12.1)
 $$
 
 $L_D$ is the **extrinsic Debye length** at $C_0$: the length over which
@@ -143,24 +143,24 @@ Following the same recipe for the continuity rows, all the algebra in
 
 $$
 -\nabla\cdot(L_D^2\varepsilon_r\nabla\hat\psi) = \hat p - \hat n + \hat N
-\tag{12.2a}
+\qquad (12.2a)
 $$
 
 $$
 -\nabla\cdot(L_0^2\,\hat\mu_n\,\hat n\,\nabla\hat\Phi_n) = +\hat R
-\tag{12.2b}
+\qquad (12.2b)
 $$
 
 $$
 -\nabla\cdot(L_0^2\,\hat\mu_p\,\hat p\,\nabla\hat\Phi_p) = -\hat R
-\tag{12.2c}
+\qquad (12.2c)
 $$
 
 with $\hat n, \hat p$ from Slotboom (11.3), and the scaled SRH kernel
 
 $$
 \hat R(\hat n, \hat p) = \frac{\hat n\hat p - \hat n_i^2}{\hat\tau_p(\hat n+\hat n_1) + \hat\tau_n(\hat p+\hat p_1)}.
-\tag{12.2d}
+\qquad (12.2d)
 $$
 
 The $L_0^2$ in (12.2b)–(12.2c) is the same "mesh stays in meters" pickup;

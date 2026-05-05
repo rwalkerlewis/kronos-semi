@@ -37,7 +37,7 @@ temperature $T$ and Fermi level $E_F$, the occupancy probability is
 $$
 f_\mathrm{FD}(E; E_F, T)
    = \frac{1}{1 + \exp\big((E - E_F)/kT\big)}.
-\tag{3.1}
+\qquad (3.1)
 $$
 
 The number density of electrons in the conduction band is the integral
@@ -45,7 +45,7 @@ over the band's density of states $g_c(E)$ weighted by occupancy:
 
 $$
 n = \int_{E_c}^{\infty} g_c(E)\,f_\mathrm{FD}(E; E_F, T)\,dE.
-\tag{3.2}
+\qquad (3.2)
 $$
 
 Using the parabolic-band density of states (2.4), substituting
@@ -55,7 +55,7 @@ $$
 n = N_c\,F_{1/2}(\eta_F),
 \qquad
 F_{1/2}(\eta_F) = \frac{2}{\sqrt\pi}\int_0^\infty \frac{\sqrt\eta}{1 + e^{\eta - \eta_F}}\,d\eta,
-\tag{3.3}
+\qquad (3.3)
 $$
 
 where $N_c$ is the effective DOS from (2.6) and $F_{1/2}$ is the
@@ -73,7 +73,7 @@ $$
 n = N_c \exp\left(\frac{E_F - E_c}{kT}\right),
 \qquad
 p = N_v \exp\left(\frac{E_v - E_F}{kT}\right).
-\tag{3.4}
+\qquad (3.4)
 $$
 
 Equation (3.4) is **Boltzmann statistics**. The error in (3.4) relative
@@ -92,14 +92,14 @@ $$
 E_i = \frac{E_c + E_v}{2} + \frac{kT}{2}\ln\left(\frac{N_v}{N_c}\right),
 \qquad
 n_i = \sqrt{N_c N_v}\,\exp\left(-\frac{E_g}{2kT}\right).
-\tag{3.5}
+\qquad (3.5)
 $$
 
 Define the electrostatic potential measured from $E_i$:
 
 $$
 \psi(\mathbf{x}) \equiv -\frac{E_i(\mathbf{x})}{q} + \mathrm{const}.
-\tag{3.6}
+\qquad (3.6)
 $$
 
 (Add an arbitrary constant; the engine pins it via the asinh formula at
@@ -120,7 +120,7 @@ $$
 n = n_i\,\exp\left(\frac{\psi - \Phi_n}{V_t}\right),
 \qquad
 p = n_i\,\exp\left(\frac{\Phi_p - \psi}{V_t}\right),
-\tag{3.7}
+\qquad (3.7)
 $$
 
 with $V_t = kT/q$ the **thermal voltage**. Equation (3.7) is the
@@ -131,7 +131,7 @@ the **mass-action law** in disguise:
 $$
 n p \;=\; n_i^2 \;=\; N_c N_v \exp(-E_g/kT)
 \quad\text{at thermal equilibrium}.
-\tag{3.8}
+\qquad (3.8)
 $$
 
 Mass action is exact under Boltzmann statistics; it fails by the same

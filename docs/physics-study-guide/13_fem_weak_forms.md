@@ -62,7 +62,7 @@ $$
 \int_\Omega \varepsilon\nabla\psi\cdot\nabla v\,dV
 = \int_\Omega \rho\,v\,dV
 \quad\forall v \in H^1_0(\Omega).
-\tag{13.1}
+\qquad (13.1)
 $$
 
 ### Function spaces

@@ -40,14 +40,14 @@ Start from Maxwell's equations in matter, in SI units:
 $$
 \nabla\cdot\mathbf{D} = \rho_\mathrm{free},
 \qquad \nabla\cdot\mathbf{B} = 0,
-\tag{1.1}
+\qquad (1.1)
 $$
 
 $$
 \nabla\times\mathbf{E} = -\,\frac{\partial \mathbf{B}}{\partial t},
 \qquad \nabla\times\mathbf{H} = \mathbf{J}_\mathrm{free}
                                    + \frac{\partial\mathbf{D}}{\partial t}.
-\tag{1.2}
+\qquad (1.2)
 $$
 
 The constitutive relations for a linear isotropic dielectric are
@@ -57,7 +57,7 @@ $\rho_\mathrm{free}$ in a doped semiconductor is
 
 $$
 \rho_\mathrm{free} = q\,(p - n + N_D^+ - N_A^-),
-\tag{1.3}
+\qquad (1.3)
 $$
 
 with $q$ the elementary charge, $p$ and $n$ the (positive) hole and
@@ -93,7 +93,7 @@ $\nabla\times\mathbf{E}$, which gives
 $$
 \nabla\times\mathbf{E} = 0 \;\;\Longrightarrow\;\;
 \mathbf{E} = -\nabla\psi
-\tag{1.4}
+\qquad (1.4)
 $$
 
 for some scalar potential $\psi(\mathbf{x},t)$. The displacement-current
@@ -110,7 +110,7 @@ and the divergence equation $\nabla\cdot\mathbf{D} = \rho_\mathrm{free}$:
 $$
 -\nabla\cdot\bigl(\varepsilon_0\varepsilon_r(\mathbf{x})\,\nabla\psi\bigr)
 = q\,(p - n + N_D^+ - N_A^-).
-\tag{1.5}
+\qquad (1.5)
 $$
 
 Equation (1.5) is the **dimensional Poisson equation** as it appears in
@@ -148,7 +148,7 @@ The four BCs the engine uses are:
    \psi_\mathrm{ohmic} \;=\;
        V_t\,\mathrm{asinh}\left(\frac{N_D - N_A}{2\,n_i}\right)
        + V_\mathrm{applied}.
-   \tag{1.6}
+   \qquad (1.6)
 $$
    Code: [`semi/bcs.py:181-189`](../../semi/bcs.py).
 
@@ -157,7 +157,7 @@ $$
    difference $\phi_{ms}$:
    $$
    \psi_\mathrm{gate} \;=\; V_\mathrm{gate} - \phi_{ms}.
-   \tag{1.7}
+   \qquad (1.7)
 $$
    Code: [`semi/bcs.py:186-189`](../../semi/bcs.py). The work function
    originates in the band alignment at the metal–semiconductor interface
@@ -176,7 +176,7 @@ $$
    $$
    \llbracket\psi\rrbracket = 0,
    \qquad \llbracket\varepsilon_0\varepsilon_r\,\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket = 0.
-   \tag{1.8}
+   \qquad (1.8)
 $$
    The jump bracket $\llbracket f\rrbracket$ denotes $f|_+ - f|_-$ across the
    interface. Equation (1.8) is the local form of $\nabla\cdot\mathbf{D}
@@ -196,7 +196,7 @@ $$
 $$
 -\nabla\cdot\bigl(\varepsilon_0\varepsilon_r(\mathbf{x})\,\nabla\psi\bigr)
    = q\,(p - n + N_D^+ - N_A^-)
-\tag{1.9}
+\qquad (1.9)
 $$
 
 Units: both sides have $[\mathrm{C/m^3}]$. The left side is
@@ -205,7 +205,7 @@ side is $[\mathrm{C}] \cdot [\mathrm{m^{-3}}] = [\mathrm{C/m^3}]$. ✓
 
 $$
 \mathbf{E} = -\nabla\psi
-\tag{1.10}
+\qquad (1.10)
 $$
 
 Units: $[\mathrm{V/m}]$. ✓

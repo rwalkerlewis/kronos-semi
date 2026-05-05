@@ -49,7 +49,7 @@ $$
 n(\mathbf{x}) = N_c\,\exp\left(\frac{E_{F,n}(\mathbf{x}) - E_c(\mathbf{x})}{kT}\right),
 \quad
 p(\mathbf{x}) = N_v\,\exp\left(\frac{E_v(\mathbf{x}) - E_{F,p}(\mathbf{x})}{kT}\right).
-\tag{11.1}
+\qquad (11.1)
 $$
 
 In equilibrium, both $E_{F,n}$ and $E_{F,p}$ collapse to the global
@@ -65,7 +65,7 @@ $$
 \Phi_n(\mathbf{x}) \equiv -\frac{E_{F,n}(\mathbf{x})}{q},
 \qquad
 \Phi_p(\mathbf{x}) \equiv -\frac{E_{F,p}(\mathbf{x})}{q}.
-\tag{11.2}
+\qquad (11.2)
 $$
 
 (Negative sign so that high $\Phi_n$ corresponds to low electron density
@@ -79,7 +79,7 @@ $$
 n = n_i\,\exp\left(\frac{\psi - \Phi_n}{V_t}\right),
 \qquad
 p = n_i\,\exp\left(\frac{\Phi_p - \psi}{V_t}\right).
-\tag{11.3}
+\qquad (11.3)
 $$
 
 This is the engine's working form, in [`semi/physics/slotboom.py:27-42`](../../semi/physics/slotboom.py)
@@ -94,7 +94,7 @@ the choice of energy zero at the intrinsic level is the convention. So:
 
 $$
 \Phi_n = \Phi_p = 0\quad\text{at thermal equilibrium}.
-\tag{11.4}
+\qquad (11.4)
 $$
 
 Substituting (11.4) into (11.3): $n = n_i\exp(\psi/V_t)$, $p = n_i\exp(-\psi/V_t)$,
@@ -112,7 +112,7 @@ the applied bias:
 
 $$
 \Phi_n|_\mathrm{contact} = \Phi_p|_\mathrm{contact} = V_\mathrm{applied}.
-\tag{11.5}
+\qquad (11.5)
 $$
 
 This is the **Shockley boundary condition** (cf. (8.5)). Inside the
@@ -140,7 +140,7 @@ Substitute and simplify:
 $$
 \mathbf{J}_n = -q\mu_n n\,\nabla\psi + q\mu_n n\,(\nabla\psi - \nabla\Phi_n)
    = -q\mu_n n\,\nabla\Phi_n.
-\tag{11.6}
+\qquad (11.6)
 $$
 
 The drift and diffusion terms have *cancelled* against each other; the
@@ -150,7 +150,7 @@ $$
 \mathbf{J}_n = -q\,\mu_n n\,\nabla\Phi_n,
 \qquad
 \mathbf{J}_p = -q\,\mu_p p\,\nabla\Phi_p,
-\tag{11.7}
+\qquad (11.7)
 $$
 
 a **pure gradient times a coefficient**. This is the magic of Slotboom.
@@ -162,7 +162,7 @@ becomes
 
 $$
 -\nabla\cdot(q\mu_n n\,\nabla\Phi_n) = qR,
-\tag{11.8}
+\qquad (11.8)
 $$
 
 a second-order *elliptic* PDE in $\Phi_n$ with a positive coefficient

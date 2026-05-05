@@ -51,7 +51,7 @@ residual is
 
 $$
 F_\mathrm{trans}(u; V) = F(u; V) + M\,\frac{du}{dt},
-\tag{18.1}
+\qquad (18.1)
 $$
 
 with $M$ the mass matrix from Ch. 17. Linearize around $(u_0, V_\mathrm{DC})$:
@@ -67,7 +67,7 @@ rearranging gives the **AC small-signal system**:
 
 $$
 (J + j\omega M)\,\delta u = -\frac{\partial F}{\partial V}\,\delta V.
-\tag{18.2}
+\qquad (18.2)
 $$
 
 This is the AC linearisation. Solving at each $\omega$ in a sweep
@@ -90,7 +90,7 @@ The DC sensitivity is
 $$
 \delta u_\mathrm{DC} \equiv \frac{u_0' - u_0}{\epsilon_V}
 \approx \frac{\partial u}{\partial V}\bigg|_{V_\mathrm{DC}}.
-\tag{18.3}
+\qquad (18.3)
 $$
 
 Differentiate $F(u(V); V) = 0$: $J\delta u_\mathrm{DC} + \partial F/\partial V = 0$,
@@ -115,7 +115,7 @@ $$
 \begin{bmatrix} J & -\omega M \\ \omega M & J \end{bmatrix}
 \begin{bmatrix} x \\ y \end{bmatrix}
 = \begin{bmatrix} b_R \\ b_I \end{bmatrix}.
-\tag{18.4}
+\qquad (18.4)
 $$
 
 The block size is $2\cdot 3N$ where $N$ is the per-block DOF count. A
@@ -134,7 +134,7 @@ The mass matrix on the continuity rows is, from (17.2):
 
 $$
 M_n = \int (n_\mathrm{ufl})\,v_n\,dx_\mathrm{lump}\;\text{evaluated as Jacobian wrt }(\psi, \Phi_n, \Phi_p).
-\tag{18.5}
+\qquad (18.5)
 $$
 
 UFL's `derivative` produces the chain-rule entries automatically:
@@ -175,7 +175,7 @@ $$
 \delta I_\mathrm{cond} = \int_\Gamma\frac{\partial\mathbf{J}_\mathrm{cond}}{\partial u}\,\delta u\,\hat{\mathbf{n}}\,dS,
 \qquad
 \delta I_\mathrm{disp} = -j\omega\int_\Gamma\varepsilon\nabla(\delta\psi)\cdot\hat{\mathbf{n}}\,dS.
-\tag{18.6}
+\qquad (18.6)
 $$
 
 The conduction part uses UFL `derivative` of the steady-state
@@ -190,7 +190,7 @@ The terminal admittance is
 
 $$
 Y(\omega) = \frac{\delta I_\mathrm{total}}{\delta V}.
-\tag{18.7}
+\qquad (18.7)
 $$
 
 The capacitance is $C(\omega) = +\mathrm{Im}(Y)/(2\pi f)$; the
@@ -245,7 +245,7 @@ $$
 \frac{dQ_\mathrm{gate}}{dV_g}
 = -\frac{q}{W_\mathrm{lat}}\int_{\Omega_\mathrm{Si}}\frac{\partial\rho}{\partial\psi}\,\delta\psi\,dA
 = +\frac{q}{W_\mathrm{lat}}\int_{\Omega_\mathrm{Si}} n_i\bigl(e^{-\psi_0/V_t} + e^{\psi_0/V_t}\bigr)\,\delta\psi\,dA.
-\tag{18.8}
+\qquad (18.8)
 $$
 
 (Differentiating $\rho = n_i(e^{-\psi/V_t} - e^{\psi/V_t}) + N$ wrt $\psi$

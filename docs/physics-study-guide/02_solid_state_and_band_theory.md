@@ -53,7 +53,7 @@ $$
 \left[-\,\frac{\hbar^2}{2m_0}\,\nabla^2 + V(\mathbf{r})\right]\psi(\mathbf{r})
    = E\,\psi(\mathbf{r}),
 \qquad V(\mathbf{r}+\mathbf{R}) = V(\mathbf{r}).
-\tag{2.1}
+\qquad (2.1)
 $$
 
 Bloch's theorem says the eigenfunctions take the form
@@ -61,7 +61,7 @@ Bloch's theorem says the eigenfunctions take the form
 $$
 \psi_{n\mathbf{k}}(\mathbf{r}) = e^{i\mathbf{k}\cdot\mathbf{r}}\,u_{n\mathbf{k}}(\mathbf{r}),
 \qquad u_{n\mathbf{k}}(\mathbf{r}+\mathbf{R}) = u_{n\mathbf{k}}(\mathbf{r}),
-\tag{2.2}
+\qquad (2.2)
 $$
 
 where $n$ is a band index and $\mathbf{k}$ ranges over the first
@@ -81,7 +81,7 @@ order. For an isotropic effective mass $m^*$:
 
 $$
 E(\mathbf{k}) \;\approx\; E_0 + \frac{\hbar^2 |\mathbf{k} - \mathbf{k}_0|^2}{2m^*}.
-\tag{2.3}
+\qquad (2.3)
 $$
 
 This is the **effective-mass approximation**: an electron near the
@@ -98,7 +98,7 @@ and $E + dE$ gives, for a 3D parabolic band,
 $$
 g(E) = \frac{1}{2\pi^2}\left(\frac{2m^*}{\hbar^2}\right)^{3/2} \sqrt{E - E_0},
 \qquad E \geq E_0.
-\tag{2.4}
+\qquad (2.4)
 $$
 
 Multiplying by 2 for spin and integrating against the Fermi–Dirac
@@ -111,7 +111,7 @@ $$
 n = N_c\,\exp\left(-\frac{E_c - E_F}{kT}\right),
 \qquad
 p = N_v\,\exp\left(-\frac{E_F - E_v}{kT}\right),
-\tag{2.5}
+\qquad (2.5)
 $$
 
 with the **effective densities of states**
@@ -120,7 +120,7 @@ $$
 N_c = 2\left(\frac{m_n^* kT}{2\pi\hbar^2}\right)^{3/2},
 \qquad
 N_v = 2\left(\frac{m_p^* kT}{2\pi\hbar^2}\right)^{3/2}.
-\tag{2.6}
+\qquad (2.6)
 $$
 
 The full algebra of (2.6) is in Appendix B §B.1; the result is what
@@ -159,7 +159,7 @@ required to remove an electron from the Fermi level to vacuum — is
 $$
 \Phi_s = \chi + (E_c - E_F)
        = \chi + V_t\,\ln(N_c / n),
-\tag{2.7}
+\qquad (2.7)
 $$
 
 which depends on the doping. For a metal, the work function $\Phi_m$
@@ -174,17 +174,17 @@ $$
 n = N_c\,\exp\left(-\frac{E_c - E_F}{kT}\right),
 \qquad
 p = N_v\,\exp\left(-\frac{E_F - E_v}{kT}\right)
-\tag{2.8}
+\qquad (2.8)
 $$
 
 $$
 n_i^2 = N_c N_v\,\exp\left(-\frac{E_g}{kT}\right)
-\tag{2.9}
+\qquad (2.9)
 $$
 
 $$
 \phi_{ms} = \Phi_m - \Phi_s = \Phi_m - \big[\chi + V_t\,\ln(N_c/n)\big]
-\tag{2.10}
+\qquad (2.10)
 $$
 
 Equation (2.9) follows from multiplying $n$ and $p$ from (2.8), using

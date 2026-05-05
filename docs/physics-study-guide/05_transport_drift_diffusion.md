@@ -50,7 +50,7 @@ $$
 + \mathbf{v}_\mathbf{k}\cdot\nabla_\mathbf{r} f
 + \frac{q}{\hbar}\,\mathbf{E}\cdot\nabla_\mathbf{k} f
 = \left.\frac{\partial f}{\partial t}\right|_\mathrm{coll}.
-\tag{5.1}
+\qquad (5.1)
 $$
 
 The left side is convection in real space and acceleration in
@@ -66,7 +66,7 @@ The zeroth $\mathbf{k}$-moment of (5.1) gives the continuity equation:
 
 $$
 \frac{\partial n}{\partial t} + \nabla\cdot(n\mathbf{v}_n) = G - R,
-\tag{5.2}
+\qquad (5.2)
 $$
 
 with $G$, $R$ generation and recombination from the collision operator.
@@ -77,7 +77,7 @@ $$
 \mathbf{J}_n = q\,\mu_n n\,\mathbf{E} + q\,D_n\,\nabla n,
 \qquad
 \mathbf{J}_p = q\,\mu_p p\,\mathbf{E} - q\,D_p\,\nabla p,
-\tag{5.3}
+\qquad (5.3)
 $$
 
 where $\mu_n = q\tau_m/m_n^*$ is the electron mobility (sign absorbed
@@ -110,7 +110,7 @@ D_n = \mu_n V_t,
 D_p = \mu_p V_t,
 \qquad
 V_t = kT/q.
-\tag{5.4}
+\qquad (5.4)
 $$
 
 Substituting (5.4) into (5.3) and using $\mathbf{E} = -\nabla\psi$:
@@ -118,7 +118,7 @@ Substituting (5.4) into (5.3) and using $\mathbf{E} = -\nabla\psi$:
 $$
 \mathbf{J}_n = -q\mu_n n\,\nabla\psi + q\mu_n V_t\,\nabla n
    = q\mu_n V_t\,\bigl(\nabla n - (n/V_t)\nabla\psi\bigr).
-\tag{5.5}
+\qquad (5.5)
 $$
 
 This is the form that goes into the engine's terminal-current evaluator
@@ -136,7 +136,7 @@ $$
 \nabla\cdot\mathbf{J}_n = +q\,R(n,p),
 \qquad
 \nabla\cdot\mathbf{J}_p = -q\,R(n,p),
-\tag{5.6}
+\qquad (5.6)
 $$
 
 with $R$ the *net* recombination (positive when electrons and holes
@@ -162,7 +162,7 @@ spacing. The dimensionless ratio is the cell **Péclet number**
 
 $$
 \mathrm{Pe} = \frac{|\nabla\psi|\,h}{V_t} = \frac{|E|\,h}{V_t}.
-\tag{5.7}
+\qquad (5.7)
 $$
 
 A 1 V drop over a 1 µm cell at $V_t = 25\,\mathrm{mV}$ gives $\mathrm{Pe} \approx 40$.
@@ -189,7 +189,7 @@ and at high doping (impurity scattering).
 $$
 \mu(F) = \frac{\mu_0}{\bigl(1 + (\mu_0 F / v_\mathrm{sat})^\beta\bigr)^{1/\beta}},
 \qquad F = |\nabla\Phi_n|\,(\text{or }|\nabla\Phi_p|).
-\tag{5.8}
+\qquad (5.8)
 $$
 
 Limits: $F\to 0$ gives $\mu \to \mu_0$ (low-field); $F\to\infty$ gives
@@ -206,7 +206,7 @@ $$
 \frac{1}{\mu} = \frac{1}{\mu_\mathrm{Coulomb}}
               + \frac{1}{\mu_\mathrm{phonon}}
               + \frac{1}{\mu_\mathrm{surface}}.
-\tag{5.9}
+\qquad (5.9)
 $$
 
 Forward reference to [`docs/IMPROVEMENT_GUIDE.md` §M16.2](../IMPROVEMENT_GUIDE.md).

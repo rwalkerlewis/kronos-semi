@@ -75,7 +75,7 @@ interface contains a sheet density:
 $$
 Q_\mathrm{inv}(V_{GS}) = C_{ox}(V_{GS} - V_T),
 \qquad V_{GS} > V_T.
-\tag{10.1}
+\qquad (10.1)
 $$
 
 This is the **gradual-channel approximation**: the inversion charge per
@@ -94,7 +94,7 @@ Q_\mathrm{inv}$:
 $$
 I_D = \frac{W}{L_{ch}}\,\mu_n\,Q_\mathrm{inv}\,V_{DS}
     = \frac{W}{L_{ch}}\,\mu_n\,C_{ox}\,(V_{GS} - V_T)\,V_{DS}.
-\tag{10.2}
+\qquad (10.2)
 $$
 
 Here $W$ is the gate width (transverse to current flow) and $L_{ch}$ is
@@ -114,7 +114,7 @@ $I_D$ saturates:
 
 $$
 I_{D,\mathrm{sat}} = \frac{W}{2 L_{ch}}\,\mu_n\,C_{ox}\,(V_{GS} - V_T)^2.
-\tag{10.3}
+\qquad (10.3)
 $$
 
 This is the **Pao–Sah square-law saturation current**. Real short-channel

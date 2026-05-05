@@ -43,7 +43,7 @@ $\tan\theta = y/x$, $z = z$. The volume element is
 
 $$
 dV = r\,dr\,d\theta\,dz.
-\tag{15.1}
+\qquad (15.1)
 $$
 
 Integrating an $\theta$-independent integrand over the full 3D domain
@@ -51,7 +51,7 @@ collapses the $\theta$ integral to $2\pi$:
 
 $$
 \int_\Omega f(r, z)\,dV = 2\pi\int_{\Omega_\mathrm{merid}} f(r,z)\,r\,dr\,dz.
-\tag{15.2}
+\qquad (15.2)
 $$
 
 The factor $2\pi$ cancels on both sides of any equation where every
@@ -68,7 +68,7 @@ $$
 \qquad
 \nabla\cdot\mathbf{F} = \frac{1}{r}\frac{\partial(rF_r)}{\partial r}
                           + \frac{\partial F_z}{\partial z}.
-\tag{15.3}
+\qquad (15.3)
 $$
 
 The Laplacian is $\nabla^2\psi = (1/r)\partial_r(r\partial_r\psi) + \partial_z^2\psi$.
@@ -90,7 +90,7 @@ result is the **r-weighted Galerkin weak form**:
 $$
 \int_\Omega \varepsilon\,\nabla\psi\cdot\nabla v\,r\,dr\,dz
 = \int_\Omega \rho\,v\,r\,dr\,dz.
-\tag{15.4}
+\qquad (15.4)
 $$
 
 (With $\nabla$ now the meridian-plane gradient $(\partial_r, \partial_z)$.)
@@ -126,7 +126,7 @@ The same recipe applies to the continuity equations:
 $$
 \int_\Omega L_0^2\,\hat\mu_n\,\hat n\,\nabla\hat\Phi_n\cdot\nabla v_n\,r\,dr\,dz
 - \int_\Omega \hat R\,v_n\,r\,dr\,dz = 0,
-\tag{15.5}
+\qquad (15.5)
 $$
 
 and similarly for holes with sign flip. See [`semi/physics/axisymmetric.py:142-219`](../../semi/physics/axisymmetric.py)
@@ -138,7 +138,7 @@ For the AC sweep / `mos_cap_ac` runner, the gate area integral becomes
 
 $$
 A_\mathrm{gate}^{3D} = 2\pi\int_\mathrm{gate facet} r\,ds_\mathrm{merid}.
-\tag{15.6}
+\qquad (15.6)
 $$
 
 The $\int r\,ds$ in the meridian computes the per-unit-radian gate

@@ -10,7 +10,7 @@ Goal: derive
 
 $$
 N_c = 2\left(\frac{m_n^* kT}{2\pi\hbar^2}\right)^{3/2}.
-\tag{B.1}
+\qquad (B.1)
 $$
 
 Start from (3.2):
@@ -156,7 +156,7 @@ at the depletion edge). Continuity of $E$ at $x = 0$:
 $$
 \frac{qN_A x_p}{\varepsilon} = \frac{qN_D x_n}{\varepsilon}
 \;\;\Rightarrow\;\; N_A x_p = N_D x_n.
-\tag{B.2}
+\qquad (B.2)
 $$
 
 This is charge balance.
@@ -179,7 +179,7 @@ $$
 \psi_R^\mathrm{eq} - \psi_L^\mathrm{eq}
 = \frac{qN_A x_p^2}{2\varepsilon} + \frac{qN_D x_n^2}{2\varepsilon}
 = V_{bi} - V.
-\tag{B.3}
+\qquad (B.3)
 $$
 
 Combine (B.2) and (B.3) with $W = x_p + x_n$:

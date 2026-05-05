@@ -63,7 +63,7 @@ and the local volume is electrically neutral:
 
 $$
 p(\psi) - n(\psi) + N_D - N_A = 0,
-\tag{4.1}
+\qquad (4.1)
 $$
 
 with $n, p$ from Boltzmann (3.7) at $\Phi_n = \Phi_p = 0$:
@@ -82,7 +82,7 @@ so
 
 $$
 \psi_\mathrm{eq} = V_t\,\mathrm{asinh}\left(\frac{N_D - N_A}{2\,n_i}\right).
-\tag{4.2}
+\qquad (4.2)
 $$
 
 This is the **equilibrium potential at local charge neutrality**.
@@ -95,7 +95,7 @@ $\mathrm{asinh}(x) \approx \ln(2x)$, so
 $$
 \psi_\mathrm{eq} \approx V_t\,\ln\left(\frac{N_\mathrm{net}}{n_i}\right)
 \quad (N_\mathrm{net} \gg n_i),
-\tag{4.3}
+\qquad (4.3)
 $$
 
 with sign matching $N_\mathrm{net}$. This is the textbook "log form"

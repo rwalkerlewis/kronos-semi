@@ -63,7 +63,7 @@ The built-in voltage is the difference:
 $$
 V_{bi} = \psi_R^\mathrm{eq} - \psi_L^\mathrm{eq}
        = V_t\bigl[\mathrm{asinh}(N_D/(2n_i)) + \mathrm{asinh}(N_A/(2n_i))\bigr].
-\tag{7.1}
+\qquad (7.1)
 $$
 
 For $N \gg n_i$, $\mathrm{asinh}(x) \approx \ln(2x)$, giving
@@ -71,7 +71,7 @@ For $N \gg n_i$, $\mathrm{asinh}(x) \approx \ln(2x)$, giving
 $$
 V_{bi} \approx V_t\bigl[\ln(N_D/n_i) + \ln(N_A/n_i)\bigr]
         = V_t\,\ln\left(\frac{N_A N_D}{n_i^2}\right).
-\tag{7.2}
+\qquad (7.2)
 $$
 
 Equation (7.2) is the textbook expression. The two forms agree to
@@ -98,7 +98,7 @@ $$
        +qN_A/\varepsilon & -x_p < x < 0 \\
        -qN_D/\varepsilon & 0 < x < x_n
      \end{cases}.
-\tag{7.3}
+\qquad (7.3)
 $$
 
 (Sign convention: I have used $-d^2\psi/dx^2 = \rho/\varepsilon$ from
@@ -111,7 +111,7 @@ The total exposed charge on each side must be equal in magnitude:
 
 $$
 N_A x_p = N_D x_n.
-\tag{7.4}
+\qquad (7.4)
 $$
 
 (The charge per unit area is $qN x$; if they were unequal there would
@@ -131,14 +131,14 @@ E(x) = -\frac{d\psi}{dx}
          -(qN_A/\varepsilon)(x + x_p) & -x_p < x < 0 \\
          -(qN_D/\varepsilon)(x_n - x) & 0 < x < x_n
        \end{cases}.
-\tag{7.5}
+\qquad (7.5)
 $$
 
 The peak field at $x = 0$:
 
 $$
 |E_\mathrm{max}| = \frac{q N_A x_p}{\varepsilon} = \frac{q N_D x_n}{\varepsilon}.
-\tag{7.6}
+\qquad (7.6)
 $$
 
 (Both expressions are equal by (7.4), and they have to be: $E$ is
@@ -149,7 +149,7 @@ and $\psi(+x_n) = \psi_R^\mathrm{eq}$:
 
 $$
 V_{bi} - V = \frac{q}{2\varepsilon}\bigl(N_A x_p^2 + N_D x_n^2\bigr),
-\tag{7.7}
+\qquad (7.7)
 $$
 
 where the left-hand side is $V_{bi}$ at thermal equilibrium and
@@ -163,14 +163,14 @@ Combining charge balance (7.4) and the integrated potential (7.7):
 $$
 W(V) = x_n + x_p
     = \sqrt{\frac{2\varepsilon (V_{bi} - V)(N_A + N_D)}{q\,N_A N_D}},
-\tag{7.8}
+\qquad (7.8)
 $$
 
 $$
 x_n = W\,\frac{N_A}{N_A + N_D},
 \qquad
 x_p = W\,\frac{N_D}{N_A + N_D}.
-\tag{7.9}
+\qquad (7.9)
 $$
 
 Combining (7.6) and (7.9):
@@ -179,7 +179,7 @@ $$
 |E_\mathrm{max}| = \sqrt{\frac{2 q (V_{bi} - V) N_\mathrm{eff}}{\varepsilon}},
 \qquad
 N_\mathrm{eff} \equiv \frac{N_A N_D}{N_A + N_D}.
-\tag{7.10}
+\qquad (7.10)
 $$
 
 For the symmetric case $N_A = N_D$, $N_\mathrm{eff} = N/2$.

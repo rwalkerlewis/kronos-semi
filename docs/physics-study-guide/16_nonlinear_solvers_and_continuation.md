@@ -41,7 +41,7 @@ Newton iterates
 
 $$
 \mathbf{u}^{(k+1)} = \mathbf{u}^{(k)} - J(\mathbf{u}^{(k)})^{-1}\,F(\mathbf{u}^{(k)}),
-\tag{16.1}
+\qquad (16.1)
 $$
 
 with $J = \partial F/\partial\mathbf{u}$ the Jacobian. The local

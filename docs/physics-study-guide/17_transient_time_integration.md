@@ -42,7 +42,7 @@ $$
 \frac{\partial n}{\partial t} + \nabla\cdot\mathbf{J}_n/(-q) = G - R,
 \qquad
 \frac{\partial p}{\partial t} + \nabla\cdot\mathbf{J}_p/(+q) = G - R,
-\tag{17.1}
+\qquad (17.1)
 $$
 
 with the same drift-diffusion currents (5.3) and recombination (Ch. 6).
@@ -57,7 +57,7 @@ $$
 = \frac{\partial n}{\partial\psi}\cdot\frac{\partial\psi}{\partial t}
 + \frac{\partial n}{\partial\Phi_n}\cdot\frac{\partial\Phi_n}{\partial t}
 = \frac{n}{V_t}\left(\frac{\partial\psi}{\partial t} - \frac{\partial\Phi_n}{\partial t}\right).
-\tag{17.2}
+\qquad (17.2)
 $$
 
 Thus the time derivative *couples* $\psi$ and $\Phi_n$ through a chain
@@ -73,14 +73,14 @@ The simplest implicit scheme: approximate
 
 $$
 \frac{\partial n}{\partial t}\bigg|_{t^{n+1}} \approx \frac{n^{n+1} - n^n}{dt}.
-\tag{17.3}
+\qquad (17.3)
 $$
 
 The residual at $t^{n+1}$ is
 
 $$
 F_n^\mathrm{BDF1} = \frac{n^{n+1} - n^n}{dt} + \nabla\cdot\mathbf{J}_n^{n+1}/(-q) + R^{n+1} = 0.
-\tag{17.4}
+\qquad (17.4)
 $$
 
 Convergence rate: first-order in time, $O(dt)$. A-stable.
@@ -92,7 +92,7 @@ Use a three-level history with quadratic backward extrapolation:
 $$
 \frac{\partial n}{\partial t}\bigg|_{t^{n+1}}
 \approx \frac{1}{dt}\left(\frac{3}{2}n^{n+1} - 2n^n + \frac{1}{2}n^{n-1}\right).
-\tag{17.5}
+\qquad (17.5)
 $$
 
 Convergence rate: $O(dt^2)$. A-stable for $\theta$ in $[0, 90°)$ relative
@@ -107,7 +107,7 @@ Generic BDF-$k$:
 $$
 \frac{\partial u}{\partial t}\bigg|_{t^{n+1}}
 \approx \frac{1}{dt}\sum_{j=0}^{k}\alpha_j u^{n+1-j},
-\tag{17.6}
+\qquad (17.6)
 $$
 
 with $\alpha_0 > 0$ the leading coefficient. For BDF1: $(1, -1)$.

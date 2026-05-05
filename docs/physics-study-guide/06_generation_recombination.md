@@ -56,14 +56,14 @@ occupied by an electron. The rate equation for $f_t$ is
 
 $$
 \frac{df_t}{dt} = c_n n (1 - f_t) - e_n f_t - c_p p f_t + e_p (1 - f_t).
-\tag{6.1}
+\qquad (6.1)
 $$
 
 In steady state $df_t/dt = 0$:
 
 $$
 f_t = \frac{c_n n + e_p}{c_n n + e_p + c_p p + e_n}.
-\tag{6.2}
+\qquad (6.2)
 $$
 
 The net rate at which electrons leave the conduction band (and holes
@@ -71,7 +71,7 @@ leave the valence band) equals the *net* of the two electron processes:
 
 $$
 R = c_n n (1 - f_t) - e_n f_t = c_p p f_t - e_p (1 - f_t).
-\tag{6.3}
+\qquad (6.3)
 $$
 
 Equality of the two expressions in (6.3) is the definition of
@@ -90,7 +90,7 @@ $$
 \frac{e_n}{c_n} = n_i\,e^{(E_t - E_i)/kT} \equiv n_1,
 \qquad
 \frac{e_p}{c_p} = n_i\,e^{(E_i - E_t)/kT} \equiv p_1.
-\tag{6.4}
+\qquad (6.4)
 $$
 
 So $n_1 p_1 = n_i^2$ for any trap level $E_t$.
@@ -106,7 +106,7 @@ gets
 $$
 R_\mathrm{SRH}(n, p)
    = \frac{n p - n_i^2}{\tau_p (n + n_1) + \tau_n (p + p_1)}.
-\tag{6.5}
+\qquad (6.5)
 $$
 
 with $n_1 = n_i\exp(E_t/V_t)$, $p_1 = n_i\exp(-E_t/V_t)$ measured from
@@ -147,7 +147,7 @@ which is excited to a higher kinetic state and thermalizes. Rate:
 
 $$
 R_\mathrm{Auger} = (C_n n + C_p p)(np - n_i^2),
-\tag{6.6}
+\qquad (6.6)
 $$
 
 with Auger coefficients $C_n \approx 2.8\times 10^{-31}\,\mathrm{cm^6/s}$,
@@ -161,7 +161,7 @@ Radiative recombination (band-to-band photon emission):
 
 $$
 R_\mathrm{rad} = B(np - n_i^2),
-\tag{6.7}
+\qquad (6.7)
 $$
 
 with $B \sim 10^{-14}\,\mathrm{cm^3/s}$ in silicon (indirect gap; small)
@@ -177,7 +177,7 @@ junction. Kane's model gives
 
 $$
 G_\mathrm{BBT} = A\,\frac{|E|^\alpha}{\sqrt{E_g}}\,\exp\left(-\frac{B\,E_g^{3/2}}{|E|}\right),
-\tag{6.8}
+\qquad (6.8)
 $$
 
 with material-dependent constants $A, B$. Forward reference:
