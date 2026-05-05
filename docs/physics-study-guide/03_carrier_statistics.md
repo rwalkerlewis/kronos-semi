@@ -36,8 +36,8 @@ temperature $T$ and Fermi level $E_F$, the occupancy probability is
 
 $$
 f_\mathrm{FD}(E; E_F, T)
-   = \frac{1}{1 + \exp\!\big((E - E_F)/kT\big)}.
-\tag{3.1}
+   = \frac{1}{1 + \exp\big((E - E_F)/kT\big)}.
+\qquad (3.1)
 $$
 
 The number density of electrons in the conduction band is the integral
@@ -45,7 +45,7 @@ over the band's density of states $g_c(E)$ weighted by occupancy:
 
 $$
 n = \int_{E_c}^{\infty} g_c(E)\,f_\mathrm{FD}(E; E_F, T)\,dE.
-\tag{3.2}
+\qquad (3.2)
 $$
 
 Using the parabolic-band density of states (2.4), substituting
@@ -55,7 +55,7 @@ $$
 n = N_c\,F_{1/2}(\eta_F),
 \qquad
 F_{1/2}(\eta_F) = \frac{2}{\sqrt\pi}\int_0^\infty \frac{\sqrt\eta}{1 + e^{\eta - \eta_F}}\,d\eta,
-\tag{3.3}
+\qquad (3.3)
 $$
 
 where $N_c$ is the effective DOS from (2.6) and $F_{1/2}$ is the
@@ -70,12 +70,10 @@ denominator can be replaced by $e^{\eta_F - \eta}$. The integral
 collapses to $F_{1/2}(\eta_F) \approx e^{\eta_F}$, giving
 
 $$
-\boxed{
-n = N_c \exp\!\left(\frac{E_F - E_c}{kT}\right),
+n = N_c \exp\left(\frac{E_F - E_c}{kT}\right),
 \qquad
-p = N_v \exp\!\left(\frac{E_v - E_F}{kT}\right).
-}
-\tag{3.4}
+p = N_v \exp\left(\frac{E_v - E_F}{kT}\right).
+\qquad (3.4)
 $$
 
 Equation (3.4) is **Boltzmann statistics**. The error in (3.4) relative
@@ -91,17 +89,17 @@ which $n = p$ in an undoped sample. Setting $n = p$ in (3.4) and
 solving:
 
 $$
-E_i = \frac{E_c + E_v}{2} + \frac{kT}{2}\ln\!\left(\frac{N_v}{N_c}\right),
+E_i = \frac{E_c + E_v}{2} + \frac{kT}{2}\ln\left(\frac{N_v}{N_c}\right),
 \qquad
-n_i = \sqrt{N_c N_v}\,\exp\!\left(-\frac{E_g}{2kT}\right).
-\tag{3.5}
+n_i = \sqrt{N_c N_v}\,\exp\left(-\frac{E_g}{2kT}\right).
+\qquad (3.5)
 $$
 
 Define the electrostatic potential measured from $E_i$:
 
 $$
 \psi(\mathbf{x}) \equiv -\frac{E_i(\mathbf{x})}{q} + \mathrm{const}.
-\tag{3.6}
+\qquad (3.6)
 $$
 
 (Add an arbitrary constant; the engine pins it via the asinh formula at
@@ -109,8 +107,8 @@ the contacts.) Then $E_c = -q\psi - q\chi - E_g/2 + \mathrm{const}$ in
 the bulk, and substituting (3.6) into (3.4):
 
 $$
-n = N_c\,\exp\!\left(\frac{E_F - E_c}{kT}\right)
-   = n_i\,\exp\!\left(\frac{q\psi - (E_i - E_F)}{kT}\right).
+n = N_c\,\exp\left(\frac{E_F - E_c}{kT}\right)
+   = n_i\,\exp\left(\frac{q\psi - (E_i - E_F)}{kT}\right).
 $$
 
 Define the **electron quasi-Fermi potential** $\Phi_n$ by $E_F \equiv -q\Phi_n$
@@ -119,12 +117,10 @@ single global constant, and the engine's convention pins it to zero).
 Then
 
 $$
-\boxed{
-n = n_i\,\exp\!\left(\frac{\psi - \Phi_n}{V_t}\right),
+n = n_i\,\exp\left(\frac{\psi - \Phi_n}{V_t}\right),
 \qquad
-p = n_i\,\exp\!\left(\frac{\Phi_p - \psi}{V_t}\right),
-}
-\tag{3.7}
+p = n_i\,\exp\left(\frac{\Phi_p - \psi}{V_t}\right),
+\qquad (3.7)
 $$
 
 with $V_t = kT/q$ the **thermal voltage**. Equation (3.7) is the
@@ -133,11 +129,9 @@ $\Phi_n = \Phi_p = 0$ identically, so $n p = n_i^2$ falls out — that is
 the **mass-action law** in disguise:
 
 $$
-\boxed{
 n p \;=\; n_i^2 \;=\; N_c N_v \exp(-E_g/kT)
 \quad\text{at thermal equilibrium}.
-}
-\tag{3.8}
+\qquad (3.8)
 $$
 
 Mass action is exact under Boltzmann statistics; it fails by the same
@@ -151,8 +145,7 @@ $10^{20}\,\mathrm{cm^{-3}}$).
 - Engine's working form: (3.7).
 - Mass action: (3.8).
 - Thermal voltage: $V_t = kT/q$. At $T = 300\,\mathrm{K}$,
-  $V_t = (1.381\times 10^{-23})(300) / (1.602\times 10^{-19})
-   = 25.85\,\mathrm{mV}$.
+  $V_t = (1.381\times 10^{-23})(300) / (1.602\times 10^{-19}) = 25.85\,\mathrm{mV}$.
 
 ## Worked numerical example
 
@@ -161,8 +154,7 @@ exercises exactly the formulas in this chapter. Reproducing it line by
 line:
 
 **Thermal voltage at 300 K.**
-$V_t = kT/q = 1.381\times 10^{-23} \cdot 300 / 1.602\times 10^{-19}
-       = 0.025852\,\mathrm{V} = 25.85\,\mathrm{mV}$. ✓
+$V_t = kT/q = 1.381\times 10^{-23} \cdot 300 / 1.602\times 10^{-19} = 0.025852\,\mathrm{V} = 25.85\,\mathrm{mV}$. ✓
 (The test asserts $|V_t - 0.02585| < 0.001$.)
 
 **Bulk electron density on the n-side of the M1 pn junction.**
@@ -170,11 +162,9 @@ With $N_D = 10^{17}\,\mathrm{cm^{-3}} = 10^{23}\,\mathrm{m^{-3}}$ and
 $n_i = 10^{10}\,\mathrm{cm^{-3}} = 10^{16}\,\mathrm{m^{-3}}$:
 $\psi_R^\mathrm{eq} = V_t\,\mathrm{asinh}(N_D/2n_i)$.
 The argument is $10^{23}/(2 \cdot 10^{16}) = 5\times 10^6$;
-$\mathrm{asinh}(5\times 10^6) = \ln(5\times 10^6 + \sqrt{25\times 10^{12}+1})
-\approx \ln(10^7) = 7\ln 10 = 16.118$.
+$\mathrm{asinh}(5\times 10^6) = \ln(5\times 10^6 + \sqrt{25\times 10^{12}+1}) \approx \ln(10^7) = 7\ln 10 = 16.118$.
 So $\psi_R^\mathrm{eq} = 0.02585 \cdot 16.118 = 0.4167\,\mathrm{V}$.
-Then $n^R = n_i \exp(\psi_R/V_t) = 10^{10} \cdot e^{16.118}
-= 10^{10} \cdot 10^7 \approx 10^{17}\,\mathrm{cm^{-3}} \approx N_D$, ✓ (the test
+Then $n^R = n_i \exp(\psi_R/V_t) = 10^{10} \cdot e^{16.118} = 10^{10} \cdot 10^7 \approx 10^{17}\,\mathrm{cm^{-3}} \approx N_D$, ✓ (the test
 asserts $n_R \approx N_D$ to 1%).
 
 **Mass action.**
@@ -186,8 +176,7 @@ $n_i^2 = 10^{20}\,\mathrm{cm^{-6}}$. ✓
 On the p-bulk: $p - n - N_A = 10^{17} - 10^3 - 10^{17} \approx 0$ to
 14 digits. The test asserts the residual is below $10^{-10} \cdot N_A$. ✓
 The exact identity is the asinh(1) trick:
-$\exp(-\psi_L/V_t) - \exp(\psi_L/V_t) = -2\sinh(\psi_L/V_t)
-= 2\,\mathrm{asinh}(N_A/(2n_i))$ when $\psi_L = V_t\,\mathrm{asinh}(-N_A/(2n_i))$,
+$\exp(-\psi_L/V_t) - \exp(\psi_L/V_t) = -2\sinh(\psi_L/V_t) = 2\,\mathrm{asinh}(N_A/(2n_i))$ when $\psi_L = V_t\,\mathrm{asinh}(-N_A/(2n_i))$,
 giving $p^L - n^L = N_A$ exactly.
 
 ## Code map
@@ -274,11 +263,9 @@ Slotboom underflow / overflow note in
 ### Solutions
 
 **3.1.** $n \propto \exp(E_F/kT)$, so $n_2/n_1 = \exp((E_{F,2} - E_{F,1})/kT)$.
-Setting the ratio to 2: $E_{F,2} - E_{F,1} = kT\ln 2 = 0.02585 \cdot 0.693
-= 0.01791\,\mathrm{V}$. ✓
+Setting the ratio to 2: $E_{F,2} - E_{F,1} = kT\ln 2 = 0.02585 \cdot 0.693 = 0.01791\,\mathrm{V}$. ✓
 
-**3.2.** asinh form: $\mathrm{asinh}(10^{23}/(2 \cdot 10^{16}))
-= \mathrm{asinh}(5\times 10^6) = 16.1180$, $V_t \cdot 16.1180 = 0.4167\,\mathrm{V}$.
+**3.2.** asinh form: $\mathrm{asinh}(10^{23}/(2 \cdot 10^{16})) = \mathrm{asinh}(5\times 10^6) = 16.1180$, $V_t \cdot 16.1180 = 0.4167\,\mathrm{V}$.
 log form: $\ln(10^{23}/10^{16}) = \ln(10^7) = 7\ln 10 = 16.1181$,
 $V_t \cdot 16.1181 = 0.4167\,\mathrm{V}$. They agree to 4 decimal places
 because $\mathrm{asinh}(x) \approx \ln(2x)$ for $x \gg 1$, and the
@@ -291,12 +278,10 @@ log-2 cancels (the asinhs sum to give a single ln(2)) and the difference
 collapses below 0.01% (see [`tests/check_analytical_math.py:39-47`](../../tests/check_analytical_math.py)).
 
 **3.3.** Ratio $F_{1/2}(-1)/\exp(-1) = 0.347/0.368 = 0.943$, so Boltzmann
-overestimates $n$ by 5.7% at this Fermi level. At $\eta_F = 0$ ($E_F =
-E_c$, severe degeneracy), $F_{1/2}(0) \approx 0.765$ vs $\exp(0) = 1$,
+overestimates $n$ by 5.7% at this Fermi level. At $\eta_F = 0$ ($E_F = E_c$, severe degeneracy), $F_{1/2}(0) \approx 0.765$ vs $\exp(0) = 1$,
 a 23% overestimate.
 
-**3.4.** n-bulk: $n p = 10^{17} \cdot 10^3 = 10^{20}\,\mathrm{cm^{-6}}
-= n_i^2 = (10^{10})^2$. ✓ p-bulk: same number by symmetry. ✓
+**3.4.** n-bulk: $n p = 10^{17} \cdot 10^3 = 10^{20}\,\mathrm{cm^{-6}} = n_i^2 = (10^{10})^2$. ✓ p-bulk: same number by symmetry. ✓
 
 **3.5.** $\Phi_n$ very negative under heavy forward bias on the n-side
 overflows $\exp(\psi - \Phi_n)$. The Slotboom path keeps the *quasi-Fermi*

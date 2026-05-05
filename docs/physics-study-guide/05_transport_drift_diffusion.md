@@ -7,10 +7,9 @@
 - State the Einstein relation $D = \mu V_t$ and derive it from detailed
   balance at thermal equilibrium.
 - Write the steady-state continuity equations
-  $\nabla\!\cdot\!\mathbf{J}_n = qR$, $\nabla\!\cdot\!\mathbf{J}_p = -qR$
+  $\nabla\cdot\mathbf{J}_n = qR$, $\nabla\cdot\mathbf{J}_p = -qR$
   and explain the sign convention.
-- Recognize why naive Galerkin discretization of $\mathbf{J} = \mu n\mathbf{E}
-  + D\nabla n$ fails when drift dominates diffusion (the Péclet
+- Recognize why naive Galerkin discretization of $\mathbf{J} = \mu n\mathbf{E} + D\nabla n$ fails when drift dominates diffusion (the Péclet
   problem) and why Slotboom (Ch. 11) cures it.
 - Locate the constant- and Caughey–Thomas-mobility branches in
   `semi/physics/mobility.py` and explain when each is appropriate.
@@ -47,10 +46,10 @@ $f(\mathbf{r}, \mathbf{k}, t)$:
 
 $$
 \frac{\partial f}{\partial t}
-+ \mathbf{v}_\mathbf{k}\!\cdot\!\nabla_\mathbf{r} f
-+ \frac{q}{\hbar}\,\mathbf{E}\!\cdot\!\nabla_\mathbf{k} f
++ \mathbf{v}_\mathbf{k}\cdot\nabla_\mathbf{r} f
++ \frac{q}{\hbar}\,\mathbf{E}\cdot\nabla_\mathbf{k} f
 = \left.\frac{\partial f}{\partial t}\right|_\mathrm{coll}.
-\tag{5.1}
+\qquad (5.1)
 $$
 
 The left side is convection in real space and acceleration in
@@ -65,8 +64,8 @@ and assuming the distribution stays close to local equilibrium $f_0$.
 The zeroth $\mathbf{k}$-moment of (5.1) gives the continuity equation:
 
 $$
-\frac{\partial n}{\partial t} + \nabla\!\cdot\!(n\mathbf{v}_n) = G - R,
-\tag{5.2}
+\frac{\partial n}{\partial t} + \nabla\cdot(n\mathbf{v}_n) = G - R,
+\qquad (5.2)
 $$
 
 with $G$, $R$ generation and recombination from the collision operator.
@@ -77,10 +76,10 @@ $$
 \mathbf{J}_n = q\,\mu_n n\,\mathbf{E} + q\,D_n\,\nabla n,
 \qquad
 \mathbf{J}_p = q\,\mu_p p\,\mathbf{E} - q\,D_p\,\nabla p,
-\tag{5.3}
+\qquad (5.3)
 $$
 
-where $\mu_n = q\tau_m/m_n^*$ is the electron mobility (sign absorbed
+where $\mu_n = q\tau_m/m_n^\ast$ is the electron mobility (sign absorbed
 into the velocity convention $\mathbf{v}_n = -\mu_n\mathbf{E}$) and
 $D_n$ is the diffusivity. The signs differ between (5.3a) and (5.3b)
 because electrons drift opposite to $\mathbf{E}$ and holes drift along
@@ -105,14 +104,12 @@ $$
 so $D_n = \mu_n V_t$. This is the **Einstein relation**:
 
 $$
-\boxed{
 D_n = \mu_n V_t,
 \qquad
 D_p = \mu_p V_t,
 \qquad
 V_t = kT/q.
-}
-\tag{5.4}
+\qquad (5.4)
 $$
 
 Substituting (5.4) into (5.3) and using $\mathbf{E} = -\nabla\psi$:
@@ -120,7 +117,7 @@ Substituting (5.4) into (5.3) and using $\mathbf{E} = -\nabla\psi$:
 $$
 \mathbf{J}_n = -q\mu_n n\,\nabla\psi + q\mu_n V_t\,\nabla n
    = q\mu_n V_t\,\bigl(\nabla n - (n/V_t)\nabla\psi\bigr).
-\tag{5.5}
+\qquad (5.5)
 $$
 
 This is the form that goes into the engine's terminal-current evaluator
@@ -135,12 +132,10 @@ In steady state, (5.2) drops the time derivative, and combining with the
 hole equation:
 
 $$
-\boxed{
-\nabla\!\cdot\!\mathbf{J}_n = +q\,R(n,p),
+\nabla\cdot\mathbf{J}_n = +q\,R(n,p),
 \qquad
-\nabla\!\cdot\!\mathbf{J}_p = -q\,R(n,p),
-}
-\tag{5.6}
+\nabla\cdot\mathbf{J}_p = -q\,R(n,p),
+\qquad (5.6)
 $$
 
 with $R$ the *net* recombination (positive when electrons and holes
@@ -151,7 +146,7 @@ matches the rate of electron *removal* with a $+q$ sign, while
 divergence of $\mathbf{J}_p$ matches the rate of hole *removal* with a
 $-q$ sign.
 
-Adding (5.6a) and (5.6b) gives $\nabla\!\cdot\!(\mathbf{J}_n + \mathbf{J}_p) = 0$,
+Adding (5.6a) and (5.6b) gives $\nabla\cdot(\mathbf{J}_n + \mathbf{J}_p) = 0$,
 which is the **total-current conservation** law that the V&V suite
 checks per-target-bias to within 5% forward / 15% reverse
 ([`docs/PHYSICS.md` §5.3](../PHYSICS.md)).
@@ -166,7 +161,7 @@ spacing. The dimensionless ratio is the cell **Péclet number**
 
 $$
 \mathrm{Pe} = \frac{|\nabla\psi|\,h}{V_t} = \frac{|E|\,h}{V_t}.
-\tag{5.7}
+\qquad (5.7)
 $$
 
 A 1 V drop over a 1 µm cell at $V_t = 25\,\mathrm{mV}$ gives $\mathrm{Pe} \approx 40$.
@@ -193,7 +188,7 @@ and at high doping (impurity scattering).
 $$
 \mu(F) = \frac{\mu_0}{\bigl(1 + (\mu_0 F / v_\mathrm{sat})^\beta\bigr)^{1/\beta}},
 \qquad F = |\nabla\Phi_n|\,(\text{or }|\nabla\Phi_p|).
-\tag{5.8}
+\qquad (5.8)
 $$
 
 Limits: $F\to 0$ gives $\mu \to \mu_0$ (low-field); $F\to\infty$ gives
@@ -210,7 +205,7 @@ $$
 \frac{1}{\mu} = \frac{1}{\mu_\mathrm{Coulomb}}
               + \frac{1}{\mu_\mathrm{phonon}}
               + \frac{1}{\mu_\mathrm{surface}}.
-\tag{5.9}
+\qquad (5.9)
 $$
 
 Forward reference to [`docs/IMPROVEMENT_GUIDE.md` §M16.2](../IMPROVEMENT_GUIDE.md).
@@ -245,17 +240,14 @@ Plug in (using SI throughout):
   $L_n = \sqrt{3.62\times 10^{-3} \cdot 10^{-7}} = 1.90\times 10^{-5}\,\mathrm{m} = 19\,\mu\mathrm{m}$.
   $L_p = \sqrt{1.16\times 10^{-3} \cdot 10^{-7}} = 1.08\times 10^{-5}\,\mathrm{m} = 10.8\,\mu\mathrm{m}$.
 - $N_A = N_D = 10^{23}\,\mathrm{m^{-3}}$.
-- $J_s = 1.602\times 10^{-19} \cdot 10^{32}\cdot (3.62\times 10^{-3}/(1.90\times 10^{-5}\cdot 10^{23})
-   + 1.16\times 10^{-3}/(1.08\times 10^{-5}\cdot 10^{23}))$.
+- $J_s = 1.602\times 10^{-19} \cdot 10^{32}\cdot (3.62\times 10^{-3}/(1.90\times 10^{-5}\cdot 10^{23}) + 1.16\times 10^{-3}/(1.08\times 10^{-5}\cdot 10^{23}))$.
 - First term: $3.62\times 10^{-3}/1.90\times 10^{18} = 1.91\times 10^{-21}$.
 - Second: $1.16\times 10^{-3}/1.08\times 10^{18} = 1.07\times 10^{-21}$.
 - Sum: $2.98\times 10^{-21}$.
-- $J_s = 1.602\times 10^{-19} \cdot 10^{32} \cdot 2.98\times 10^{-21}
-   = 4.78\times 10^{-8}\,\mathrm{A/m^2}$.
+- $J_s = 1.602\times 10^{-19} \cdot 10^{32} \cdot 2.98\times 10^{-21} = 4.78\times 10^{-8}\,\mathrm{A/m^2}$.
 
 At $V = 0.6\,\mathrm{V}$, $\exp(V/V_t) = e^{23.21} = 1.20\times 10^{10}$.
-$J_\mathrm{Shockley} = J_s\cdot(e^{V/V_t} - 1) \approx J_s\cdot 1.20\times 10^{10}
-= 5.74\times 10^2\,\mathrm{A/m^2}$.
+$J_\mathrm{Shockley} = J_s\cdot(e^{V/V_t} - 1) \approx J_s\cdot 1.20\times 10^{10} = 5.74\times 10^2\,\mathrm{A/m^2}$.
 
 The actual benchmark reports $\sim 1.6\times 10^3\,\mathrm{A/m^2}$ at
 $V = 0.6\,\mathrm{V}$ ([`docs/PHYSICS.md` §2.5 close](../PHYSICS.md)),
@@ -330,8 +322,7 @@ the cell Péclet number on a 100-cell mesh at $V_{bi} = 0.83\,\mathrm{V}$.
 Conclude that naive Galerkin would produce wiggles.
 
 **Exercise 5.3.** Compute the diffusion length $L_n = \sqrt{D_n\tau_n}$
-in silicon for $\tau_n = 10^{-7}\,\mathrm{s}$. Repeat for $\tau_n =
-10^{-9}\,\mathrm{s}$ (heavily damaged silicon). Comment on which case
+in silicon for $\tau_n = 10^{-7}\,\mathrm{s}$. Repeat for $\tau_n = 10^{-9}\,\mathrm{s}$ (heavily damaged silicon). Comment on which case
 is "short-base" for a 2 µm device.
 
 **Exercise 5.4.** At what field does Caughey–Thomas (5.8) predict
@@ -339,26 +330,20 @@ $\mu = \mu_0/2$ for electrons in silicon, with $\beta_n = 2$ and
 $v_\mathrm{sat} = 10^7\,\mathrm{cm/s}$?
 
 **Exercise 5.5.** Show that adding the two continuities (5.6) gives
-$\nabla\!\cdot\!(\mathbf{J}_n + \mathbf{J}_p) = 0$ — total current is
+$\nabla\cdot(\mathbf{J}_n + \mathbf{J}_p) = 0$ — total current is
 divergence-free, i.e. has the same value on every cross-section of a
 1D device.
 
 ### Solutions
 
-**5.1.** $0 = q\mu_p p\,\mathbf{E} - qD_p\,\nabla p
-= q\mu_p p(-\nabla\psi) - qD_p\,(-(p/V_t)\nabla\psi)
-= q p \nabla\psi(-\mu_p + D_p/V_t)$. So $D_p = \mu_p V_t$, same as electrons.
+**5.1.** $0 = q\mu_p p\,\mathbf{E} - qD_p\,\nabla p = q\mu_p p(-\nabla\psi) - qD_p\,(-(p/V_t)\nabla\psi) = q p \nabla\psi(-\mu_p + D_p/V_t)$. So $D_p = \mu_p V_t$, same as electrons.
 
 **5.2.** Mesh spacing $h = 2\,\mu\mathrm{m}/100 = 20\,\mathrm{nm}$.
-Field at the junction is $\sim V_{bi}/W \approx 0.83/146\,\mathrm{nm}
-\approx 5.7\times 10^6\,\mathrm{V/m}$. So $\mathrm{Pe} = Eh/V_t
-= 5.7\times 10^6\cdot 20\times 10^{-9}/0.02585 = 4.4$. Well above 1;
+Field at the junction is $\sim V_{bi}/W \approx 0.83/146\,\mathrm{nm} \approx 5.7\times 10^6\,\mathrm{V/m}$. So $\mathrm{Pe} = Eh/V_t = 5.7\times 10^6\cdot 20\times 10^{-9}/0.02585 = 4.4$. Well above 1;
 naive Galerkin would wiggle. Slotboom sidesteps it.
 
-**5.3.** $D_n = 3.62\times 10^{-3}\,\mathrm{m^2/s}$. $L_n =
-\sqrt{D_n\cdot 10^{-7}} = 1.90\times 10^{-5}\,\mathrm{m} = 19\,\mu\mathrm{m}$
-for $\tau = 10^{-7}$. $L_n = \sqrt{D_n\cdot 10^{-9}} = 1.90\times 10^{-6}\,\mathrm{m}
-= 1.9\,\mu\mathrm{m}$ for $\tau = 10^{-9}$. The 2 µm device is
+**5.3.** $D_n = 3.62\times 10^{-3}\,\mathrm{m^2/s}$. $L_n = \sqrt{D_n\cdot 10^{-7}} = 1.90\times 10^{-5}\,\mathrm{m} = 19\,\mu\mathrm{m}$
+for $\tau = 10^{-7}$. $L_n = \sqrt{D_n\cdot 10^{-9}} = 1.90\times 10^{-6}\,\mathrm{m} = 1.9\,\mu\mathrm{m}$ for $\tau = 10^{-9}$. The 2 µm device is
 "short-base" relative to the first ($L\approx W$); "long-base" relative
 to the second ($L \gg W$ doesn't hold here either; both are
 intermediate). Short-base reduces $J_s$ by a factor $W/L_n$; this is the
@@ -369,8 +354,7 @@ so $1 + (\mu_0 F/v_s)^2 = 4$, $\mu_0 F/v_s = \sqrt 3$, $F = \sqrt 3\,v_s/\mu_0$.
 With $v_s = 10^5\,\mathrm{m/s}$ and $\mu_0 = 0.14\,\mathrm{m^2/Vs}$:
 $F = 1.732\cdot 10^5/0.14 = 1.24\times 10^6\,\mathrm{V/m} = 12.4\,\mathrm{kV/cm}$.
 
-**5.5.** Add (5.6a) and (5.6b): $\nabla\!\cdot\!(\mathbf{J}_n + \mathbf{J}_p)
-= +qR + (-qR) = 0$. The recombination is equal-and-opposite on the two
+**5.5.** Add (5.6a) and (5.6b): $\nabla\cdot(\mathbf{J}_n + \mathbf{J}_p) = +qR + (-qR) = 0$. The recombination is equal-and-opposite on the two
 rows, so it cancels. In 1D, this means $J_n(x) + J_p(x)$ is constant in
 $x$ across the device — the **total-current conservation** that the
 V&V conservation gate verifies on ten interior facets per bias point.

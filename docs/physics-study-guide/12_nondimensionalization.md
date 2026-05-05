@@ -34,14 +34,13 @@ as a cautionary note — illustrates vividly.
 ### The conditioning problem
 
 Plug typical numbers into the dimensional Poisson equation
-$-\nabla\!\cdot\!(\varepsilon\nabla\psi) = q(p - n + N)$:
+$-\nabla\cdot(\varepsilon\nabla\psi) = q(p - n + N)$:
 - $\varepsilon \sim 10^{-11}\,\mathrm{F/m}$
 - $q \sim 10^{-19}\,\mathrm{C}$
 - $N \sim 10^{23}\,\mathrm{m^{-3}}$
 - $L \sim 10^{-6}\,\mathrm{m}$
 
-The discrete Laplacian has entries $\sim \varepsilon/h^2 \sim 10^{-11}/10^{-12}
-= 10$. The discrete carrier-density rows (continuity equations) have entries
+The discrete Laplacian has entries $\sim \varepsilon/h^2 \sim 10^{-11}/10^{-12} = 10$. The discrete carrier-density rows (continuity equations) have entries
 $\sim qN/V_t \sim 10^{-19}\cdot 10^{23}/0.025 = 4\times 10^5$. Block
 ratio of the unknowns $\psi$ vs $n$ is $V_t/N \sim 10^{-25}$. Newton
 sees a Jacobian whose diagonal entries span 30 orders of magnitude, and
@@ -70,18 +69,16 @@ remains $\mathbf{x}$ in meters; this is **Invariant 3** in `PLAN.md`.
 Substitute $\psi = V_t\hat\psi$, $n = C_0\hat n$, etc. into (1.9):
 
 $$
--\nabla\!\cdot\!(\varepsilon\,V_t\,\nabla\hat\psi) = q\,C_0\,(\hat p - \hat n + \hat N).
+-\nabla\cdot(\varepsilon\,V_t\,\nabla\hat\psi) = q\,C_0\,(\hat p - \hat n + \hat N).
 $$
 
 Divide both sides by $qC_0$:
 
 $$
-\boxed{
--\nabla\!\cdot\!(L_D^2\,\varepsilon_r\,\nabla\hat\psi) = \hat p - \hat n + \hat N,
+-\nabla\cdot(L_D^2\,\varepsilon_r\,\nabla\hat\psi) = \hat p - \hat n + \hat N,
 \qquad
 L_D^2 \equiv \frac{\varepsilon_0 V_t}{q C_0}.
-}
-\tag{12.1}
+\qquad (12.1)
 $$
 
 $L_D$ is the **extrinsic Debye length** at $C_0$: the length over which
@@ -119,8 +116,7 @@ $\varepsilon_r$ ([`semi/scaling.py:62-70`](../../semi/scaling.py)).
 ### The mesh-stays-in-meters subtlety
 
 If you naively rewrote (12.1) with the gradient operator scaled
-($\nabla \to \nabla/L_0$), you would get $-\lambda^2\varepsilon_r\Delta\hat\psi
-= \hat\rho$ with $\Delta = $ scaled Laplacian. But the kronos-semi
+($\nabla \to \nabla/L_0$), you would get $-\lambda^2\varepsilon_r\Delta\hat\psi = \hat\rho$ with $\Delta = $ scaled Laplacian. But the kronos-semi
 mesh stays in physical meters, so $\nabla$ in the UFL form is the
 physical gradient (1/m). The coefficient is therefore $L_D^2 = \lambda^2 L_0^2$:
 
@@ -144,25 +140,25 @@ Following the same recipe for the continuity rows, all the algebra in
 [`docs/PHYSICS.md` §2.5](../PHYSICS.md):
 
 $$
--\nabla\!\cdot\!(L_D^2\varepsilon_r\nabla\hat\psi) = \hat p - \hat n + \hat N
-\tag{12.2a}
+-\nabla\cdot(L_D^2\varepsilon_r\nabla\hat\psi) = \hat p - \hat n + \hat N
+\qquad (12.2a)
 $$
 
 $$
--\nabla\!\cdot\!(L_0^2\,\hat\mu_n\,\hat n\,\nabla\hat\Phi_n) = +\hat R
-\tag{12.2b}
+-\nabla\cdot(L_0^2\,\hat\mu_n\,\hat n\,\nabla\hat\Phi_n) = +\hat R
+\qquad (12.2b)
 $$
 
 $$
--\nabla\!\cdot\!(L_0^2\,\hat\mu_p\,\hat p\,\nabla\hat\Phi_p) = -\hat R
-\tag{12.2c}
+-\nabla\cdot(L_0^2\,\hat\mu_p\,\hat p\,\nabla\hat\Phi_p) = -\hat R
+\qquad (12.2c)
 $$
 
 with $\hat n, \hat p$ from Slotboom (11.3), and the scaled SRH kernel
 
 $$
 \hat R(\hat n, \hat p) = \frac{\hat n\hat p - \hat n_i^2}{\hat\tau_p(\hat n+\hat n_1) + \hat\tau_n(\hat p+\hat p_1)}.
-\tag{12.2d}
+\qquad (12.2d)
 $$
 
 The $L_0^2$ in (12.2b)–(12.2c) is the same "mesh stays in meters" pickup;
@@ -193,7 +189,7 @@ doping, while quasi-neutral bulk regions can be hundreds of microns.
   $L_D^2 = \lambda^2 L_0^2 = \varepsilon_0 V_t/(qC_0)$.
 - Scaled DD residual: (12.2).
 - Singular-perturbation bound: width of transition regions $\sim L_D$.
-- Mesh-in-meters convention: every $\nabla\!\cdot\!\nabla$ picks up an
+- Mesh-in-meters convention: every $\nabla\cdot\nabla$ picks up an
   explicit $L_0^2$.
 
 ## Worked numerical example
@@ -201,9 +197,7 @@ doping, while quasi-neutral bulk regions can be hundreds of microns.
 For the M1 `pn_1d` benchmark:
 - $L_0 = 2\,\mu\mathrm{m}$, $V_t = 25.85\,\mathrm{mV}$,
   $C_0 = 10^{17}\,\mathrm{cm^{-3}} = 10^{23}\,\mathrm{m^{-3}}$.
-- `lambda2` $= \varepsilon_0 V_t/(qC_0L_0^2)
-  = 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23}\cdot 4\times 10^{-12})
-  = 2.288\times 10^{-13}/6.41\times 10^{-8} = 3.57\times 10^{-6}$. ✓
+- `lambda2` $= \varepsilon_0 V_t/(qC_0L_0^2) = 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23}\cdot 4\times 10^{-12}) = 2.288\times 10^{-13}/6.41\times 10^{-8} = 3.57\times 10^{-6}$. ✓
 - $L_D^2 = \lambda^2 L_0^2 = 3.57\times 10^{-6}\cdot 4\times 10^{-12} = 1.43\times 10^{-17}\,\mathrm{m^2}$.
 - Stiffness coefficient: $L_D^2 \cdot \varepsilon_r = 1.67\times 10^{-16}$.
 
@@ -216,8 +210,7 @@ M1 bug.
 
 **$L_0^2$ in the continuity rows.** Same $L_0 = 2\,\mu\mathrm{m}$ gives
 $L_0^2 = 4\times 10^{-12}\,\mathrm{m^2}$. The continuity stiffness in
-(12.2b) is $L_0^2\hat\mu\hat n$; with $\hat\mu \approx 1$ and $\hat n
-\approx 1$ at full doping, the coefficient is again $\sim 10^{-12}$,
+(12.2b) is $L_0^2\hat\mu\hat n$; with $\hat\mu \approx 1$ and $\hat n \approx 1$ at full doping, the coefficient is again $\sim 10^{-12}$,
 balancing against the dimensionless $\hat R$ (which is normalized to
 $C_0/t_0$).
 
@@ -271,8 +264,7 @@ A typical $\tau_n = 100\,\mathrm{ns}$ scaled is $\hat\tau_n = 100/1.1 = 90.9$.
    diffusion time scale. Real device timescales (the RC charging time
    of an MOS capacitor, the SRH lifetime) are different orders of
    magnitude. The scaled lifetime $\hat\tau = \tau/t_0$ can be very
-   large (hundreds), which is fine, but the scaled time step $\hat{dt}
-   = dt/t_0$ has to fall inside a reasonable range or BDF1/BDF2 stalls.
+   large (hundreds), which is fine, but the scaled time step $\hat{dt} = dt/t_0$ has to fall inside a reasonable range or BDF1/BDF2 stalls.
 
 ## Exercises
 
@@ -285,7 +277,7 @@ $10^{17}\,\mathrm{cm^{-3}}$, matching the [`tests/check_analytical_math.py:30-33
 assertion.
 
 **Exercise 12.3.** Derive (12.2b) from the dimensional electron
-continuity equation $\nabla\!\cdot\!(q\mu_n n\,\nabla\Phi_n) = qR$ by
+continuity equation $\nabla\cdot(q\mu_n n\,\nabla\Phi_n) = qR$ by
 substituting $\Phi_n = V_t\hat\Phi_n$, $n = C_0\hat n$, $\mu_n = \mu_0\hat\mu_n$,
 and dividing by $qC_0/t_0$.
 
@@ -301,23 +293,16 @@ actual doping?
 
 ### Solutions
 
-**12.1.** $L_0 = 500\,\mathrm{nm}$. $\lambda^2 = 8.854\times 10^{-12}\cdot 0.02585
-/(1.602\times 10^{-19}\cdot 10^{23}\cdot (5\times 10^{-7})^2)
-= 2.288\times 10^{-13}/(1.602\times 10^4\cdot 2.5\times 10^{-13})
-= 2.288\times 10^{-13}/4.005\times 10^{-9}
-= 5.71\times 10^{-5}$.
+**12.1.** $L_0 = 500\,\mathrm{nm}$. $\lambda^2 = 8.854\times 10^{-12}\cdot 0.02585 /(1.602\times 10^{-19}\cdot 10^{23}\cdot (5\times 10^{-7})^2) = 2.288\times 10^{-13}/(1.602\times 10^4\cdot 2.5\times 10^{-13}) = 2.288\times 10^{-13}/4.005\times 10^{-9} = 5.71\times 10^{-5}$.
 Smaller device → larger $\lambda^2$ at fixed doping. Multiplied by
 $\varepsilon_r = 11.7$: $6.69\times 10^{-4}$.
 
-**12.2.** $L_D^\mathrm{absolute} = \sqrt{\varepsilon_r\varepsilon_0V_t/(qC_0)}
-= \sqrt{11.7\cdot 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23})}
-= \sqrt{1.679\times 10^{-16}} = 1.296\times 10^{-8}\,\mathrm{m} = 12.96\,\mathrm{nm}$. ✓
+**12.2.** $L_D^\mathrm{absolute} = \sqrt{\varepsilon_r\varepsilon_0V_t/(qC_0)} = \sqrt{11.7\cdot 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23})} = \sqrt{1.679\times 10^{-16}} = 1.296\times 10^{-8}\,\mathrm{m} = 12.96\,\mathrm{nm}$. ✓
 The test asserts $10 < L_D/\mathrm{nm} < 16$.
 
-**12.3.** Substitute: $\nabla\!\cdot\!(q\mu_0\hat\mu_n C_0\hat n V_t\nabla\hat\Phi_n)
-= qR$. Pull constants out: $q\mu_0 V_t C_0\nabla\!\cdot\!(\hat\mu_n\hat n\nabla\hat\Phi_n) = qR$.
-Divide by $qC_0/t_0 = qC_0D_0/L_0^2$: $\mu_0 V_t/(D_0/L_0^2)\cdot\nabla\!\cdot\!(\hat\mu_n\hat n\nabla\hat\Phi_n) = \hat R$.
-With $D_0 = V_t\mu_0$: $L_0^2\nabla\!\cdot\!(\hat\mu_n\hat n\nabla\hat\Phi_n) = \hat R$. ✓
+**12.3.** Substitute: $\nabla\cdot(q\mu_0\hat\mu_n C_0\hat n V_t\nabla\hat\Phi_n) = qR$. Pull constants out: $q\mu_0 V_t C_0\nabla\cdot(\hat\mu_n\hat n\nabla\hat\Phi_n) = qR$.
+Divide by $qC_0/t_0 = qC_0D_0/L_0^2$: $\mu_0 V_t/(D_0/L_0^2)\cdot\nabla\cdot(\hat\mu_n\hat n\nabla\hat\Phi_n) = \hat R$.
+With $D_0 = V_t\mu_0$: $L_0^2\nabla\cdot(\hat\mu_n\hat n\nabla\hat\Phi_n) = \hat R$. ✓
 
 **12.4.** $\lambda^2 \to 0$ means the stiffness term in (12.1)
 vanishes; the equation reduces to $\hat\rho = \hat p - \hat n + \hat N = 0$
@@ -329,14 +314,12 @@ The depletion-approximation charge-sheet picture is exact in the
 $\lambda^2 \to 0$ limit.
 
 **12.5.** $C_0 = 10^{16}\,\mathrm{cm^{-3}}$ (floored), $L_0 = 10\,\mu\mathrm{m}$.
-$\lambda^2 = 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{22}\cdot 10^{-10})
-= 2.288\times 10^{-13}/(1.602\times 10^3\cdot 10^{-10}\cdot 10^{-12})$
+$\lambda^2 = 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{22}\cdot 10^{-10}) = 2.288\times 10^{-13}/(1.602\times 10^3\cdot 10^{-10}\cdot 10^{-12})$
 Wait, recompute: $C_0L_0^2 = 10^{22}\cdot 10^{-10} = 10^{12}$;
 $qC_0L_0^2 = 1.602\times 10^{-7}$.
 $\lambda^2 = 2.288\times 10^{-13}/1.602\times 10^{-7} = 1.43\times 10^{-6}$.
 With *actual* doping $10^{14}\,\mathrm{cm^{-3}} = 10^{20}\,\mathrm{m^{-3}}$:
-$\lambda^2 = 2.288\times 10^{-13}/(1.602\times 10^{-19}\cdot 10^{20}\cdot 10^{-10})
-= 2.288\times 10^{-13}/1.602\times 10^{-9} = 1.43\times 10^{-4}$.
+$\lambda^2 = 2.288\times 10^{-13}/(1.602\times 10^{-19}\cdot 10^{20}\cdot 10^{-10}) = 2.288\times 10^{-13}/1.602\times 10^{-9} = 1.43\times 10^{-4}$.
 Two orders of magnitude smaller because the floor over-rates $C_0$.
 The scaled equation is solved with the floored $C_0$; the result is
 correctly recovered in physical units after un-scaling, but the

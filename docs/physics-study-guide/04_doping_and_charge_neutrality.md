@@ -4,8 +4,7 @@
 
 - State the donor / acceptor / complete-ionization model and recognize
   its assumptions in the engine's net-doping callable.
-- Derive the bulk equilibrium potential $\psi_\mathrm{eq} =
-  V_t\,\mathrm{asinh}(N_\mathrm{net}/(2n_i))$ from charge neutrality.
+- Derive the bulk equilibrium potential $\psi_\mathrm{eq} = V_t\,\mathrm{asinh}(N_\mathrm{net}/(2n_i))$ from charge neutrality.
 - Identify the three doping-profile types in the schema (uniform, step,
   Gaussian) and connect each to a physical fabrication step.
 - Predict the sign of $\psi_\mathrm{eq}$ for n-type and p-type bulk and
@@ -63,7 +62,7 @@ and the local volume is electrically neutral:
 
 $$
 p(\psi) - n(\psi) + N_D - N_A = 0,
-\tag{4.1}
+\qquad (4.1)
 $$
 
 with $n, p$ from Boltzmann (3.7) at $\Phi_n = \Phi_p = 0$:
@@ -81,10 +80,8 @@ $$
 so
 
 $$
-\boxed{
-\psi_\mathrm{eq} = V_t\,\mathrm{asinh}\!\left(\frac{N_D - N_A}{2\,n_i}\right).
-}
-\tag{4.2}
+\psi_\mathrm{eq} = V_t\,\mathrm{asinh}\left(\frac{N_D - N_A}{2\,n_i}\right).
+\qquad (4.2)
 $$
 
 This is the **equilibrium potential at local charge neutrality**.
@@ -95,9 +92,9 @@ For $N_\mathrm{net} \gg n_i$ (heavily doped),
 $\mathrm{asinh}(x) \approx \ln(2x)$, so
 
 $$
-\psi_\mathrm{eq} \approx V_t\,\ln\!\left(\frac{N_\mathrm{net}}{n_i}\right)
+\psi_\mathrm{eq} \approx V_t\,\ln\left(\frac{N_\mathrm{net}}{n_i}\right)
 \quad (N_\mathrm{net} \gg n_i),
-\tag{4.3}
+\qquad (4.3)
 $$
 
 with sign matching $N_\mathrm{net}$. This is the textbook "log form"
@@ -117,9 +114,7 @@ $x_\mathrm{axis} < x_\mathrm{loc}$ and $N_\mathrm{right}$ otherwise.
 Physical interpretation: an abrupt junction (idealized; real diffusion
 profiles have finite width). Used by the M1 pn benchmark.
 
-**Gaussian.** $N_\mathrm{net}(\mathbf{x}) = N_\mathrm{bg} \pm
-N_\mathrm{peak}\,\exp(-\tfrac12 r^2)$ with $r^2 = \sum_d
-((x_d - c_d)/\sigma_d)^2$. Physical interpretation: an ion implant
+**Gaussian.** $N_\mathrm{net}(\mathbf{x}) = N_\mathrm{bg} \pm N_\mathrm{peak}\,\exp(-\tfrac12 r^2)$ with $r^2 = \sum_d ((x_d - c_d)/\sigma_d)^2$. Physical interpretation: an ion implant
 followed by drive-in diffusion. The plus sign is for donors, minus for
 acceptors. Used by the M12 MOSFET benchmark for n+ source/drain
 implants.
@@ -257,12 +252,8 @@ doping profiles?
 
 ### Solutions
 
-**4.1.** $N_\mathrm{net} = -5\times 10^{16}\,\mathrm{cm^{-3}}
-= -5\times 10^{22}\,\mathrm{m^{-3}}$.
-$\psi_\mathrm{eq} = V_t\,\mathrm{asinh}(-5\times 10^{22}/(2\cdot 10^{16}))
-= -V_t\,\mathrm{asinh}(2.5\times 10^6)
-= -V_t \cdot \ln(5\times 10^6)
-= -0.02585 \cdot 15.425 = -0.3989\,\mathrm{V}$. The MOSCAP code reports
+**4.1.** $N_\mathrm{net} = -5\times 10^{16}\,\mathrm{cm^{-3}} = -5\times 10^{22}\,\mathrm{m^{-3}}$.
+$\psi_\mathrm{eq} = V_t\,\mathrm{asinh}(-5\times 10^{22}/(2\cdot 10^{16})) = -V_t\,\mathrm{asinh}(2.5\times 10^6) = -V_t \cdot \ln(5\times 10^6) = -0.02585 \cdot 15.425 = -0.3989\,\mathrm{V}$. The MOSCAP code reports
 $|\phi_B| = 0.399\,\mathrm{V}$ — same number to three decimal places.
 The sign convention shifts: the engine reports $|\phi_B|$ as a positive
 magnitude; the equilibrium $\psi$ on a p-body is $-|\phi_B|$.

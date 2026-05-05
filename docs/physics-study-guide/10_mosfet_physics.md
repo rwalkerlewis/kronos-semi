@@ -75,7 +75,7 @@ interface contains a sheet density:
 $$
 Q_\mathrm{inv}(V_{GS}) = C_{ox}(V_{GS} - V_T),
 \qquad V_{GS} > V_T.
-\tag{10.1}
+\qquad (10.1)
 $$
 
 This is the **gradual-channel approximation**: the inversion charge per
@@ -88,13 +88,12 @@ length of channel.
 
 In the linear (triode) regime $V_{DS} \ll V_{GS} - V_T$, the inversion
 charge is roughly uniform along the channel; the channel acts like a
-voltage-controlled resistor of sheet conductance $\sigma_s = \mu_n
-Q_\mathrm{inv}$:
+voltage-controlled resistor of sheet conductance $\sigma_s = \mu_n Q_\mathrm{inv}$:
 
 $$
 I_D = \frac{W}{L_{ch}}\,\mu_n\,Q_\mathrm{inv}\,V_{DS}
     = \frac{W}{L_{ch}}\,\mu_n\,C_{ox}\,(V_{GS} - V_T)\,V_{DS}.
-\tag{10.2}
+\qquad (10.2)
 $$
 
 Here $W$ is the gate width (transverse to current flow) and $L_{ch}$ is
@@ -114,7 +113,7 @@ $I_D$ saturates:
 
 $$
 I_{D,\mathrm{sat}} = \frac{W}{2 L_{ch}}\,\mu_n\,C_{ox}\,(V_{GS} - V_T)^2.
-\tag{10.3}
+\qquad (10.3)
 $$
 
 This is the **Pao–Sah square-law saturation current**. Real short-channel
@@ -141,8 +140,7 @@ to (10.2).
   At $V_{GS} = V_T + 0.2$, the strong-inversion charge dominates by
   $\sim 7$ orders of magnitude.
 - **Upper edge $V_T + 0.6\,\mathrm{V}$.** Above this, velocity saturation
-  starts to bite; at the lateral field $V_{DS}/L_{ch} = 0.05/250\,\mathrm{nm}
-  = 2\times 10^5\,\mathrm{V/m}$ the Caughey–Thomas correction to mobility
+  starts to bite; at the lateral field $V_{DS}/L_{ch} = 0.05/250\,\mathrm{nm} = 2\times 10^5\,\mathrm{V/m}$ the Caughey–Thomas correction to mobility
   is small, but accumulating as you bias higher would invalidate the
   constant-mobility (10.2). M16.1 lets the window expand.
 - **$V_{DS} = 0.05\,\mathrm{V} \approx 2 V_t$.** Small enough to keep
@@ -194,9 +192,7 @@ The `mosfet_2d` benchmark has:
 - $N_a = 10^{17}\,\mathrm{cm^{-3}}$, so $|\phi_B| = V_t\ln(10^7) = 0.418\,\mathrm{V}$.
 - $T_{ox} = 5\,\mathrm{nm}$, so $C_{ox} = 6.91\times 10^{-3}\,\mathrm{F/m^2}$.
 - $\phi_{ms} = 0$ (ideal gate). $V_{fb}^\mathrm{textbook} = 0$.
-- $W_\mathrm{dmax} = \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.836/(1.602\times 10^{-19}\cdot 10^{23})}
-  = \sqrt{1.73\times 10^{-10}/1.602\times 10^4} = \sqrt{1.08\times 10^{-14}}
-  = 1.04\times 10^{-7}\,\mathrm{m} = 104\,\mathrm{nm}$.
+- $W_\mathrm{dmax} = \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.836/(1.602\times 10^{-19}\cdot 10^{23})} = \sqrt{1.73\times 10^{-10}/1.602\times 10^4} = \sqrt{1.08\times 10^{-14}} = 1.04\times 10^{-7}\,\mathrm{m} = 104\,\mathrm{nm}$.
 - Depletion charge term: $\sqrt{2\cdot 1.036\times 10^{-10}\cdot 1.602\times 10^{-19}\cdot 10^{23}\cdot 0.836}/C_{ox}$.
   Numerator: $\sqrt{2.77\times 10^{-6}} = 1.66\times 10^{-3}\,\mathrm{C/m^2}$. Divide by $6.91\times 10^{-3}$:
   $0.241\,\mathrm{V}$.
@@ -222,9 +218,7 @@ in the engine convention, with $V_{DS} = 0.05\,\mathrm{V}$.
 **$I_D/W$ at $V_{GS} = V_T + 0.4 = 1.058\,\mathrm{V}$.**
 $\mu_n = 0.14\,\mathrm{m^2/Vs}$, $C_{ox} = 6.91\times 10^{-3}\,\mathrm{F/m^2}$,
 $L_{ch} = 250\times 10^{-9}\,\mathrm{m}$.
-$I_D/W = (0.14/250\times 10^{-9})\cdot 6.91\times 10^{-3}\cdot 0.4\cdot 0.05
-= 5.6\times 10^5\cdot 6.91\times 10^{-3}\cdot 0.02
-= 77.4\,\mathrm{A/m}$.
+$I_D/W = (0.14/250\times 10^{-9})\cdot 6.91\times 10^{-3}\cdot 0.4\cdot 0.05 = 5.6\times 10^5\cdot 6.91\times 10^{-3}\cdot 0.02 = 77.4\,\mathrm{A/m}$.
 
 The benchmark verifier asserts the simulated $I_D/W$ is within 20% of
 this analytical value at three $V_{GS}$ points in the window. The actual
@@ -305,9 +299,7 @@ how the upper edge changes.
 
 ### Solutions
 
-**10.1.** $I_D/W = (0.14/250\times 10^{-9})\cdot 6.91\times 10^{-3}\cdot 0.6\cdot 0.05
-= 5.6\times 10^5\cdot 6.91\times 10^{-3}\cdot 0.03
-= 116\,\mathrm{A/m}$. Linear in $V_{GS}-V_T$ as expected; from $V_{GS}=V_T+0.4$
+**10.1.** $I_D/W = (0.14/250\times 10^{-9})\cdot 6.91\times 10^{-3}\cdot 0.6\cdot 0.05 = 5.6\times 10^5\cdot 6.91\times 10^{-3}\cdot 0.03 = 116\,\mathrm{A/m}$. Linear in $V_{GS}-V_T$ as expected; from $V_{GS}=V_T+0.4$
 to $+0.6$ the current grows by 50%.
 
 **10.2.** $I_{D,\mathrm{sat}} = (W/2L)\mu_nC_{ox}(V_{GS}-V_T)^2$.

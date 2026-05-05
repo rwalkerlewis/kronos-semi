@@ -43,7 +43,7 @@ $\tan\theta = y/x$, $z = z$. The volume element is
 
 $$
 dV = r\,dr\,d\theta\,dz.
-\tag{15.1}
+\qquad (15.1)
 $$
 
 Integrating an $\theta$-independent integrand over the full 3D domain
@@ -51,7 +51,7 @@ collapses the $\theta$ integral to $2\pi$:
 
 $$
 \int_\Omega f(r, z)\,dV = 2\pi\int_{\Omega_\mathrm{merid}} f(r,z)\,r\,dr\,dz.
-\tag{15.2}
+\qquad (15.2)
 $$
 
 The factor $2\pi$ cancels on both sides of any equation where every
@@ -66,21 +66,21 @@ $$
 \nabla\psi = \frac{\partial\psi}{\partial r}\hat{\mathbf{e}}_r
            + \frac{\partial\psi}{\partial z}\hat{\mathbf{e}}_z,
 \qquad
-\nabla\!\cdot\!\mathbf{F} = \frac{1}{r}\frac{\partial(rF_r)}{\partial r}
+\nabla\cdot\mathbf{F} = \frac{1}{r}\frac{\partial(rF_r)}{\partial r}
                           + \frac{\partial F_z}{\partial z}.
-\tag{15.3}
+\qquad (15.3)
 $$
 
 The Laplacian is $\nabla^2\psi = (1/r)\partial_r(r\partial_r\psi) + \partial_z^2\psi$.
 
 ### r-weighted Poisson weak form
 
-Strong form: $-\nabla\!\cdot\!(\varepsilon\nabla\psi) = \rho$ on the
-meridian half-plane (with the cylindrical $\nabla\!\cdot$ from (15.3)).
+Strong form: $-\nabla\cdot(\varepsilon\nabla\psi) = \rho$ on the
+meridian half-plane (with the cylindrical $\nabla\cdot$ from (15.3)).
 Multiply by a test function $v(r, z)$ and integrate against $r\,dr\,dz$:
 
 $$
--\int_\Omega \nabla\!\cdot\!(\varepsilon\nabla\psi)\,v\,r\,dr\,dz
+-\int_\Omega \nabla\cdot(\varepsilon\nabla\psi)\,v\,r\,dr\,dz
 = \int_\Omega \rho v\,r\,dr\,dz.
 $$
 
@@ -88,11 +88,9 @@ Use the cylindrical divergence identity to integrate by parts. The
 result is the **r-weighted Galerkin weak form**:
 
 $$
-\boxed{
-\int_\Omega \varepsilon\,\nabla\psi\!\cdot\!\nabla v\,r\,dr\,dz
+\int_\Omega \varepsilon\,\nabla\psi\cdot\nabla v\,r\,dr\,dz
 = \int_\Omega \rho\,v\,r\,dr\,dz.
-}
-\tag{15.4}
+\qquad (15.4)
 $$
 
 (With $\nabla$ now the meridian-plane gradient $(\partial_r, \partial_z)$.)
@@ -126,9 +124,9 @@ The meridian half-plane has four kinds of boundary:
 The same recipe applies to the continuity equations:
 
 $$
-\int_\Omega L_0^2\,\hat\mu_n\,\hat n\,\nabla\hat\Phi_n\!\cdot\!\nabla v_n\,r\,dr\,dz
+\int_\Omega L_0^2\,\hat\mu_n\,\hat n\,\nabla\hat\Phi_n\cdot\nabla v_n\,r\,dr\,dz
 - \int_\Omega \hat R\,v_n\,r\,dr\,dz = 0,
-\tag{15.5}
+\qquad (15.5)
 $$
 
 and similarly for holes with sign flip. See [`semi/physics/axisymmetric.py:142-219`](../../semi/physics/axisymmetric.py)
@@ -140,14 +138,13 @@ For the AC sweep / `mos_cap_ac` runner, the gate area integral becomes
 
 $$
 A_\mathrm{gate}^{3D} = 2\pi\int_\mathrm{gate facet} r\,ds_\mathrm{merid}.
-\tag{15.6}
+\qquad (15.6)
 $$
 
 The $\int r\,ds$ in the meridian computes the per-unit-radian gate
 "length" that, multiplied by $2\pi$, gives the actual gate area on the
 revolved 3D device. [`semi/runners/mos_cap_ac.py:188-198`](../../semi/runners/mos_cap_ac.py)
-performs this assembly to convert the integrated charge $Q_\mathrm{semi}^{3D}
-= 2\pi q\int\rho r\,dA$ into a per-unit-area $Q_\mathrm{gate}/A_\mathrm{gate}$.
+performs this assembly to convert the integrated charge $Q_\mathrm{semi}^{3D} = 2\pi q\int\rho r\,dA$ into a per-unit-area $Q_\mathrm{gate}/A_\mathrm{gate}$.
 
 ### When axisymmetric is wrong
 
@@ -179,8 +176,7 @@ the meridian's radial extent in this benchmark, because the entire top
 face is the gate. (More general benchmarks could have a smaller gate
 inside a larger meridian.)
 
-Gate area in 3D: $A_\mathrm{gate} = \pi R_\mathrm{gate}^2 = \pi(5\times 10^{-5})^2
-= 7.85\times 10^{-9}\,\mathrm{m^2} = 7.85\times 10^{-5}\,\mathrm{cm^2}$.
+Gate area in 3D: $A_\mathrm{gate} = \pi R_\mathrm{gate}^2 = \pi(5\times 10^{-5})^2 = 7.85\times 10^{-9}\,\mathrm{m^2} = 7.85\times 10^{-5}\,\mathrm{cm^2}$.
 
 Integrate $r$ over the gate facet in the meridian:
 $L_\mathrm{gate}^\mathrm{merid} = \int_0^{R_\mathrm{gate}} r\,dr = R_\mathrm{gate}^2/2$.
@@ -281,7 +277,7 @@ the entire $z = 0$ edge. The symmetry axis is the left edge $r = 0$.
 
 **15.2.** Far from $r = 0$, $r$ varies slowly over a P1 element.
 Approximate $r$ by its element midpoint $\bar r$; the integrand factors
-as $\bar r\,\varepsilon\nabla\psi\!\cdot\!\nabla v$ for the stiffness term,
+as $\bar r\,\varepsilon\nabla\psi\cdot\nabla v$ for the stiffness term,
 and similarly for the source. The $\bar r$ cancels on both sides of
 any *local* (per-element) test of the equation, leaving the Cartesian
 form. Validity: $r$ must vary by $\ll 1$ across an element, i.e.
@@ -301,8 +297,7 @@ substantially beyond the gate to allow the field to fall off radially.
 divided by $\pi$. That is: when you revolve the meridian around the
 $z$-axis, a meridian-line segment at radius $r$ traces out an annulus
 of circumference $2\pi r$ on the 3D gate; the meridian-line element
-$ds$ traces out an area element $2\pi r\,ds$. So $\int r\,ds_\mathrm{merid}
-= A_\mathrm{gate}^{3D}/(2\pi)$. The radial extent of the gate facet is
+$ds$ traces out an area element $2\pi r\,ds$. So $\int r\,ds_\mathrm{merid} = A_\mathrm{gate}^{3D}/(2\pi)$. The radial extent of the gate facet is
 just $R_\mathrm{gate} - r_\mathrm{inner}$; the area picks up the $r$
 factor.
 

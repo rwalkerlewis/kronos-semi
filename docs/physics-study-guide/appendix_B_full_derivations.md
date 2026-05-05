@@ -9,8 +9,8 @@ return when you need to verify a step.
 Goal: derive
 
 $$
-N_c = 2\left(\frac{m_n^* kT}{2\pi\hbar^2}\right)^{3/2}.
-\tag{B.1}
+N_c = 2\left(\frac{m_n^\astkT}{2\pi\hbar^2}\right)^{3/2}.
+\qquad (B.1)
 $$
 
 Start from (3.2):
@@ -22,42 +22,41 @@ $$
 The 3D parabolic-band density of states is (2.4):
 
 $$
-g_c(E) = \frac{1}{2\pi^2}\left(\frac{2m_n^*}{\hbar^2}\right)^{3/2}\sqrt{E - E_c}.
+g_c(E) = \frac{1}{2\pi^2}\left(\frac{2m_n^\ast}{\hbar^2}\right)^{3/2}\sqrt{E - E_c}.
 $$
 
 Multiply by 2 for spin and substitute. In the Boltzmann limit
 $f_\mathrm{FD} \approx \exp(-(E - E_F)/kT)$:
 
 $$
-n = \frac{2}{2\pi^2}\left(\frac{2m_n^*}{\hbar^2}\right)^{3/2}\,e^{(E_F - E_c)/kT}
+n = \frac{2}{2\pi^2}\left(\frac{2m_n^\ast}{\hbar^2}\right)^{3/2}\,e^{(E_F - E_c)/kT}
    \int_{E_c}^\infty \sqrt{E - E_c}\,e^{-(E - E_c)/kT}\,dE.
 $$
 
 Substitute $\eta = (E - E_c)/kT$, $d\eta = dE/kT$:
 
 $$
-n = \frac{1}{\pi^2}\left(\frac{2m_n^*}{\hbar^2}\right)^{3/2}\,(kT)^{3/2}\,e^{(E_F - E_c)/kT}
+n = \frac{1}{\pi^2}\left(\frac{2m_n^\ast}{\hbar^2}\right)^{3/2}\,(kT)^{3/2}\,e^{(E_F - E_c)/kT}
    \int_0^\infty \sqrt\eta\,e^{-\eta}\,d\eta.
 $$
 
 The integral is $\Gamma(3/2) = \sqrt\pi/2$. Combining:
 
 $$
-n = \frac{\sqrt\pi}{2\pi^2}\left(\frac{2m_n^* kT}{\hbar^2}\right)^{3/2}\,e^{(E_F-E_c)/kT}
-   = \frac{1}{2\pi^{3/2}}\left(\frac{2m_n^* kT}{\hbar^2}\right)^{3/2}\,e^{(E_F-E_c)/kT}.
+n = \frac{\sqrt\pi}{2\pi^2}\left(\frac{2m_n^\astkT}{\hbar^2}\right)^{3/2}\,e^{(E_F-E_c)/kT}
+   = \frac{1}{2\pi^{3/2}}\left(\frac{2m_n^\astkT}{\hbar^2}\right)^{3/2}\,e^{(E_F-E_c)/kT}.
 $$
 
 Identifying $n = N_c\exp(-(E_c - E_F)/kT)$:
 
 $$
-N_c = \frac{1}{2\pi^{3/2}}\left(\frac{2m_n^* kT}{\hbar^2}\right)^{3/2}
-    = 2\left(\frac{m_n^* kT}{2\pi\hbar^2}\right)^{3/2},
+N_c = \frac{1}{2\pi^{3/2}}\left(\frac{2m_n^\astkT}{\hbar^2}\right)^{3/2}
+    = 2\left(\frac{m_n^\astkT}{2\pi\hbar^2}\right)^{3/2},
 $$
 
-using $(2/\hbar^2)^{3/2}\cdot 1/(2\pi^{3/2}) = 1/(\pi^{3/2}\hbar^3)\cdot 2^{1/2}
-= 2/(2\pi\hbar^2/m^*kT)^{3/2}$ after rearrangement. (B.1) ✓
+using $(2/\hbar^2)^{3/2}\cdot 1/(2\pi^{3/2}) = 1/(\pi^{3/2}\hbar^3)\cdot 2^{1/2} = 2/(2\pi\hbar^2/m^\astkT)^{3/2}$ after rearrangement. (B.1) ✓
 
-The hole expression $N_v = 2(m_p^*kT/(2\pi\hbar^2))^{3/2}$ follows by
+The hole expression $N_v = 2(m_p^\astkT/(2\pi\hbar^2))^{3/2}$ follows by
 the symmetric integral over the valence band.
 
 ## B.2 — Full SRH derivation
@@ -156,7 +155,7 @@ at the depletion edge). Continuity of $E$ at $x = 0$:
 $$
 \frac{qN_A x_p}{\varepsilon} = \frac{qN_D x_n}{\varepsilon}
 \;\;\Rightarrow\;\; N_A x_p = N_D x_n.
-\tag{B.2}
+\qquad (B.2)
 $$
 
 This is charge balance.
@@ -179,7 +178,7 @@ $$
 \psi_R^\mathrm{eq} - \psi_L^\mathrm{eq}
 = \frac{qN_A x_p^2}{2\varepsilon} + \frac{qN_D x_n^2}{2\varepsilon}
 = V_{bi} - V.
-\tag{B.3}
+\qquad (B.3)
 $$
 
 Combine (B.2) and (B.3) with $W = x_p + x_n$:
@@ -204,8 +203,7 @@ $$
 Goal: derive (11.6), $\mathbf{J}_n = -q\mu_n n\,\nabla\Phi_n$.
 
 Start with (5.5):
-$\mathbf{J}_n = q\mu_n n\,\mathbf{E} + qD_n\,\nabla n
-= -q\mu_n n\,\nabla\psi + q\mu_n V_t\,\nabla n$ (using Einstein $D_n = \mu_n V_t$).
+$\mathbf{J}_n = q\mu_n n\,\mathbf{E} + qD_n\,\nabla n = -q\mu_n n\,\nabla\psi + q\mu_n V_t\,\nabla n$ (using Einstein $D_n = \mu_n V_t$).
 
 Slotboom: $n = n_i\exp((\psi - \Phi_n)/V_t)$, so
 
@@ -229,19 +227,19 @@ The drift and diffusion terms cancelled. ✓
 Goal: derive (12.1).
 
 Start with the dimensional Poisson (1.9):
-$-\nabla\!\cdot\!(\varepsilon_0\varepsilon_r\,\nabla\psi) = q(p - n + N)$.
+$-\nabla\cdot(\varepsilon_0\varepsilon_r\,\nabla\psi) = q(p - n + N)$.
 
 Substitute $\psi = V_t\hat\psi$, $n = C_0\hat n$, $p = C_0\hat p$,
 $N = C_0\hat N$:
 
 $$
--\nabla\!\cdot\!(\varepsilon_0\varepsilon_r V_t\,\nabla\hat\psi) = qC_0(\hat p - \hat n + \hat N).
+-\nabla\cdot(\varepsilon_0\varepsilon_r V_t\,\nabla\hat\psi) = qC_0(\hat p - \hat n + \hat N).
 $$
 
 Divide both sides by $qC_0$:
 
 $$
--\nabla\!\cdot\!\left(\frac{\varepsilon_0 V_t}{qC_0}\,\varepsilon_r\,\nabla\hat\psi\right)
+-\nabla\cdot\left(\frac{\varepsilon_0 V_t}{qC_0}\,\varepsilon_r\,\nabla\hat\psi\right)
 = \hat p - \hat n + \hat N.
 $$
 
@@ -265,30 +263,29 @@ The cylindrical divergence of a $\theta$-independent vector field
 $\mathbf{F} = F_r\hat{\mathbf{e}}_r + F_z\hat{\mathbf{e}}_z$ is
 
 $$
-\nabla\!\cdot\!\mathbf{F} = \frac{1}{r}\frac{\partial(rF_r)}{\partial r} + \frac{\partial F_z}{\partial z}.
+\nabla\cdot\mathbf{F} = \frac{1}{r}\frac{\partial(rF_r)}{\partial r} + \frac{\partial F_z}{\partial z}.
 $$
 
-The strong Poisson is $-\nabla\!\cdot\!(\varepsilon\nabla\psi) = \rho$.
+The strong Poisson is $-\nabla\cdot(\varepsilon\nabla\psi) = \rho$.
 Multiply by $v(r,z)$ and integrate against $r\,dr\,dz$:
 
 $$
--\int\nabla\!\cdot\!(\varepsilon\nabla\psi)\cdot v\cdot r\,dr\,dz = \int\rho v r\,dr\,dz.
+-\int\nabla\cdot(\varepsilon\nabla\psi)\cdot v\cdot r\,dr\,dz = \int\rho v r\,dr\,dz.
 $$
 
 Apply the divergence-theorem identity in cylindrical coordinates:
-$\int_\Omega(\nabla\!\cdot\!\mathbf{F})v\,dV = -\int_\Omega \mathbf{F}\!\cdot\!\nabla v\,dV
-+ \int_{\partial\Omega}\mathbf{F}\!\cdot\!\hat{\mathbf{n}}\,v\,dS$. With
+$\int_\Omega(\nabla\cdot\mathbf{F})v\,dV = -\int_\Omega \mathbf{F}\cdot\nabla v\,dV + \int_{\partial\Omega}\mathbf{F}\cdot\hat{\mathbf{n}}\,v\,dS$. With
 $\mathbf{F} = \varepsilon\nabla\psi$:
 
 $$
-\int_\Omega\varepsilon\nabla\psi\!\cdot\!\nabla v\,dV - \int_{\partial\Omega}\varepsilon\nabla\psi\!\cdot\!\hat{\mathbf{n}}\,v\,dS
+\int_\Omega\varepsilon\nabla\psi\cdot\nabla v\,dV - \int_{\partial\Omega}\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}\,v\,dS
 = \int_\Omega\rho v\,dV.
 $$
 
 Substituting $dV = r\,dr\,d\theta\,dz$ and dropping the $2\pi$:
 
 $$
-\int\varepsilon\nabla\psi\!\cdot\!\nabla v\,r\,dr\,dz - (\text{boundary terms})
+\int\varepsilon\nabla\psi\cdot\nabla v\,r\,dr\,dz - (\text{boundary terms})
 = \int\rho v\,r\,dr\,dz.
 $$
 
@@ -367,8 +364,7 @@ $Jx - \omega My = b_R$
 $\omega Mx + Jy = b_I$.
 
 In matrix form:
-$\begin{bmatrix} J & -\omega M \\ \omega M & J\end{bmatrix}\begin{bmatrix}x\\y\end{bmatrix}
-= \begin{bmatrix}b_R\\b_I\end{bmatrix}$.
+$\begin{bmatrix} J & -\omega M \\ \omega M & J\end{bmatrix}\begin{bmatrix}x\\y\end{bmatrix} = \begin{bmatrix}b_R\\b_I\end{bmatrix}$.
 
 Equation (18.4). ✓
 

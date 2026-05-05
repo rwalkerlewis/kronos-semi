@@ -63,15 +63,15 @@ The built-in voltage is the difference:
 $$
 V_{bi} = \psi_R^\mathrm{eq} - \psi_L^\mathrm{eq}
        = V_t\bigl[\mathrm{asinh}(N_D/(2n_i)) + \mathrm{asinh}(N_A/(2n_i))\bigr].
-\tag{7.1}
+\qquad (7.1)
 $$
 
 For $N \gg n_i$, $\mathrm{asinh}(x) \approx \ln(2x)$, giving
 
 $$
 V_{bi} \approx V_t\bigl[\ln(N_D/n_i) + \ln(N_A/n_i)\bigr]
-        = V_t\,\ln\!\left(\frac{N_A N_D}{n_i^2}\right).
-\tag{7.2}
+        = V_t\,\ln\left(\frac{N_A N_D}{n_i^2}\right).
+\qquad (7.2)
 $$
 
 Equation (7.2) is the textbook expression. The two forms agree to
@@ -98,12 +98,11 @@ $$
        +qN_A/\varepsilon & -x_p < x < 0 \\
        -qN_D/\varepsilon & 0 < x < x_n
      \end{cases}.
-\tag{7.3}
+\qquad (7.3)
 $$
 
 (Sign convention: I have used $-d^2\psi/dx^2 = \rho/\varepsilon$ from
-Ch. 1, with $\rho_\mathrm{p-side} = -qN_A$ and $\rho_\mathrm{n-side}
-= +qN_D$.)
+Ch. 1, with $\rho_\mathrm{p-side} = -qN_A$ and $\rho_\mathrm{n-side} = +qN_D$.)
 
 ### Charge balance
 
@@ -111,7 +110,7 @@ The total exposed charge on each side must be equal in magnitude:
 
 $$
 N_A x_p = N_D x_n.
-\tag{7.4}
+\qquad (7.4)
 $$
 
 (The charge per unit area is $qN x$; if they were unequal there would
@@ -131,16 +130,14 @@ E(x) = -\frac{d\psi}{dx}
          -(qN_A/\varepsilon)(x + x_p) & -x_p < x < 0 \\
          -(qN_D/\varepsilon)(x_n - x) & 0 < x < x_n
        \end{cases}.
-\tag{7.5}
+\qquad (7.5)
 $$
 
 The peak field at $x = 0$:
 
 $$
-\boxed{
 |E_\mathrm{max}| = \frac{q N_A x_p}{\varepsilon} = \frac{q N_D x_n}{\varepsilon}.
-}
-\tag{7.6}
+\qquad (7.6)
 $$
 
 (Both expressions are equal by (7.4), and they have to be: $E$ is
@@ -151,7 +148,7 @@ and $\psi(+x_n) = \psi_R^\mathrm{eq}$:
 
 $$
 V_{bi} - V = \frac{q}{2\varepsilon}\bigl(N_A x_p^2 + N_D x_n^2\bigr),
-\tag{7.7}
+\qquad (7.7)
 $$
 
 where the left-hand side is $V_{bi}$ at thermal equilibrium and
@@ -163,18 +160,16 @@ the built-in barrier).
 Combining charge balance (7.4) and the integrated potential (7.7):
 
 $$
-\boxed{
 W(V) = x_n + x_p
     = \sqrt{\frac{2\varepsilon (V_{bi} - V)(N_A + N_D)}{q\,N_A N_D}},
-}
-\tag{7.8}
+\qquad (7.8)
 $$
 
 $$
 x_n = W\,\frac{N_A}{N_A + N_D},
 \qquad
 x_p = W\,\frac{N_D}{N_A + N_D}.
-\tag{7.9}
+\qquad (7.9)
 $$
 
 Combining (7.6) and (7.9):
@@ -183,7 +178,7 @@ $$
 |E_\mathrm{max}| = \sqrt{\frac{2 q (V_{bi} - V) N_\mathrm{eff}}{\varepsilon}},
 \qquad
 N_\mathrm{eff} \equiv \frac{N_A N_D}{N_A + N_D}.
-\tag{7.10}
+\qquad (7.10)
 $$
 
 For the symmetric case $N_A = N_D$, $N_\mathrm{eff} = N/2$.
@@ -232,25 +227,16 @@ $N_A = N_D = 10^{23}\,\mathrm{m^{-3}}$, $V_t = 25.85\,\mathrm{mV}$.
 $\varepsilon = \varepsilon_r\varepsilon_0 = 1.036\times 10^{-10}\,\mathrm{F/m}$.
 
 **$V_{bi}$.** Log form:
-$V_{bi} = V_t\ln(10^{23}\cdot 10^{23}/(10^{16})^2) = V_t\ln(10^{14})
-= 0.02585\cdot 32.236 = 0.8334\,\mathrm{V}$. ✓
+$V_{bi} = V_t\ln(10^{23}\cdot 10^{23}/(10^{16})^2) = V_t\ln(10^{14}) = 0.02585\cdot 32.236 = 0.8334\,\mathrm{V}$. ✓
 
 **$W$ at $V = 0$.** $N_\mathrm{eff} = N/2 = 5\times 10^{22}\,\mathrm{m^{-3}}$.
-$W = \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.8334 / (1.602\times 10^{-19}\cdot 5\times 10^{22})}
-   = \sqrt{1.727\times 10^{-10}/8.012\times 10^{3}}
-   = \sqrt{2.156\times 10^{-14}}
-   = 1.469\times 10^{-7}\,\mathrm{m}
-   = 146.9\,\mathrm{nm}$. ✓
+$W = \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.8334 / (1.602\times 10^{-19}\cdot 5\times 10^{22})} = \sqrt{1.727\times 10^{-10}/8.012\times 10^{3}} = \sqrt{2.156\times 10^{-14}} = 1.469\times 10^{-7}\,\mathrm{m} = 146.9\,\mathrm{nm}$. ✓
 The test asserts $W \approx 146\,\mathrm{nm}$.
 
 **$x_n, x_p$.** Symmetric: $x_n = x_p = W/2 = 73.4\,\mathrm{nm}$. ✓
 
 **$|E_\mathrm{max}|$.**
-$|E_\mathrm{max}| = qN_A x_p/\varepsilon
-   = 1.602\times 10^{-19}\cdot 10^{23}\cdot 7.34\times 10^{-8}/1.036\times 10^{-10}
-   = 1.176\times 10^{-3}/1.036\times 10^{-10}
-   = 1.135\times 10^{7}\,\mathrm{V/m}
-   = 113.5\,\mathrm{kV/cm}$. ✓
+$|E_\mathrm{max}| = qN_A x_p/\varepsilon = 1.602\times 10^{-19}\cdot 10^{23}\cdot 7.34\times 10^{-8}/1.036\times 10^{-10} = 1.176\times 10^{-3}/1.036\times 10^{-10} = 1.135\times 10^{7}\,\mathrm{V/m} = 113.5\,\mathrm{kV/cm}$. ✓
 The test gates $90 < |E|/(\mathrm{kV/cm}) < 130$.
 
 **Charge balance check.** $x_p N_A = 7.34\times 10^{-8}\cdot 10^{23} = 7.34\times 10^{15}$.
@@ -263,9 +249,7 @@ All five tests pass.
 
 ### Forward-bias estimate
 
-At $V = 0.6\,\mathrm{V}$ on the M2 device (same parameters, plus $\tau_n = \tau_p
-= 10^{-7}\,\mathrm{s}$): $\exp(V/V_t) = e^{0.6/0.02585} = e^{23.21}
-= 1.20\times 10^{10}$. Saturation current $J_s = 4.78\times 10^{-8}\,\mathrm{A/m^2}$
+At $V = 0.6\,\mathrm{V}$ on the M2 device (same parameters, plus $\tau_n = \tau_p = 10^{-7}\,\mathrm{s}$): $\exp(V/V_t) = e^{0.6/0.02585} = e^{23.21} = 1.20\times 10^{10}$. Saturation current $J_s = 4.78\times 10^{-8}\,\mathrm{A/m^2}$
 (Ch. 5 worked example, long-diode formula). Predicted Shockley current
 $\approx 5.74\times 10^2\,\mathrm{A/m^2}$. Engine reports
 $\sim 1.6\times 10^3\,\mathrm{A/m^2}$. The factor-of-3 discrepancy is
@@ -273,12 +257,9 @@ consistent with short-base correction; see Ch. 5 worked example.
 
 ### Reverse-bias estimate
 
-At $V = -1\,\mathrm{V}$: $W(-1) = \sqrt{2\varepsilon(V_{bi}+1) N_A+N_D)/(qN_AN_D)}
-= \sqrt{(0.834+1)/0.834}\cdot W(0) = \sqrt{2.20}\cdot 146.9 = 218\,\mathrm{nm}$.
+At $V = -1\,\mathrm{V}$: $W(-1) = \sqrt{2\varepsilon(V_{bi}+1) N_A+N_D)/(qN_AN_D)} = \sqrt{(0.834+1)/0.834}\cdot W(0) = \sqrt{2.20}\cdot 146.9 = 218\,\mathrm{nm}$.
 $\Delta W = 218 - 147 = 71\,\mathrm{nm}$.
-$|J_\mathrm{gen}| = qn_i\Delta W /(2\tau)
-= 1.602\times 10^{-19}\cdot 10^{16}\cdot 7.1\times 10^{-8}/(2\cdot 10^{-7})
-= 5.7\times 10^{-4}\,\mathrm{A/m^2}$.
+$|J_\mathrm{gen}| = qn_i\Delta W /(2\tau) = 1.602\times 10^{-19}\cdot 10^{16}\cdot 7.1\times 10^{-8}/(2\cdot 10^{-7}) = 5.7\times 10^{-4}\,\mathrm{A/m^2}$.
 The M3 verifier accepts 20% agreement; the engine match is well within.
 
 ## Code map
@@ -356,21 +337,15 @@ field is $\sim 3\times 10^5\,\mathrm{V/cm}$)?
 
 ### Solutions
 
-**7.1.** $W(0.5) = W(0)\sqrt{(V_{bi}-0.5)/V_{bi}}
-= 146.9\,\mathrm{nm}\cdot\sqrt{0.334/0.834} = 146.9\cdot 0.633 = 92.9\,\mathrm{nm}$.
+**7.1.** $W(0.5) = W(0)\sqrt{(V_{bi}-0.5)/V_{bi}} = 146.9\,\mathrm{nm}\cdot\sqrt{0.334/0.834} = 146.9\cdot 0.633 = 92.9\,\mathrm{nm}$.
 The depletion region shrinks by 37%.
 
-**7.2.** $V_{bi} = V_t\ln(10^{15}\cdot 10^{17}/(10^{10})^2) = V_t\ln(10^{12})
-= 0.02585\cdot 27.63 = 0.714\,\mathrm{V}$.
-$N_\mathrm{eff} = 10^{15}\cdot 10^{17}/(10^{15}+10^{17}) \approx 10^{15}\,\mathrm{cm^{-3}}
-= 10^{21}\,\mathrm{m^{-3}}$.
-$W = \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.714 / (1.602\times 10^{-19}\cdot 10^{21})}
-= \sqrt{1.479\times 10^{-10}/1.602\times 10^2}
-= \sqrt{9.23\times 10^{-13}} = 9.61\times 10^{-7}\,\mathrm{m} = 961\,\mathrm{nm}$.
+**7.2.** $V_{bi} = V_t\ln(10^{15}\cdot 10^{17}/(10^{10})^2) = V_t\ln(10^{12}) = 0.02585\cdot 27.63 = 0.714\,\mathrm{V}$.
+$N_\mathrm{eff} = 10^{15}\cdot 10^{17}/(10^{15}+10^{17}) \approx 10^{15}\,\mathrm{cm^{-3}} = 10^{21}\,\mathrm{m^{-3}}$.
+$W = \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.714 / (1.602\times 10^{-19}\cdot 10^{21})} = \sqrt{1.479\times 10^{-10}/1.602\times 10^2} = \sqrt{9.23\times 10^{-13}} = 9.61\times 10^{-7}\,\mathrm{m} = 961\,\mathrm{nm}$.
 $x_p = W\cdot N_D/(N_A+N_D) = 961\cdot 10^{17}/(10^{17}+10^{15}) = 951\,\mathrm{nm}$,
 $x_n = W - x_p = 10\,\mathrm{nm}$. The depletion is 99% on the lightly-doped p-side.
-$|E_\mathrm{max}| = qN_D x_n/\varepsilon = 1.602\times 10^{-19}\cdot 10^{23}\cdot 10^{-8}/1.036\times 10^{-10}
-= 1.55\times 10^6\,\mathrm{V/m} = 15.5\,\mathrm{kV/cm}$.
+$|E_\mathrm{max}| = qN_D x_n/\varepsilon = 1.602\times 10^{-19}\cdot 10^{23}\cdot 10^{-8}/1.036\times 10^{-10} = 1.55\times 10^6\,\mathrm{V/m} = 15.5\,\mathrm{kV/cm}$.
 
 **7.3.** At $V \gg V_t$: $\exp(V/V_t)$ dominates the $-1$, so $J \to J_s e^{V/V_t}$
 (exponential growth). At $V \ll -V_t$: $\exp(V/V_t) \to 0$, so $J \to -J_s$
@@ -380,16 +355,13 @@ back-biased and the only available current is minority-carrier
 diffusion from the bulks.
 
 **7.4.** Integrate (7.5) for $-x_p < x < 0$ once:
-$\psi(x) - \psi_L^\mathrm{eq} = -\int_{-x_p}^x E(x')\,dx'
-= (qN_A/\varepsilon)\int_{-x_p}^x (x' + x_p)\,dx'
-= (qN_A/(2\varepsilon))(x + x_p)^2$.
+$\psi(x) - \psi_L^\mathrm{eq} = -\int_{-x_p}^x E(x')\,dx' = (qN_A/\varepsilon)\int_{-x_p}^x (x' + x_p)\,dx' = (qN_A/(2\varepsilon))(x + x_p)^2$.
 At $x = 0$: $\psi(0) - \psi_L = qN_A x_p^2/(2\varepsilon)$.
 Similarly on the n-side: $\psi_R - \psi(0) = qN_D x_n^2/(2\varepsilon)$.
 Sum: $V_{bi} = (q/2\varepsilon)(N_A x_p^2 + N_D x_n^2)$, replacing
 $V_{bi}$ with $V_{bi}-V$ under applied bias. ✓
 
-**7.5.** $W(-10) = W(0)\sqrt{(V_{bi}+10)/V_{bi}} = 146.9\sqrt{10.83/0.83}
-= 146.9\cdot 3.61 = 530\,\mathrm{nm}$.
+**7.5.** $W(-10) = W(0)\sqrt{(V_{bi}+10)/V_{bi}} = 146.9\sqrt{10.83/0.83} = 146.9\cdot 3.61 = 530\,\mathrm{nm}$.
 $|E_\mathrm{max}| = $ scales as $\sqrt{V_{bi}-V}$, so
 $E_\mathrm{max}(-10) = E_\mathrm{max}(0)\cdot 3.61 = 410\,\mathrm{kV/cm}$.
 This exceeds the silicon breakdown field of $\sim 300\,\mathrm{kV/cm}$;

@@ -106,7 +106,7 @@ by the BCs and is mesh-independent; reported but not gated.
 Three (now four with M16.1) variants exercise progressively more of
 the residual:
 
-- **Variant A (psi-only).** $\Phi_n^* = \Phi_p^* = 0$. Continuity rows
+- **Variant A (psi-only).** $\Phi_n^\ast = \Phi_p^\ast = 0$. Continuity rows
   collapse to noise; only the psi block is rate-gated.
 - **Variant B (full coupling, no R).** All three fields nontrivial,
   lifetimes set to $10^{20}\,\mathrm{s}$ to make $R$ negligible.
@@ -121,20 +121,20 @@ $\ge 0.19$ headroom; 1D and 2D paths consistent.
 
 ## Method of Manufactured Solutions
 
-Pick an exact solution $u^*(\mathbf{x})$ that you *know* (e.g.
-$u^*(x) = \sin(\pi x/L)$). Plug it into the strong-form residual:
+Pick an exact solution $u^\ast(\mathbf{x})$ that you *know* (e.g.
+$u^\ast(x) = \sin(\pi x/L)$). Plug it into the strong-form residual:
 
 $$
-F_\mathrm{strong}[u^*] = -\nabla\!\cdot\!(\varepsilon\nabla u^*) + (\text{source}) - \rho^*
-\equiv f^*(\mathbf{x}),
+F_\mathrm{strong}[u^\ast] = -\nabla\cdot(\varepsilon\nabla u^\ast) + (\text{source}) - \rho^\ast
+\equiv f^\ast(\mathbf{x}),
 $$
 
-with $f^*$ in general nonzero. Now redefine the right-hand side of
-your PDE to be $\rho^*(u^*) + f^*$. By construction, $u^*$ is the exact
+with $f^\ast$ in general nonzero. Now redefine the right-hand side of
+your PDE to be $\rho^\ast(u^\ast) + f^\ast$. By construction, $u^\ast$ is the exact
 solution of the modified problem.
 
 Discretize the modified problem on a sequence of meshes; compute the
-error $\|u_h - u^*\|$ at each level. The error should scale as
+error $\|u_h - u^\ast\|$ at each level. The error should scale as
 $h^{p+1}$ in $L^2$ and $h^p$ in $H^1$ where $p$ is the polynomial
 degree (P1 → $p=1$). Observed rate $\to 2$ in $L^2$ and $\to 1$ in $H^1$
 with mesh refinement.
@@ -144,9 +144,9 @@ operator is missing a derivative or has a sign error. MMS catches
 silent bugs that single-point validation misses.
 
 The forcing term must be added *in weak form*: do not compute
-$f^* = -\nabla\!\cdot\!(\varepsilon\nabla u^*)$ symbolically and then
+$f^\ast = -\nabla\cdot(\varepsilon\nabla u^\ast)$ symbolically and then
 integrate it against $v$ — at coarse mesh resolution, the symbolic
-discretization can collapse to numerical zero. Instead, build $u^*$ as
+discretization can collapse to numerical zero. Instead, build $u^\ast$ as
 a UFL expression and compose the strong form *as UFL*, which the
 assembler then integrates by parts in weak form
 ([`semi/verification/mms_poisson.py`](../../semi/verification/mms_poisson.py)
@@ -158,19 +158,28 @@ This script asserts the basic physics math without dolfinx. Reproducing
 each assertion from formulas in this guide:
 
 **Thermal voltage** (Ch. 3).
-$V_t = kT/q = 1.381\times 10^{-23}\cdot 300/1.602\times 10^{-19}
-= 0.025852\,\mathrm{V}$. Asserted $|V_t - 0.02585| < 0.001$. ✓
+
+$$
+V_t = kT/q = 1.381\times 10^{-23}\cdot 300/1.602\times 10^{-19} = 0.025852\,\mathrm{V}.
+$$
+
+Asserted $|V_t - 0.02585| < 0.001$. ✓
 
 **$\lambda^2$ bare** (Ch. 12).
-$\lambda^2 = \varepsilon_0 V_t/(qC_0L_0^2)
-= 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23}\cdot 4\times 10^{-12})
-= 3.57\times 10^{-6}$. Asserted matches.
+
+$$
+\lambda^2 = \varepsilon_0 V_t/(qC_0L_0^2) = 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23}\cdot 4\times 10^{-12}) = 3.57\times 10^{-6}.
+$$
+
+Asserted matches.
 
 **Debye length in silicon** (Ch. 12).
-$L_D = \sqrt{\varepsilon_r\varepsilon_0V_t/(qC_0)}
-= \sqrt{11.7\cdot 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23})}
-= 1.296\times 10^{-8}\,\mathrm{m} = 12.96\,\mathrm{nm}$. Asserted
-$10 < L_D < 16\,\mathrm{nm}$. ✓
+
+$$
+L_D = \sqrt{\varepsilon_r\varepsilon_0V_t/(qC_0)} = \sqrt{11.7\cdot 8.854\times 10^{-12}\cdot 0.02585/(1.602\times 10^{-19}\cdot 10^{23})} = 1.296\times 10^{-8}\,\mathrm{m} = 12.96\,\mathrm{nm}.
+$$
+
+Asserted $10 < L_D < 16\,\mathrm{nm}$. ✓
 
 **Cross-check $(L_D/L_0)^2 = \lambda^2\varepsilon_r$** (Ch. 12 Exercise).
 $(L_D/L_0)^2 = (1.296\times 10^{-8}/2\times 10^{-6})^2 = 4.20\times 10^{-5}$.
@@ -178,32 +187,40 @@ $\lambda^2\varepsilon_r = 3.57\times 10^{-6}\cdot 11.7 = 4.18\times 10^{-5}$.
 Match within 0.5%. ✓ (Asserted $|...|/(...) < 0.01$.)
 
 **$V_{bi}$ via asinh and via log** (Ch. 7).
-asinh: $V_t[\mathrm{asinh}(N_A/(2n_i)) + \mathrm{asinh}(N_D/(2n_i))]
-= V_t[\mathrm{asinh}(5\times 10^6) + \mathrm{asinh}(5\times 10^6)]
-= V_t\cdot 2\cdot 16.118 = 0.8334\,\mathrm{V}$.
-log: $V_t\ln(N_AN_D/n_i^2) = V_t\ln(10^{14}) = 0.8334\,\mathrm{V}$.
+
+$$
+\text{asinh: }V_t[\mathrm{asinh}(N_A/(2n_i)) + \mathrm{asinh}(N_D/(2n_i))] = V_t[\mathrm{asinh}(5\times 10^6) + \mathrm{asinh}(5\times 10^6)] = V_t\cdot 2\cdot 16.118 = 0.8334\,\mathrm{V}.
+$$
+
+$$
+\text{log: }V_t\ln(N_AN_D/n_i^2) = V_t\ln(10^{14}) = 0.8334\,\mathrm{V}.
+$$
+
 Relative diff $< 0.01$. ✓
 
 **Depletion width $W$, $x_p$, $x_n$** (Ch. 7).
 $N_\mathrm{eff} = N/2 = 5\times 10^{22}\,\mathrm{m^{-3}}$.
-$W = \sqrt{2\varepsilon V_{bi}/(qN_\mathrm{eff})}
-= \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.834/(1.602\times 10^{-19}\cdot 5\times 10^{22})}
-= 1.469\times 10^{-7}\,\mathrm{m} = 146.9\,\mathrm{nm}$.
+
+$$
+W = \sqrt{2\varepsilon V_{bi}/(qN_\mathrm{eff})} = \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.834/(1.602\times 10^{-19}\cdot 5\times 10^{22})} = 1.469\times 10^{-7}\,\mathrm{m} = 146.9\,\mathrm{nm}.
+$$
+
 $x_p = x_n = W/2 = 73.4\,\mathrm{nm}$. Asserted at 1% relative.
 
 **Peak $|E|$** (Ch. 7).
-$|E_\mathrm{max}| = qN_Ax_p/\varepsilon
-= 1.602\times 10^{-19}\cdot 10^{23}\cdot 7.34\times 10^{-8}/1.036\times 10^{-10}
-= 1.135\times 10^{7}\,\mathrm{V/m} = 113.5\,\mathrm{kV/cm}$. Asserted in $[90, 130]$ kV/cm. ✓
+
+$$
+|E_\mathrm{max}| = qN_Ax_p/\varepsilon = 1.602\times 10^{-19}\cdot 10^{23}\cdot 7.34\times 10^{-8}/1.036\times 10^{-10} = 1.135\times 10^{7}\,\mathrm{V/m} = 113.5\,\mathrm{kV/cm}.
+$$
+
+Asserted in $[90, 130]$ kV/cm. ✓
 
 **Charge balance** (Ch. 4).
 $x_pN_A = 7.34\times 10^{-8}\cdot 10^{23} = 7.34\times 10^{15}$;
 $x_nN_D$ same. Match to roundoff. ✓
 
 **Bulk carriers** (Ch. 7).
-$n^R = n_i\exp(\psi_R^\mathrm{eq}/V_t) = 10^{16}\cdot e^{16.12} = 10^{23}\,\mathrm{m^{-3}}$
-($= N_D$, ✓). $p^R = n_i\exp(-\psi_R^\mathrm{eq}/V_t) = 10^{9}\,\mathrm{m^{-3}}
-= 10^3\,\mathrm{cm^{-3}}$.
+$n^R = n_i\exp(\psi_R^\mathrm{eq}/V_t) = 10^{16}\cdot e^{16.12} = 10^{23}\,\mathrm{m^{-3}}$ ($= N_D$, ✓). $p^R = n_i\exp(-\psi_R^\mathrm{eq}/V_t) = 10^{9}\,\mathrm{m^{-3}} = 10^3\,\mathrm{cm^{-3}}$.
 
 **Mass action $np = n_i^2$** (Ch. 3).
 $10^{23}\cdot 10^9 = 10^{32}\,\mathrm{m^{-6}} = n_i^2$. ✓
@@ -331,7 +348,7 @@ would cause spurious CI failures.
 
 ## Common pitfalls
 
-1. **MMS forcing in strong form.** Computing $f^* = -\nabla\!\cdot\!(\varepsilon\nabla u^*)$
+1. **MMS forcing in strong form.** Computing $f^\ast = -\nabla\cdot(\varepsilon\nabla u^\ast)$
    symbolically and then integrating against $v$ in the discrete form
    can produce spurious zeros at coarse mesh. Always inject the
    manufactured solution into the weak form via UFL composition; let
@@ -342,7 +359,7 @@ would cause spurious CI failures.
    reference's own error, not the engine's. The Cauchy ratio gate is
    the proper convergence check; the depletion-error comparison is
    informational only.
-3. **Variant A's continuity rows are noise.** When $\Phi_n^* = \Phi_p^* = 0$,
+3. **Variant A's continuity rows are noise.** When $\Phi_n^\ast = \Phi_p^\ast = 0$,
    the continuity terms collapse to machine-roundoff residuals. The
    reported "rates" on those rows are meaningless. ADR 0006 documents
    that Variant A gates only the psi block.
@@ -359,9 +376,9 @@ would cause spurious CI failures.
 
 ## Exercises
 
-**Exercise 21.1.** Pick a manufactured solution $\psi^*(x) = \sin(2\pi x/L)$
+**Exercise 21.1.** Pick a manufactured solution $\psi^\ast(x) = \sin(2\pi x/L)$
 on a 1D Poisson problem with $\varepsilon = 1$. Compute the strong-form
-residual $f^*$. Plug the modified problem into the engine and predict
+residual $f^\ast$. Plug the modified problem into the engine and predict
 the observed L² rate.
 
 **Exercise 21.2.** Derive the SNS recombination current correction in
@@ -382,9 +399,9 @@ MMS? mesh convergence? conservation? validation?
 
 ### Solutions
 
-**21.1.** $\psi^* = \sin(2\pi x/L)$. $\nabla\psi^* = (2\pi/L)\cos(...)$.
-$\nabla\cdot(\varepsilon\nabla\psi^*) = -(2\pi/L)^2\sin(...)$.
-$f^* = -(-1\cdot(2\pi/L)^2\sin(...)) = (2\pi/L)^2\sin(2\pi x/L) = (2\pi/L)^2\psi^*$.
+**21.1.** $\psi^\ast = \sin(2\pi x/L)$. $\nabla\psi^\ast = (2\pi/L)\cos(...)$.
+$\nabla\cdot(\varepsilon\nabla\psi^\ast) = -(2\pi/L)^2\sin(...)$.
+$f^\ast = -(-1\cdot(2\pi/L)^2\sin(...)) = (2\pi/L)^2\sin(2\pi x/L) = (2\pi/L)^2\psi^\ast$.
 Inject into the runner. Observed L² rate should be 2.0 (P1 Lagrange,
 smooth solution).
 
@@ -407,10 +424,8 @@ clear; if Variant B is fine, the bug is in R; check
 `semi/physics/recombination.py` for sign changes since last green CI.
 
 **21.4.** $V_{bi}^\mathrm{asinh} = V_t[\mathrm{asinh}(N_D/(2n_i)) + \mathrm{asinh}(N_A/(2n_i))]$.
-For $N \gg n_i$: $\mathrm{asinh}(N/(2n_i)) = \ln(N/(2n_i) + \sqrt{(N/(2n_i))^2 + 1})
-\approx \ln(N/n_i)$. Sum: $V_t[\ln(N_D/n_i) + \ln(N_A/n_i)] = V_t\ln(N_AN_D/n_i^2)
-= V_{bi}^\mathrm{log}$. The remainder is
-$O((n_i/N)^2)$, of order $10^{-12}$ for $N/n_i = 10^7$ — well below 0.01%.
+For $N \gg n_i$: $\mathrm{asinh}(N/(2n_i)) = \ln(N/(2n_i) + \sqrt{(N/(2n_i))^2 + 1}) \approx \ln(N/n_i)$. Sum: $V_t[\ln(N_D/n_i) + \ln(N_A/n_i)] = V_t\ln(N_AN_D/n_i^2) = V_{bi}^\mathrm{log}$.
+The remainder is $O((n_i/N)^2)$, of order $10^{-12}$ for $N/n_i = 10^7$ — well below 0.01%.
 
 **21.5.** New benchmark `schottky_1d` will need:
 - **Validation**: thermionic-emission analytical I-V from (8.3); the

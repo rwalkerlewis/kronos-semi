@@ -45,8 +45,7 @@ under $N \to N$, $V \to -V$. The body has acceptor doping $N_a$ and an
 ohmic back contact. The gate is a metal with work function $\Phi_m$.
 
 Define $\phi_{ms} = \Phi_m - \Phi_s$ where $\Phi_s$ is the semiconductor
-work function (Ch. 2). For an n+ poly-silicon gate on p-Si at $N_a =
-5\times 10^{16}\,\mathrm{cm^{-3}}$, $\phi_{ms} \approx -0.95\,\mathrm{V}$
+work function (Ch. 2). For an n+ poly-silicon gate on p-Si at $N_a = 5\times 10^{16}\,\mathrm{cm^{-3}}$, $\phi_{ms} \approx -0.95\,\mathrm{V}$
 (this is the value in [`semi/cv.py:69`](../../semi/cv.py)).
 
 Three voltage regimes (taking V_g as the gate-to-body voltage):
@@ -78,16 +77,15 @@ intrinsic level). So
 
 $$
 V_{fb} = \phi_{ms} + (-|\phi_B|) - (-|\phi_B|) = \phi_{ms}\quad\text{(textbook)}.
-\tag{9.1a}
+\qquad (9.1a)
 $$
 
 But the engine's body-ohmic BC pins $\psi_\mathrm{body} = \psi_b = -|\phi_B|$
-on the back contact. The flat-band condition is then $\psi_\mathrm{gate}
-= \psi_\mathrm{body}$, giving (with (8.6) for the gate):
+on the back contact. The flat-band condition is then $\psi_\mathrm{gate} = \psi_\mathrm{body}$, giving (with (8.6) for the gate):
 
 $$
 V_{fb} = \phi_{ms} - \phi_F,
-\tag{9.1b}
+\qquad (9.1b)
 $$
 
 where $\phi_F = -|\phi_B|$ on a p-body, so $V_{fb} = \phi_{ms} + |\phi_B|$
@@ -112,7 +110,7 @@ support the depletion charge and bend the bands by $2|\phi_B|$:
 
 $$
 V_T = V_{fb} + 2|\phi_B| + \frac{\sqrt{2\varepsilon_s q N_a (2|\phi_B|)}}{C_{ox}},
-\tag{9.2}
+\qquad (9.2)
 $$
 
 with $C_{ox} = \varepsilon_{ox}/T_{ox}$ the per-area oxide capacitance.
@@ -126,7 +124,7 @@ At strong inversion the depletion region freezes at:
 
 $$
 W_\mathrm{dmax} = \sqrt{\frac{2\varepsilon_s\cdot 2|\phi_B|}{q N_a}}.
-\tag{9.3}
+\qquad (9.3)
 $$
 
 (Same form as the pn-junction depletion-width formula, with
@@ -138,7 +136,7 @@ The oxide is a thin parallel-plate capacitor:
 
 $$
 C_{ox} = \varepsilon_{ox}/T_{ox}.
-\tag{9.4}
+\qquad (9.4)
 $$
 
 The depletion region acts like a second capacitor in series, with
@@ -148,7 +146,7 @@ $$
 \frac{1}{C(V_g)} = \frac{1}{C_{ox}} + \frac{1}{C_\mathrm{dep}(V_g)},
 \qquad
 C_\mathrm{dep} = \frac{\varepsilon_s}{W_\mathrm{dep}}.
-\tag{9.5}
+\qquad (9.5)
 $$
 
 In accumulation, $W_\mathrm{dep} \to 0$ and $C \to C_{ox}$.
@@ -160,7 +158,7 @@ At inversion, the inversion layer at the surface either
   $W_\mathrm{dep}$ stays at $W_\mathrm{dmax}$, $C$ stays at
 $$
 C_\mathrm{min} = \frac{1}{1/C_{ox} + W_\mathrm{dmax}/\varepsilon_s}.
-\tag{9.6}
+\qquad (9.6)
 $$
 
 This is the LF–HF distinction that the C–V community lives by.
@@ -193,7 +191,7 @@ nonlinear Poisson equation:
 
 $$
 K(\psi_0)\,\delta\psi = -\frac{\partial F}{\partial V_g}\,\delta V_g,
-\tag{9.7}
+\qquad (9.7)
 $$
 
 with $K = \partial F/\partial\psi$ the discrete Jacobian at the
@@ -207,7 +205,7 @@ $$
 \frac{dQ_\mathrm{gate}}{dV_g}
    = -\frac{q}{W_\mathrm{lat}}\int_\mathrm{Si}
        n_i\bigl(e^{-\psi_0/V_t} + e^{\psi_0/V_t}\bigr)\,\delta\psi\,dV.
-\tag{9.8}
+\qquad (9.8)
 $$
 
 (With an r-weighted integrand in the axisymmetric case; see Ch. 15.)
@@ -232,30 +230,23 @@ $T_{ox} = 10\,\mathrm{nm}$, $\phi_{ms} = -0.95\,\mathrm{V}$,
 $Q_f = 0$, $T = 300\,\mathrm{K}$, $\varepsilon_r^\mathrm{Si} = 11.7$,
 $\varepsilon_r^\mathrm{SiO_2} = 3.9$.
 
-**$|\phi_B|$.** $V_t\ln(5\times 10^{16}/10^{10}) = 0.02585\cdot\ln(5\times 10^6)
-= 0.02585\cdot 15.42 = 0.399\,\mathrm{V}$. ✓
+**$|\phi_B|$.** $V_t\ln(5\times 10^{16}/10^{10}) = 0.02585\cdot\ln(5\times 10^6) = 0.02585\cdot 15.42 = 0.399\,\mathrm{V}$. ✓
 
-**$C_{ox}$.** $\varepsilon_{ox}/T_{ox} = 3.9\cdot 8.854\times 10^{-12}/10^{-8}
-= 3.45\times 10^{-3}\,\mathrm{F/m^2} = 345\,\mathrm{nF/cm^2}$. ✓
+**$C_{ox}$.** $\varepsilon_{ox}/T_{ox} = 3.9\cdot 8.854\times 10^{-12}/10^{-8} = 3.45\times 10^{-3}\,\mathrm{F/m^2} = 345\,\mathrm{nF/cm^2}$. ✓
 
 **$V_{fb}$.** $\phi_{ms} - Q_f/C_{ox} = -0.95 - 0 = -0.950\,\mathrm{V}$. ✓
 
-**$W_\mathrm{dmax}$.** $\sqrt{2\cdot 11.7\cdot 8.854\times 10^{-12}\cdot
-2\cdot 0.399 / (1.602\times 10^{-19}\cdot 5\times 10^{22})}
-= \sqrt{1.654\times 10^{-10}/8.012\times 10^3}
-= \sqrt{2.06\times 10^{-14}} = 1.44\times 10^{-7}\,\mathrm{m} = 144\,\mathrm{nm}$. ✓
+**$W_\mathrm{dmax}$.** $\sqrt{2\cdot 11.7\cdot 8.854\times 10^{-12}\cdot 2\cdot 0.399 / (1.602\times 10^{-19}\cdot 5\times 10^{22})} = \sqrt{1.654\times 10^{-10}/8.012\times 10^3} = \sqrt{2.06\times 10^{-14}} = 1.44\times 10^{-7}\,\mathrm{m} = 144\,\mathrm{nm}$. ✓
 
 **Depletion-charge term in $V_T$.**
 $\sqrt{2\cdot 11.7\cdot 8.854\times 10^{-12}\cdot 1.602\times 10^{-19}\cdot 5\times 10^{22}\cdot 2\cdot 0.399}/C_{ox}$.
-The numerator under the sqrt: $2\cdot 1.036\times 10^{-10}\cdot 1.602\times 10^{-19}\cdot 5\times 10^{22}\cdot 0.798
-= 1.32\times 10^{-6}\,\mathrm{C^2/m^4}$. sqrt gives $1.15\times 10^{-3}\,\mathrm{C/m^2}$.
+The numerator under the sqrt: $2\cdot 1.036\times 10^{-10}\cdot 1.602\times 10^{-19}\cdot 5\times 10^{22}\cdot 0.798 = 1.32\times 10^{-6}\,\mathrm{C^2/m^4}$. sqrt gives $1.15\times 10^{-3}\,\mathrm{C/m^2}$.
 Divide by $C_{ox} = 3.45\times 10^{-3}\,\mathrm{F/m^2}$: $0.333\,\mathrm{V}$.
 
 **$V_T$.** $V_{fb} + 2|\phi_B| + \mathrm{depterm} = -0.950 + 0.798 + 0.333 = +0.181\,\mathrm{V}$. ✓
 
 **$C_\mathrm{min}/C_{ox}$.**
-$C_\mathrm{dep,max} = \varepsilon_s/W_\mathrm{dmax} = 11.7\cdot 8.854\times 10^{-12}/1.44\times 10^{-7}
-= 7.19\times 10^{-4}\,\mathrm{F/m^2}$.
+$C_\mathrm{dep,max} = \varepsilon_s/W_\mathrm{dmax} = 11.7\cdot 8.854\times 10^{-12}/1.44\times 10^{-7} = 7.19\times 10^{-4}\,\mathrm{F/m^2}$.
 $C_\mathrm{min} = 1/(1/C_{ox} + 1/C_\mathrm{dep,max}) = 1/(290 + 1391) = 1/1681 = 5.95\times 10^{-4}\,\mathrm{F/m^2}$.
 Ratio: $5.95\times 10^{-4}/3.45\times 10^{-3} = 0.173$. ✓
 
@@ -339,13 +330,11 @@ machine precision?
 
 ### Solutions
 
-**9.1.** $C_{ox}(5\,\mathrm{nm}) = 3.9\cdot 8.854\times 10^{-12}/5\times 10^{-9}
-= 6.91\times 10^{-3}\,\mathrm{F/m^2}$ (twice the original).
+**9.1.** $C_{ox}(5\,\mathrm{nm}) = 3.9\cdot 8.854\times 10^{-12}/5\times 10^{-9} = 6.91\times 10^{-3}\,\mathrm{F/m^2}$ (twice the original).
 Depletion term in $V_T$: same depletion charge but divided by twice the
 $C_{ox}$, so half: $0.166\,\mathrm{V}$.
 $V_T = -0.950 + 0.798 + 0.166 = +0.014\,\mathrm{V}$.
-$C_\mathrm{min} = 1/(1/6.91\times 10^{-3} + W_\mathrm{dmax}/\varepsilon_s)
-= 1/(145 + 1391) = 6.51\times 10^{-4}\,\mathrm{F/m^2}$.
+$C_\mathrm{min} = 1/(1/6.91\times 10^{-3} + W_\mathrm{dmax}/\varepsilon_s) = 1/(145 + 1391) = 6.51\times 10^{-4}\,\mathrm{F/m^2}$.
 $V_{fb}$ unchanged: $-0.950\,\mathrm{V}$ (independent of $T_{ox}$ when
 $Q_f = 0$).
 
@@ -354,14 +343,11 @@ $|\phi_B| \propto \ln(N_a)$ grows with doping, so the numerator grows
 slowly while the denominator grows linearly: net $W \propto \sqrt{\ln/N}$
 decreases. At $N_a = 10^{18}\,\mathrm{cm^{-3}}$:
 $|\phi_B| = V_t\ln(10^8) = 0.476\,\mathrm{V}$;
-$W_\mathrm{dmax} = \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.952/(1.602\times 10^{-19}\cdot 10^{24})}
-= \sqrt{1.97\times 10^{-10}/1.6\times 10^5} = \sqrt{1.23\times 10^{-15}} = 35\,\mathrm{nm}$.
+$W_\mathrm{dmax} = \sqrt{2\cdot 1.036\times 10^{-10}\cdot 0.952/(1.602\times 10^{-19}\cdot 10^{24})} = \sqrt{1.97\times 10^{-10}/1.6\times 10^5} = \sqrt{1.23\times 10^{-15}} = 35\,\mathrm{nm}$.
 About 1/4 of the $5\times 10^{16}$ value.
 
-**9.3.** $C_{ox}^\mathrm{HfO_2} = 25\cdot 8.854\times 10^{-12}/10^{-8}
-= 2.21\times 10^{-2}\,\mathrm{F/m^2}$ (about 6.4× larger).
-EOT = $\varepsilon_\mathrm{SiO_2}/C_{ox}^\mathrm{HfO_2} = 3.9\cdot 8.854\times 10^{-12}/2.21\times 10^{-2}
-= 1.56\times 10^{-9}\,\mathrm{m} = 1.56\,\mathrm{nm}$. So a 10 nm HfO₂
+**9.3.** $C_{ox}^\mathrm{HfO_2} = 25\cdot 8.854\times 10^{-12}/10^{-8} = 2.21\times 10^{-2}\,\mathrm{F/m^2}$ (about 6.4× larger).
+EOT = $\varepsilon_\mathrm{SiO_2}/C_{ox}^\mathrm{HfO_2} = 3.9\cdot 8.854\times 10^{-12}/2.21\times 10^{-2} = 1.56\times 10^{-9}\,\mathrm{m} = 1.56\,\mathrm{nm}$. So a 10 nm HfO₂
 acts like a 1.56 nm SiO₂. This is why high-$\varepsilon_r$ ("high-k")
 dielectrics replaced SiO₂ in advanced CMOS — they give thin-EOT gate
 insulators while keeping a physically thicker layer that does not tunnel.

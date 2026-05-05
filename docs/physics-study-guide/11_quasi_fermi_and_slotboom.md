@@ -46,10 +46,10 @@ and $E_{F,p}(\mathbf{x})$ such that the carrier densities still take the
 Boltzmann form, but with each carrier-type's own quasi-Fermi level:
 
 $$
-n(\mathbf{x}) = N_c\,\exp\!\left(\frac{E_{F,n}(\mathbf{x}) - E_c(\mathbf{x})}{kT}\right),
+n(\mathbf{x}) = N_c\,\exp\left(\frac{E_{F,n}(\mathbf{x}) - E_c(\mathbf{x})}{kT}\right),
 \quad
-p(\mathbf{x}) = N_v\,\exp\!\left(\frac{E_v(\mathbf{x}) - E_{F,p}(\mathbf{x})}{kT}\right).
-\tag{11.1}
+p(\mathbf{x}) = N_v\,\exp\left(\frac{E_v(\mathbf{x}) - E_{F,p}(\mathbf{x})}{kT}\right).
+\qquad (11.1)
 $$
 
 In equilibrium, both $E_{F,n}$ and $E_{F,p}$ collapse to the global
@@ -65,7 +65,7 @@ $$
 \Phi_n(\mathbf{x}) \equiv -\frac{E_{F,n}(\mathbf{x})}{q},
 \qquad
 \Phi_p(\mathbf{x}) \equiv -\frac{E_{F,p}(\mathbf{x})}{q}.
-\tag{11.2}
+\qquad (11.2)
 $$
 
 (Negative sign so that high $\Phi_n$ corresponds to low electron density
@@ -76,12 +76,10 @@ Substitute (3.6) — $\psi = -E_i/q$ — and rearrange (11.1) using
 $E_c - E_i = E_g/2$ at the band-edge convention:
 
 $$
-\boxed{
-n = n_i\,\exp\!\left(\frac{\psi - \Phi_n}{V_t}\right),
+n = n_i\,\exp\left(\frac{\psi - \Phi_n}{V_t}\right),
 \qquad
-p = n_i\,\exp\!\left(\frac{\Phi_p - \psi}{V_t}\right).
-}
-\tag{11.3}
+p = n_i\,\exp\left(\frac{\Phi_p - \psi}{V_t}\right).
+\qquad (11.3)
 $$
 
 This is the engine's working form, in [`semi/physics/slotboom.py:27-42`](../../semi/physics/slotboom.py)
@@ -96,7 +94,7 @@ the choice of energy zero at the intrinsic level is the convention. So:
 
 $$
 \Phi_n = \Phi_p = 0\quad\text{at thermal equilibrium}.
-\tag{11.4}
+\qquad (11.4)
 $$
 
 Substituting (11.4) into (11.3): $n = n_i\exp(\psi/V_t)$, $p = n_i\exp(-\psi/V_t)$,
@@ -114,7 +112,7 @@ the applied bias:
 
 $$
 \Phi_n|_\mathrm{contact} = \Phi_p|_\mathrm{contact} = V_\mathrm{applied}.
-\tag{11.5}
+\qquad (11.5)
 $$
 
 This is the **Shockley boundary condition** (cf. (8.5)). Inside the
@@ -142,31 +140,29 @@ Substitute and simplify:
 $$
 \mathbf{J}_n = -q\mu_n n\,\nabla\psi + q\mu_n n\,(\nabla\psi - \nabla\Phi_n)
    = -q\mu_n n\,\nabla\Phi_n.
-\tag{11.6}
+\qquad (11.6)
 $$
 
 The drift and diffusion terms have *cancelled* against each other; the
 remaining structure is
 
 $$
-\boxed{
 \mathbf{J}_n = -q\,\mu_n n\,\nabla\Phi_n,
 \qquad
 \mathbf{J}_p = -q\,\mu_p p\,\nabla\Phi_p,
-}
-\tag{11.7}
+\qquad (11.7)
 $$
 
 a **pure gradient times a coefficient**. This is the magic of Slotboom.
 
 ### Why this fixes the discretization
 
-The continuity equation $\nabla\!\cdot\!\mathbf{J}_n = qR$ with (11.7)
+The continuity equation $\nabla\cdot\mathbf{J}_n = qR$ with (11.7)
 becomes
 
 $$
--\nabla\!\cdot\!(q\mu_n n\,\nabla\Phi_n) = qR,
-\tag{11.8}
+-\nabla\cdot(q\mu_n n\,\nabla\Phi_n) = qR,
+\qquad (11.8)
 $$
 
 a second-order *elliptic* PDE in $\Phi_n$ with a positive coefficient
@@ -195,11 +191,9 @@ discretization is now well-posed at every iterate.
 At the cathode (n-side ohmic, n-type):
 - $\psi_R = \psi_R^\mathrm{eq} + V_\mathrm{applied} = 0.4167 + 0.6 = 1.0167\,\mathrm{V}$
 - $\Phi_n = \Phi_p = 0.6\,\mathrm{V}$
-- $n_R = n_i\exp((\psi_R - \Phi_n)/V_t) = 10^{16}\exp((1.0167 - 0.6)/0.02585)
-       = 10^{16}\exp(16.118) = 10^{16}\cdot 10^7 = 10^{23}\,\mathrm{m^{-3}}$
+- $n_R = n_i\exp((\psi_R - \Phi_n)/V_t) = 10^{16}\exp((1.0167 - 0.6)/0.02585) = 10^{16}\exp(16.118) = 10^{16}\cdot 10^7 = 10^{23}\,\mathrm{m^{-3}}$
        $= 10^{17}\,\mathrm{cm^{-3}}$ (= $N_D$, ✓).
-- $p_R = n_i\exp((\Phi_p - \psi_R)/V_t) = 10^{16}\exp(-16.118) = 10^{16}\cdot 10^{-7}
-       = 10^9\,\mathrm{m^{-3}} = 10^3\,\mathrm{cm^{-3}}$ (minority).
+- $p_R = n_i\exp((\Phi_p - \psi_R)/V_t) = 10^{16}\exp(-16.118) = 10^{16}\cdot 10^{-7} = 10^9\,\mathrm{m^{-3}} = 10^3\,\mathrm{cm^{-3}}$ (minority).
 
 Mass action in the forward-biased ohmic contact: $n_R p_R = 10^{17}\cdot 10^3 = 10^{20}$.
 But $n_i^2 = 10^{20}$. ✓ — at the contact, mass action *holds* because
@@ -209,8 +203,7 @@ $\Phi_n = \Phi_p$, even though the contact is biased.
 split. At the metallurgical junction with $\Phi_n - \Phi_p \approx V$,
 $np = n_i^2\exp((\Phi_p - \Phi_n)/V_t) = n_i^2\exp(-V/V_t)\cdot\exp(2V/V_t) = n_i^2\exp(V/V_t)$.
 
-Wait — let me redo the algebra. $np = n_i\exp((\psi-\Phi_n)/V_t)\cdot n_i\exp((\Phi_p - \psi)/V_t)
-= n_i^2\exp((\Phi_p - \Phi_n)/V_t)$. Under bias, $\Phi_n - \Phi_p = -V$
+Wait — let me redo the algebra. $np = n_i\exp((\psi-\Phi_n)/V_t)\cdot n_i\exp((\Phi_p - \psi)/V_t) = n_i^2\exp((\Phi_p - \Phi_n)/V_t)$. Under bias, $\Phi_n - \Phi_p = -V$
 in the depletion region (so $\Phi_p - \Phi_n = +V$); $np = n_i^2\exp(V/V_t)$.
 At $V = 0.6\,\mathrm{V}$: $np/n_i^2 = e^{23.21} = 10^{10.08}$, an
 enormous excess. This is the **mass-action breaking** that drives the
@@ -284,7 +277,7 @@ Why is `n_hat = n_from_slotboom(psi, phi_n, ni_hat)` evaluated in the
 form expression rather than precomputed? What does this buy?
 
 **Exercise 11.5.** A naive $(\psi, n, p)$ Galerkin discretization
-gives $\nabla\!\cdot\!(q\mu_n n\mathbf{E})$ as a primary term, which has a
+gives $\nabla\cdot(q\mu_n n\mathbf{E})$ as a primary term, which has a
 mixed-derivative structure. Show that this is *not* coercive in $H^1$,
 i.e. the discrete operator can have negative or zero eigenvalues at
 high Péclet number.
@@ -292,20 +285,15 @@ high Péclet number.
 ### Solutions
 
 **11.1.** Same algebra: $\nabla p = (p/V_t)(\nabla\Phi_p - \nabla\psi)$.
-Substitute into $\mathbf{J}_p = q\mu_p p(-\nabla\psi) - qD_p\nabla p
-= -q\mu_p p\nabla\psi - q\mu_p V_t\cdot(p/V_t)(\nabla\Phi_p - \nabla\psi)
-= -q\mu_p p\nabla\psi - q\mu_p p\nabla\Phi_p + q\mu_p p\nabla\psi
-= -q\mu_p p\nabla\Phi_p$. ✓
+Substitute into $\mathbf{J}_p = q\mu_p p(-\nabla\psi) - qD_p\nabla p = -q\mu_p p\nabla\psi - q\mu_p V_t\cdot(p/V_t)(\nabla\Phi_p - \nabla\psi) = -q\mu_p p\nabla\psi - q\mu_p p\nabla\Phi_p + q\mu_p p\nabla\psi = -q\mu_p p\nabla\Phi_p$. ✓
 
-**11.2.** $np = n_i\exp((\psi-\Phi_n)/V_t)\cdot n_i\exp((\Phi_p-\psi)/V_t)
-= n_i^2\exp((\Phi_p-\Phi_n)/V_t)$. With $\Phi_n = \Phi_p = 0$, the
+**11.2.** $np = n_i\exp((\psi-\Phi_n)/V_t)\cdot n_i\exp((\Phi_p-\psi)/V_t) = n_i^2\exp((\Phi_p-\Phi_n)/V_t)$. With $\Phi_n = \Phi_p = 0$, the
 exponent vanishes, so $np = n_i^2$.
 
 **11.3.** $\Phi_n = \Phi_p = -1\,\mathrm{V}$ at the swept (cathode)
 contact. (Or +1 if it's the anode.) At a cathode (n-type) with
 $\psi_R = 0.4167 - 1 = -0.5833\,\mathrm{V}$ (the equilibrium value
-shifted by the applied bias): $n_R = n_i\exp((\psi_R - \Phi_n)/V_t)
-= 10^{16}\exp((-0.5833 + 1)/0.02585) = 10^{16}\exp(16.12) = 10^{23}\,\mathrm{m^{-3}}$
+shifted by the applied bias): $n_R = n_i\exp((\psi_R - \Phi_n)/V_t) = 10^{16}\exp((-0.5833 + 1)/0.02585) = 10^{16}\exp(16.12) = 10^{23}\,\mathrm{m^{-3}}$
 — still equal to $N_D$, as expected for an ideal ohmic contact.
 
 **11.4.** UFL evaluates the form expression at quadrature points, so
