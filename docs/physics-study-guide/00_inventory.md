@@ -26,7 +26,7 @@ itself, see `01_classical_em_and_poisson.md` through
 | Poisson PDE in matter $-\nabla\cdot(\varepsilon\nabla\psi)=\rho$ | `semi/physics/poisson.py:73-79` | n/a | `docs/PHYSICS.md` §1.1, `docs/PHYSICS_INTRO.md` §2.1 | Why we solve for $\psi$, not $\mathbf{E}$ |
 | Dirichlet BC (ohmic, gate) | `semi/bcs.py:145-196` | `contacts[*].type == "ohmic"`, `"gate"` | `docs/PHYSICS.md` §3.1, §3.2 | First-principles motivation for "infinite recombination velocity" interpretation of ohmic |
 | Homogeneous Neumann BC (insulating) | `semi/bcs.py:34, 100` (skipped); natural in weak form | `contacts[*].type == "insulating"` | `docs/PHYSICS.md` §3.3 | Why this is the natural BC of the variational principle |
-| Interface flux continuity (Si/SiO₂) | `semi/physics/poisson.py:82-118` (`build_equilibrium_poisson_form_mr`) | `regions` with multiple `material` | `docs/PHYSICS.md` §6.2 | Derivation that the Galerkin form encodes $\llbracket\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket=0$ for free |
+| Interface flux continuity (Si/SiO₂) | `semi/physics/poisson.py:82-118` (`build_equilibrium_poisson_form_mr`) | `regions` with multiple `material` | `docs/PHYSICS.md` §6.2 | Derivation that the Galerkin form encodes $⟦\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}⟧=0$ for free |
 | Symmetry-axis natural BC ($r=0$) | `semi/physics/axisymmetric.py:24-27`, schema cross-validator | `coordinate_system: "axisymmetric"` | `docs/theory/axisymmetric.md` | Forward reference from Ch. 1 to Ch. 15 |
 
 ## B. Solid state and band theory (Ch. 2)

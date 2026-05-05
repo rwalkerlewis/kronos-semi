@@ -4,7 +4,7 @@
 
 - Construct a cellwise (DG0) relative-permittivity function $\varepsilon_r(\mathbf{x})$
   for a multi-region device.
-- Show that the natural flux-continuity condition $\llbracket\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket = 0$
+- Show that the natural flux-continuity condition $⟦\varepsilon\nabla\psi\cdot\hat{\mathbf{n}}⟧ = 0$
   at a Si/SiO₂ interface is encoded automatically by the Galerkin
   weak form with piecewise $\varepsilon_r$.
 - Explain why carriers (Slotboom $\Phi_n, \Phi_p$) live on a
@@ -62,15 +62,15 @@ At a sharp Si/SiO₂ interface with no surface charge, the electrostatic
 boundary condition is
 
 $$
-\llbracket\psi\rrbracket = 0,
+⟦\psi⟧ = 0,
 \qquad
-\llbracket\varepsilon_0\varepsilon_r\,\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket = 0.
+⟦\varepsilon_0\varepsilon_r\,\nabla\psi\cdot\hat{\mathbf{n}}⟧ = 0.
 \qquad (14.1)
 $$
 
 (Continuity of $\psi$, continuity of normal $\mathbf{D}$.) The
 P1 Lagrange function space is **conforming** in $H^1$ — values are
-continuous across element edges by construction — so $\llbracket\psi\rrbracket = 0$
+continuous across element edges by construction — so $⟦\psi⟧ = 0$
 is built into the discrete unknown. The flux-continuity condition is
 trickier; let's derive it from the variational principle.
 
@@ -95,13 +95,13 @@ $$
 
 with $\hat{\mathbf{n}}_1$ the outward normal to $K_1$. Combining the
 two cell-integrated-by-parts contributions, the interior surface term
-collapses to $-\int_F\,\llbracket\varepsilon_r\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket\,v\,dS$
+collapses to $-\int_F\,⟦\varepsilon_r\nabla\psi\cdot\hat{\mathbf{n}}⟧\,v\,dS$
 (the jump in normal flux). For the weak Galerkin equation
 $a(\psi, v) = (f, v)$ to hold for *every* test $v$, including those
 supported across the interface, the jump must satisfy
 
 $$
-\llbracket\varepsilon_r\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket = (\text{surface charge density})/\varepsilon_0.
+⟦\varepsilon_r\nabla\psi\cdot\hat{\mathbf{n}}⟧ = (\text{surface charge density})/\varepsilon_0.
 \qquad (14.2)
 $$
 

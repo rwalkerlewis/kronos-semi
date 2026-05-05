@@ -174,11 +174,11 @@ $$
    $\psi$ is continuous and the normal component of the displacement
    field $\mathbf{D}$ is continuous:
    $$
-   \llbracket\psi\rrbracket = 0,
-   \qquad \llbracket\varepsilon_0\varepsilon_r\,\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket = 0.
+   ⟦\psi⟧ = 0,
+   \qquad ⟦\varepsilon_0\varepsilon_r\,\nabla\psi\cdot\hat{\mathbf{n}}⟧ = 0.
    \qquad (1.8)
 $$
-   The jump bracket $\llbracket f\rrbracket$ denotes $f|_+ - f|_-$ across the
+   The jump bracket $⟦ f⟧$ denotes $f|_+ - f|_-$ across the
    interface. Equation (1.8) is the local form of $\nabla\cdot\mathbf{D}
    = \rho$ when there is no surface charge sheet at the interface; see
    Ch. 14 for the proof that the Galerkin form encodes (1.8) automatically.
@@ -319,8 +319,8 @@ portion. (Hint: integrate by parts and ask which boundary integral
 must vanish for the equation to hold.)
 
 **Exercise 1.5.** At a sharp Si/SiO₂ interface with no surface charge,
-prove that $\nabla\psi$ has a jump $\llbracket\nabla\psi\cdot\hat{\mathbf{n}}\rrbracket
-= -\llbracket\varepsilon_r\rrbracket/\varepsilon_r^+\cdot \nabla\psi^+\cdot\hat{\mathbf{n}}$
+prove that $\nabla\psi$ has a jump $⟦\nabla\psi\cdot\hat{\mathbf{n}}⟧
+= -⟦\varepsilon_r⟧/\varepsilon_r^+\cdot \nabla\psi^+\cdot\hat{\mathbf{n}}$
 even though $\psi$ is continuous. Estimate the magnitude of this jump
 for the M6 MOS capacitor at $V_g = 1\,\mathrm{V}$.
 
