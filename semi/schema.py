@@ -84,7 +84,16 @@ ENGINE_SUPPORTED_SCHEMA_MAJOR = max(ENGINE_SUPPORTED_SCHEMA_MAJORS)
 #                  v2.0.0 inputs continue to validate (the new keys are
 #                  optional with defaults that ignore the saturation
 #                  branch).
-SCHEMA_SUPPORTED_MINOR = 1
+#   M16.2 (2.2.0): added physics.mobility.model: "lombardi" plus the
+#                  bulk_model selector, the lombardi sub-object (B_n,
+#                  B_p, C_n, C_p, lambda_n, lambda_p, delta_n, delta_p),
+#                  and the interface_facet_tag (required at solve time
+#                  by the loader when model=='lombardi'; the JSON
+#                  schema declares it as ['integer', 'null'] and the
+#                  conditional requirement is enforced in
+#                  _validate_mobility_lombardi). Additive bump:
+#                  v2.0.0 and v2.1.0 inputs continue to validate.
+SCHEMA_SUPPORTED_MINOR = 2
 
 
 @lru_cache(maxsize=8)
@@ -281,6 +290,40 @@ def _validate_compute(cfg: dict[str, Any]) -> None:
         )
 
 
+def _validate_mobility_lombardi(cfg: dict[str, Any]) -> None:
+    """
+    Cross-field validation for `physics.mobility.model='lombardi'`.
+
+    The JSON schema declares `interface_facet_tag` as `['integer',
+    'null']` so v2.0.0 and v2.1.0 inputs (no Lombardi block) keep
+    validating. The schema cannot express "required only when
+    model=='lombardi'" without conditional logic; we enforce that
+    here so users see the failure at `validate(cfg)` time rather than
+    deep inside the FEM path. M16.2.
+    """
+    mob = cfg.get("physics", {}).get("mobility", {}) or {}
+    if mob.get("model") != "lombardi":
+        return
+    if mob.get("interface_facet_tag") is None:
+        raise SchemaError(
+            "physics.mobility.model='lombardi' requires "
+            "physics.mobility.interface_facet_tag (an integer mesh "
+            "facet tag identifying the Si/SiO2 interface)"
+        )
+
+
+_LOMBARDI_DEFAULTS: dict[str, float] = {
+    "B_n": 4.75e7,
+    "B_p": 9.93e6,
+    "C_n": 1.74e5,
+    "C_p": 8.84e5,
+    "lambda_n": 0.125,
+    "lambda_p": 0.0317,
+    "delta_n": 5.82e14,
+    "delta_p": 2.0546e14,
+}
+
+
 def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     """Fill in sensible defaults for optional sections."""
     cfg.setdefault("coordinate_system", "cartesian")
@@ -297,6 +340,12 @@ def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     mob.setdefault("model", "constant")
     mob.setdefault("mu_n", 1400.0)
     mob.setdefault("mu_p", 450.0)
+    if mob.get("model") == "lombardi":
+        mob.setdefault("bulk_model", "constant")
+        lombardi = mob.setdefault("lombardi", {})
+        for key, default in _LOMBARDI_DEFAULTS.items():
+            lombardi.setdefault(key, default)
+    _validate_mobility_lombardi(cfg)
     phys.setdefault("statistics", "boltzmann")
 
     solver = cfg.setdefault("solver", {})

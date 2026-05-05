@@ -16,8 +16,9 @@
     "schema_version": {
       "type": "string",
       "pattern": "^2\\.\\d+\\.\\d+$",
-      "description": "Schema version in semver form. v2 enforces additionalProperties:false on every object node (typos in input keys fail validation rather than being silently ignored). Engine refuses inputs whose major does not match the engine's supported major. Current schema: 2.1.0; v2.0.0 inputs continue to validate (additive minor for the M16.1 caughey_thomas mobility dispatch).",
+      "description": "Schema version in semver form. v2 enforces additionalProperties:false on every object node (typos in input keys fail validation rather than being silently ignored). Engine refuses inputs whose major does not match the engine's supported major. Current schema: 2.2.0; v2.0.0 and v2.1.0 inputs continue to validate (additive minors for the M16.1 caughey_thomas and M16.2 lombardi mobility dispatches).",
       "examples": [
+        "2.2.0",
         "2.1.0",
         "2.0.0"
       ]
@@ -580,26 +581,36 @@
         "mobility": {
           "type": "object",
           "title": "Mobility model",
-          "description": "Carrier mobility model. The constant branch is the V&V reference and is bit-identical to v0.16.1; the caughey_thomas branch adds closed-form velocity saturation (M16.1).",
+          "description": "Carrier mobility model. The constant branch is the V&V reference and is bit-identical to v0.16.1; the caughey_thomas branch adds closed-form velocity saturation (M16.1); the lombardi branch composes a bulk branch (constant or caughey_thomas, selected via bulk_model) with surface acoustic-phonon and surface-roughness terms via the resistor sum 1/mu = 1/mu_bulk + 1/mu_AC + 1/mu_sr (M16.2).",
           "properties": {
             "model": {
+              "type": "string",
+              "enum": [
+                "constant",
+                "caughey_thomas",
+                "lombardi"
+              ],
+              "default": "constant",
+              "description": "Mobility model selector. constant: mu(F) = mu_{n,p} (no field dependence). caughey_thomas: mu(F) = mu0 / (1 + (mu0 * F_par / vsat)^beta)^(1/beta), where mu0 is mu_{n,p} and F_par is the magnitude of the gradient of the carrier-specific quasi-Fermi potential. lombardi: 1/mu = 1/mu_bulk + 1/mu_AC + 1/mu_sr, where mu_bulk is selected by bulk_model ('constant' or 'caughey_thomas') and the surface terms depend on the perpendicular field at the Si/SiO2 interface (interface_facet_tag)."
+            },
+            "bulk_model": {
               "type": "string",
               "enum": [
                 "constant",
                 "caughey_thomas"
               ],
               "default": "constant",
-              "description": "Mobility model selector. constant: mu(F) = mu_{n,p} (no field dependence). caughey_thomas: mu(F) = mu0 / (1 + (mu0 * F_par / vsat)^beta)^(1/beta), where mu0 is mu_{n,p} and F_par is the magnitude of the gradient of the carrier-specific quasi-Fermi potential."
+              "description": "Bulk-mobility branch selector for the lombardi composite. Ignored when model is not 'lombardi'."
             },
             "mu_n": {
               "type": "number",
               "default": 1400.0,
-              "description": "Electron low-field mobility in cm^2/(V s); identical role under constant and caughey_thomas dispatch."
+              "description": "Electron low-field mobility in cm^2/(V s); identical role under constant, caughey_thomas, and lombardi dispatch."
             },
             "mu_p": {
               "type": "number",
               "default": 450.0,
-              "description": "Hole low-field mobility in cm^2/(V s); identical role under constant and caughey_thomas dispatch."
+              "description": "Hole low-field mobility in cm^2/(V s); identical role under constant, caughey_thomas, and lombardi dispatch."
             },
             "vsat_n": {
               "type": "number",
@@ -620,6 +631,62 @@
               "type": "number",
               "default": 1.0,
               "description": "Hole Caughey-Thomas exponent; ignored when model is constant."
+            },
+            "interface_facet_tag": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "default": null,
+              "description": "Mesh facet tag identifying the Si/SiO2 interface; the surface normal is the outward semiconductor normal at this facet. Required by the loader when model='lombardi'; ignored otherwise."
+            },
+            "lombardi": {
+              "type": "object",
+              "title": "Lombardi surface-mobility parameters",
+              "description": "Default coefficients are the Lombardi 1988 values for Si as documented in Synopsys Sentaurus. Units follow device-physics convention (cm/s, cm^(5/3) V^(-2/3) s^-1, cm^2 V s^-1); semi/physics/mobility.lombardi_unit_conversions converts them to the dimensionless form consumed by the UFL builder.",
+              "properties": {
+                "B_n": {
+                  "type": "number",
+                  "default": 4.75e7,
+                  "description": "Electron acoustic-phonon prefactor (cm/s)."
+                },
+                "B_p": {
+                  "type": "number",
+                  "default": 9.93e6,
+                  "description": "Hole acoustic-phonon prefactor (cm/s)."
+                },
+                "C_n": {
+                  "type": "number",
+                  "default": 1.74e5,
+                  "description": "Electron Coulomb-phonon coefficient (cm^(5/3) V^(-2/3) s^-1)."
+                },
+                "C_p": {
+                  "type": "number",
+                  "default": 8.84e5,
+                  "description": "Hole Coulomb-phonon coefficient (cm^(5/3) V^(-2/3) s^-1)."
+                },
+                "lambda_n": {
+                  "type": "number",
+                  "default": 0.125,
+                  "description": "Electron doping exponent on the Coulomb-phonon term."
+                },
+                "lambda_p": {
+                  "type": "number",
+                  "default": 0.0317,
+                  "description": "Hole doping exponent on the Coulomb-phonon term."
+                },
+                "delta_n": {
+                  "type": "number",
+                  "default": 5.82e14,
+                  "description": "Electron surface-roughness coefficient (cm^2 V s^-1)."
+                },
+                "delta_p": {
+                  "type": "number",
+                  "default": 2.0546e14,
+                  "description": "Hole surface-roughness coefficient (cm^2 V s^-1)."
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
