@@ -830,6 +830,14 @@ The engine is ready for a UI when all of these are green:
 
 ## 9. Change log for this document
 
+### [Unreleased]
+
+- **2026-05-05**, author M16.2 starter prompt
+  ([M16_2_STARTER_PROMPT.md](M16_2_STARTER_PROMPT.md)) on branch
+  `dev/m16.2-lombardi`; pure-docs Phase 0 of the M16.2 PR.
+
+### Released
+
 - **2026-04-23**, initial version, written post-M8.
 - **2026-04-30**, refresh of §1, §4, §6 to reflect v0.14.x reality
   post-M14.2; introduce §10 shipped-milestone appendix.
