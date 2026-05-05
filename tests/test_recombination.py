@@ -115,3 +115,167 @@ def test_srh_vector_input_matches_scalar():
 def test_scaled_tau_conversion():
     t0 = 1.0e-9
     assert recombination.scaled_tau(1.0e-7, t0) == pytest.approx(100.0)
+
+
+# ---------------------------------------------------------------------------
+# M16.3 Auger schema-surface tests (Phase A).
+# ---------------------------------------------------------------------------
+
+import glob  # noqa: E402
+import json  # noqa: E402
+import warnings  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+V2_SCHEMA_PATH = REPO_ROOT / "schemas" / "input.v2.json"
+BENCHMARKS_DIR = REPO_ROOT / "benchmarks"
+
+
+def _v2_validator():
+    import jsonschema
+
+    schema = json.loads(V2_SCHEMA_PATH.read_text())
+    return jsonschema.Draft7Validator(schema)
+
+
+def _base_v2_cfg(schema_version: str = "2.3.0") -> dict:
+    return {
+        "schema_version": schema_version,
+        "name": "auger_test",
+        "dimension": 1,
+        "mesh": {
+            "source": "builtin",
+            "extents": [[0.0, 1.0e-6]],
+            "resolution": [100],
+            "facets_by_plane": [
+                {"name": "L", "tag": 1, "axis": 0, "value": 0.0},
+                {"name": "R", "tag": 2, "axis": 0, "value": 1.0e-6},
+            ],
+        },
+        "regions": {"si": {"material": "Si", "tag": 1, "role": "semiconductor"}},
+        "doping": [
+            {"region": "si", "profile": {"type": "uniform", "N_D": 1e17, "N_A": 0.0}},
+        ],
+        "contacts": [
+            {"name": "L", "facet": "L", "type": "ohmic", "voltage": 0.0},
+            {"name": "R", "facet": "R", "type": "ohmic", "voltage": 0.0},
+        ],
+    }
+
+
+def test_every_benchmark_validates_under_v2_3_0():
+    """Existing v2.0.0 / v2.1.0 / v2.2.0 benchmark JSONs validate
+    unchanged against the v2.3.0 schema (additive minor)."""
+    v = _v2_validator()
+    paths = sorted(glob.glob(str(BENCHMARKS_DIR / "*" / "*.json")))
+    assert paths, "no benchmark JSONs found"
+    for p in paths:
+        cfg = json.loads(Path(p).read_text())
+        errors = sorted(v.iter_errors(cfg), key=lambda e: list(e.path))
+        assert not errors, (
+            f"{p} fails v2.3.0 validation:\n"
+            + "\n".join(
+                f"  at {'.'.join(str(x) for x in e.absolute_path) or '<root>'}: {e.message}"
+                for e in errors[:5]
+            )
+        )
+
+
+def test_auger_true_with_default_C_n_C_p_validates():
+    """auger=true with default Si C_n / C_p validates under v2.3.0."""
+    v = _v2_validator()
+    cfg = _base_v2_cfg()
+    cfg["physics"] = {
+        "recombination": {
+            "auger": True,
+            "C_n": 2.8e-31,
+            "C_p": 9.9e-32,
+        }
+    }
+    errors = sorted(v.iter_errors(cfg), key=lambda e: list(e.path))
+    assert not errors, [e.message for e in errors]
+
+
+def test_negative_C_n_is_rejected():
+    """Schema declares minimum: 0 on C_n / C_p; a negative coefficient
+    must be rejected."""
+    v = _v2_validator()
+    cfg = _base_v2_cfg()
+    cfg["physics"] = {
+        "recombination": {
+            "auger": True,
+            "C_n": -1.0e-30,
+        }
+    }
+    errors = sorted(v.iter_errors(cfg), key=lambda e: list(e.path))
+    assert errors, "negative C_n should fail validation"
+    messages = " | ".join(e.message for e in errors)
+    assert "C_n" in messages or "minimum" in messages
+
+
+def test_negative_C_p_is_rejected():
+    v = _v2_validator()
+    cfg = _base_v2_cfg()
+    cfg["physics"] = {
+        "recombination": {
+            "auger": True,
+            "C_p": -1.0e-30,
+        }
+    }
+    errors = sorted(v.iter_errors(cfg), key=lambda e: list(e.path))
+    assert errors
+
+
+def test_recombination_extra_property_is_rejected():
+    """Strict-v2 additionalProperties:false on physics.recombination."""
+    v = _v2_validator()
+    cfg = _base_v2_cfg()
+    cfg["physics"] = {"recombination": {"auger": True, "C_unknown": 1.0e-30}}
+    errors = sorted(v.iter_errors(cfg), key=lambda e: list(e.path))
+    assert errors
+    messages = " | ".join(e.message for e in errors)
+    assert "C_unknown" in messages or "additional" in messages.lower()
+
+
+def test_default_fill_auger_off_with_C_defaults():
+    """validate() default-fills auger=False and Si C_n / C_p."""
+    from semi import schema as schema_mod
+
+    cfg = _base_v2_cfg()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        cfg = schema_mod.validate(cfg)
+    rec = cfg["physics"]["recombination"]
+    assert rec["auger"] is False
+    assert rec["C_n"] == pytest.approx(2.8e-31)
+    assert rec["C_p"] == pytest.approx(9.9e-32)
+
+
+def test_default_fill_does_not_override_user_C_n():
+    """User-supplied C_n / C_p survive default-fill."""
+    from semi import schema as schema_mod
+
+    cfg = _base_v2_cfg()
+    cfg["physics"] = {"recombination": {"auger": True, "C_n": 1.0e-30}}
+    cfg = schema_mod.validate(cfg)
+    rec = cfg["physics"]["recombination"]
+    assert rec["auger"] is True
+    assert rec["C_n"] == pytest.approx(1.0e-30)
+    # C_p was unset; default fill applies.
+    assert rec["C_p"] == pytest.approx(9.9e-32)
+
+
+def test_v2_2_0_input_still_validates_after_minor_bump():
+    """v2.2.0 inputs (no auger / C_n / C_p) continue to validate
+    against the bumped schema; this is the additive-minor invariant."""
+    v = _v2_validator()
+    cfg = _base_v2_cfg(schema_version="2.2.0")
+    errors = sorted(v.iter_errors(cfg), key=lambda e: list(e.path))
+    assert not errors, [e.message for e in errors]
+
+
+def test_schema_supported_minor_is_3():
+    """Sanity: SCHEMA_SUPPORTED_MINOR was bumped to 3 in M16.3."""
+    from semi import schema as schema_mod
+
+    assert schema_mod.SCHEMA_SUPPORTED_MINOR == 3

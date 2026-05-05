@@ -93,7 +93,16 @@ ENGINE_SUPPORTED_SCHEMA_MAJOR = max(ENGINE_SUPPORTED_SCHEMA_MAJORS)
 #                  conditional requirement is enforced in
 #                  _validate_mobility_lombardi). Additive bump:
 #                  v2.0.0 and v2.1.0 inputs continue to validate.
-SCHEMA_SUPPORTED_MINOR = 2
+#   M16.3 (2.3.0): promoted physics.recombination.auger from a
+#                  forward-compat placeholder to a real flag, and
+#                  added physics.recombination.C_n and
+#                  physics.recombination.C_p (Si Dziewior-Schmid
+#                  defaults 2.8e-31 cm^6/s and 9.9e-32 cm^6/s). When
+#                  auger==false (default), the recombination kernel is
+#                  bit-identical to v0.18.0; C_n and C_p are filled to
+#                  defaults but unused. Additive bump: v2.0.0, v2.1.0,
+#                  and v2.2.0 inputs continue to validate.
+SCHEMA_SUPPORTED_MINOR = 3
 
 
 @lru_cache(maxsize=8)
@@ -336,6 +345,12 @@ def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     rec.setdefault("tau_p", 1.0e-7)
     rec.setdefault("E_t", 0.0)
     rec.setdefault("auger", False)
+    # M16.3 Si Dziewior-Schmid Auger coefficients in cm^6/s. The
+    # defaults are filled even when auger is false; the form builder
+    # only consumes them when the flag is true, so v0.18.0 byte-
+    # identity is preserved on the auger-off branch.
+    rec.setdefault("C_n", 2.8e-31)
+    rec.setdefault("C_p", 9.9e-32)
     mob = phys.setdefault("mobility", {})
     mob.setdefault("model", "constant")
     mob.setdefault("mu_n", 1400.0)

@@ -26,8 +26,8 @@ the full annotated source of truth is the JSON file.
   contact / mesh / solver fields fail validation rather than being
   silently dropped).
 - Minor/patch skew is accepted silently within a major.
-- Current schema version: **2.2.0** (M16.2 lombardi surface mobility dispatch);
-  v2.0.0 and v2.1.0 inputs continue to validate (additive minors).
+- Current schema version: **2.3.0** (M16.3 Auger recombination kernel);
+  v2.0.0, v2.1.0, and v2.2.0 inputs continue to validate (additive minors).
 
 Schemas are published to
 `https://rwalkerlewis.github.io/kronos-semi/schemas/` on every release
@@ -60,6 +60,13 @@ History:
   `delta_p`), and `interface_facet_tag` (declared `["integer", "null"]`
   in JSON Schema; the loader enforces non-null when
   `model == "lombardi"`). v2.0.0 and v2.1.0 inputs continue to validate.
+- **2.3.0** (M16.3): additive Auger recombination kernel. Promotes
+  `physics.recombination.auger` from a forward-compat placeholder to
+  a real flag and adds `physics.recombination.C_n` (Si default
+  2.8e-31 cm^6/s) and `physics.recombination.C_p` (Si default
+  9.9e-32 cm^6/s; both Dziewior-Schmid). When `auger == false` (the
+  default), the recombination kernel is bit-identical to v0.18.0.
+  v2.0.0, v2.1.0, and v2.2.0 inputs continue to validate.
 
 ## Top-level fields
 
