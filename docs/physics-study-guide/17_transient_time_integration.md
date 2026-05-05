@@ -121,11 +121,7 @@ The transient runner builds the residual
 
 - Poisson row: identical to bias_sweep (no time term, since Poisson is
   instantaneous).
-- Electron continuity row: adds
-  $\int (\alpha_0/dt) n_\mathrm{ufl} v_n\,dx_\mathrm{lump}
-  + \int (f_\mathrm{hist,n}/dt) v_n\,dx_\mathrm{lump}$
-  to the steady-state Slotboom continuity, where $f_\mathrm{hist,n}$ is
-  a stored Function holding $\sum_{k\ge 1}\alpha_k n^{n+1-k}$.
+- Electron continuity row: adds $\int (\alpha_0/dt) n_\mathrm{ufl} v_n\,dx_\mathrm{lump} + \int (f_\mathrm{hist,n}/dt) v_n\,dx_\mathrm{lump}$ to the steady-state Slotboom continuity, where $f_\mathrm{hist,n}$ is a stored Function holding $\sum_{k\ge 1}\alpha_k n^{n+1-k}$.
 - Hole continuity row: same with $p_\mathrm{ufl}$.
 
 Two important details:
@@ -225,10 +221,7 @@ $dt = 1\,\mathrm{ns}$, BDF2 order, $t_\mathrm{end} = 500\,\mathrm{ns}$:
   Scaled $\hat{dt} = dt/t_0 = 1\,\mathrm{ns}/1.1\,\mathrm{ns} = 0.91$.
   Scaled $\hat\tau_p = 100/1.1 = 90.9$.
 
-BDF2 coefficients $(\alpha_0, \alpha_1, \alpha_2) = (3/2, -2, 1/2)$. At
-step $n+1$: residual = $(3/2/\hat{dt}) n^{n+1}_\mathrm{ufl} v_n\,dx_\mathrm{lump}
-+ (-2 n^n + n^{n-1}/2)/\hat{dt}\cdot v_n\,dx_\mathrm{lump} + \mathrm{spatial}$
-$+ \hat R\,v_n\,dx$.
+BDF2 coefficients $(\alpha_0, \alpha_1, \alpha_2) = (3/2, -2, 1/2)$. At step $n+1$ the residual is $(3/2/\hat{dt}) n^{n+1}_\mathrm{ufl} v_n\,dx_\mathrm{lump} + (-2 n^n + n^{n-1}/2)/\hat{dt}\cdot v_n\,dx_\mathrm{lump} + \mathrm{spatial} + \hat R\,v_n\,dx$.
 
 The first step uses BDF1 (only one history value available); the
 second step onwards uses BDF2. The auto-switch lives at
@@ -329,8 +322,7 @@ so $|u^{n+1}| < |u^n|$. Stable for any $dt > 0$ — A-stable. ✓
 
 **17.2.** Taylor expand: $u^n = u^{n+1} - dt\,u' + (dt)^2/2\,u'' - (dt)^3/6\,u''' + ...$;
 $u^{n-1} = u^{n+1} - 2dt\,u' + 2(dt)^2\,u'' - (4/3)(dt)^3 u''' + ...$
-Plug in: $(3/2 - 2 + 1/2)u^{n+1} + dt(2 - 1)u' + (dt)^2(-1 + 1)u''
-+ (dt)^3(1/3 - 1/12)u''' + ...$. Coefficients:
+Plug in: $(3/2 - 2 + 1/2)u^{n+1} + dt(2 - 1)u' + (dt)^2(-1 + 1)u'' + (dt)^3(1/3 - 1/12)u''' + ...$. Coefficients:
 $u^{n+1}$: 0. $u'$: $dt$. $u''$: $0\cdot(dt)^2$. $u'''$: $(dt)^3/4$.
 So $\sum\alpha_k u^{n+1-k}/dt = u' + (dt^2/4) u''' + ...$. Hmm, my
 arithmetic is rough; the textbook BDF2 truncation is $-(2/9)(dt)^2 u'''$.
@@ -338,9 +330,8 @@ The point is BDF2 is second-order: leading truncation $\propto dt^2$.
 
 **17.3.** `hist_n_arr = sum_{k=1}^K alpha_k * n_hist[-k]`. For BDF2 with
 `coeffs = (1.5, -2.0, 0.5)`: $\alpha_1 = -2$, $\alpha_2 = 0.5$, so
-`hist_n_arr = -2 * n_hist[-1] + 0.5 * n_hist[-2] = -2 n^n + (1/2) n^{n-1}$.
-Plug into (17.5)/dt: $(\alpha_0/dt) n^{n+1} + (-2 n^n + (1/2)n^{n-1})/dt
-= (3/2/dt) n^{n+1} + \mathrm{hist}/dt$. ✓ — matches the residual
+`hist_n_arr = -2 * n_hist[-1] + 0.5 * n_hist[-2]`, i.e. $-2 n^n + (1/2) n^{n-1}$.
+Plug into (17.5)/dt: $(\alpha_0/dt) n^{n+1} + (-2 n^n + (1/2)n^{n-1})/dt = (3/2/dt) n^{n+1} + \mathrm{hist}/dt$. ✓ — matches the residual
 [`semi/runners/transient.py:651-657`](../../semi/runners/transient.py).
 
 **17.4.** $dt = 10\,\mathrm{ns}$, $t_\mathrm{end} = 1\,\mu\mathrm{s}$:
