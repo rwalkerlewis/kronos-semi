@@ -850,6 +850,15 @@ The engine is ready for a UI when all of these are green:
 
 ## 9. Change log for this document
 
+### [Unreleased]
+
+- **2026-05-05**, M16.3 Auger recombination starter prompt authored:
+  [`docs/M16_3_STARTER_PROMPT.md`](M16_3_STARTER_PROMPT.md) shipped on
+  branch `dev/m16.3-auger` so the next contributor can pick up the
+  M16.3 milestone (Auger recombination, schema 2.2.0 -> 2.3.0).
+
+### Released
+
 - **2026-05-05**, M16.2 Lombardi surface mobility shipped (v0.18.0):
   § 4 M16.2 marked Done with `[0.18.0]` CHANGELOG anchor; new MMS-DD
   Variant E with rate gate L^2 >= 1.99 / H^1 >= 0.99 (1D measured
