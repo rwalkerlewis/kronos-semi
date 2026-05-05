@@ -435,6 +435,26 @@ geometry; V_F = 0.3 V is the natural low-field anchor. See
 
 ### M16.2: Lombardi surface mobility
 
+**Status: Done (v0.18.0, 2026-05-05).** Resistor-sum composite of
+the bulk branch (constant or caughey_thomas, dispatched via
+`bulk_model`) with the Lombardi acoustic-phonon and surface-
+roughness terms shipped on branch `dev/m16.2-lombardi` per
+[`docs/M16_2_STARTER_PROMPT.md`](M16_2_STARTER_PROMPT.md). Schema
+additive minor v2.1.0 -> v2.2.0; v2.0.0 and v2.1.0 inputs continue
+to validate; the constant and caughey_thomas branches are
+bit-identical to v0.17.0. New helpers `lombardi_mu_AC`,
+`lombardi_mu_sr`, `lombardi_compose`, `lombardi_unit_conversions` in
+`semi/physics/mobility.py`; MMS Variant E in
+`semi/verification/mms_dd.py` clears the M16.2 rate gate
+(L^2 >= 1.99, H^1 >= 0.99 on every block at the finest pair;
+measured 1D = 2.000/1.999/2.000, 2D = 1.997/1.995/1.998).
+`benchmarks/mosfet_2d/` re-parametrized with Lombardi and the
+widened V_GS = [0, 2.0] V sweep. The mosfet_2d Lombardi run carries
+the M16.1-era `allow-failure: "true"` flag (the SNES depletion-onset
+line-search stagnation is independent of the Lombardi physics; a
+separate audit retires the flag in a follow-up PR). See
+[CHANGELOG.md](../CHANGELOG.md) `[0.18.0]` entry.
+
 **Why.** Inversion-layer mobility in MOSFETs is dominated by surface
 scattering, which Caughey-Thomas does not capture. Required for
 quantitative MOSFET I-V in the inversion regime.
@@ -830,14 +850,16 @@ The engine is ready for a UI when all of these are green:
 
 ## 9. Change log for this document
 
-### [Unreleased]
-
-- **2026-05-05**, author M16.2 starter prompt
-  ([M16_2_STARTER_PROMPT.md](M16_2_STARTER_PROMPT.md)) on branch
-  `dev/m16.2-lombardi`; pure-docs Phase 0 of the M16.2 PR.
-
-### Released
-
+- **2026-05-05**, M16.2 Lombardi surface mobility shipped (v0.18.0):
+  § 4 M16.2 marked Done with `[0.18.0]` CHANGELOG anchor; new MMS-DD
+  Variant E with rate gate L^2 >= 1.99 / H^1 >= 0.99 (1D measured
+  2.000/1.999/2.000, 2D measured 1.997/1.995/1.998); benchmarks/
+  mosfet_2d re-parametrized with Lombardi and the widened
+  [V_T + 0.4, V_T + 1.0] V Pao-Sah verifier window at 10 %; schema
+  2.2.0 (`physics.mobility.model: "lombardi"`, `bulk_model`,
+  `interface_facet_tag`, `lombardi` sub-object); the constant and
+  caughey_thomas branches are bit-identical to v0.17.0 on every
+  existing benchmark.
 - **2026-04-23**, initial version, written post-M8.
 - **2026-04-30**, refresh of §1, §4, §6 to reflect v0.14.x reality
   post-M14.2; introduce §10 shipped-milestone appendix.

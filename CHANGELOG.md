@@ -14,8 +14,76 @@ deprecated for one minor cycle), and in the
 active use are **1.4.0** (loose, deprecated for one minor cycle,
 accepted with a `DeprecationWarning`), **2.0.0** (strict,
 `additionalProperties: false`, the M14.3 default; shipped with
-`[0.16.0]` below), and **2.1.0** (additive minor; M16.1 caughey_thomas
-mobility dispatch; shipped with `[0.17.0]` below).
+`[0.16.0]` below), **2.1.0** (additive minor; M16.1 caughey_thomas
+mobility dispatch; shipped with `[0.17.0]` below), and **2.2.0**
+(additive minor; M16.2 lombardi surface mobility dispatch; shipped
+with `[0.18.0]` below).
+
+## [0.18.0] - 2026-05-05
+
+### Added
+- **M16.2 Lombardi surface mobility.** Closed-form composite of the
+  bulk branch (constant or caughey_thomas, dispatched via the new
+  `bulk_model` sub-key) with the Lombardi acoustic-phonon and
+  surface-roughness terms via the resistor sum
+  `1/mu = 1/mu_bulk + 1/mu_AC + 1/mu_sr`. No new primary unknowns;
+  the dispatch hangs off `physics.mobility.model = "lombardi"` in
+  the JSON config and the existing Slotboom DD form (ADR 0004).
+- Schema 2.2.0 (additive minor): `physics.mobility.model` enum gains
+  `"lombardi"`; new `bulk_model`, `lombardi`, and `interface_facet_tag`
+  properties under `physics.mobility`. v2.0.0 and v2.1.0 inputs
+  continue to validate with no migration. Loader-side conditional
+  enforces `interface_facet_tag` non-null when `model == "lombardi"`
+  (the JSON Schema declares it `["integer", "null"]`; the loader
+  carries the cross-field rule).
+- New public closed-form helpers in `semi/physics/mobility.py`:
+  `lombardi_mu_AC`, `lombardi_mu_sr`, `lombardi_compose`,
+  `lombardi_unit_conversions`. The constant and caughey_thomas
+  branches refactor into `_build_constant` and `_build_caughey_thomas`
+  private helpers; the lombardi branch composes them.
+- `build_mobility_expressions` signature gains keyword-only `psi`,
+  `facet_tags`, `N_total_hat` parameters; ignored by the constant
+  and caughey_thomas branches, required by lombardi.
+- `build_dd_block_residual` and `build_dd_block_residual_mr` thread
+  `facet_tags` and `psi` and `N_total_hat=Abs(N_hat_fn)` into the
+  mobility builder. `bias_sweep` runner forwards its `facet_tags`
+  through; the other runners (equilibrium, transient, ac_sweep,
+  resistor_3d, mos_cv, mos_cap_ac) intentionally retain the
+  pre-M16.2 dispatch surface (M16.2.x or M16.4 follow-ups).
+- MMS-DD Variant E in `semi/verification/mms_dd.py` exercises the
+  Lombardi composite at finest-pair L2 rate >= 1.99 and H1 rate
+  >= 0.99 on every block (psi, phi_n, phi_p) per ADR 0006. Measured
+  rates: 1D = (2.000, 1.999, 2.000) L2; 2D = (1.997, 1.995, 1.998) L2.
+- `tests/fem/test_mms_lombardi.py`: 1D and 2D rate-gate FEM tests.
+- `benchmarks/mosfet_2d/mosfet_2d.json` re-parametrized with Lombardi
+  mobility; V_GS sweep widened from 1.5 V to 2.0 V to cover the
+  new verifier window.
+- `verify_mosfet_2d` dispatches on `physics.mobility.model`: the
+  constant / caughey_thomas window is unchanged at
+  [V_T + 0.2, V_T + 0.6] V at 20 %; the lombardi window widens to
+  [V_T + 0.4, V_T + 1.0] V and the tolerance tightens to 10 %.
+
+### Changed
+- `physics.mobility` block now permits the lombardi composite. The
+  M14.3 strict-v2 `additionalProperties: false` invariant continues
+  to hold; new keys are explicit and any typo still fails validation
+  fast.
+- `docs/PHYSICS.md` § 5 V&V table grows the Variant E rows.
+- `docs/mms_dd_derivation.md` § 3.4 grows a Variant E sub-section
+  with the resistor-sum composition derivation.
+- `benchmarks/mosfet_2d/README.md` describes the M16.2 Lombardi
+  configuration and the new verifier window.
+
+### Notes
+- `mosfet_2d` CI matrix entry retains `allow-failure: "true"` from
+  M16.1; the SNES depletion-onset line-search stagnation has not
+  been independently audited yet. The Lombardi run currently
+  stagnates at V_GS ~ 0.1 V; retiring `allow-failure` is a separate
+  follow-up PR after the SNES path is investigated.
+- Constant-mobility branch is bit-identical to v0.17.0 on every
+  benchmark (`pn_1d_bias` anchor: J(V=0.6 V) = 1.635e+03 A/m^2).
+  Caughey-Thomas branch is bit-identical on `diode_velsat_1d`
+  (anchors: 56.27 % @ 0.9 V, 0.19 % @ 0.3 V).
 
 ## [0.15.0] - 2026-05-15
 
