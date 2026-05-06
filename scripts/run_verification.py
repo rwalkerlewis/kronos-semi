@@ -311,14 +311,14 @@ def cmd_mms_dd(args) -> int:
     """
     Phase 4: MMS for the coupled drift-diffusion block residual.
 
-    Runs twelve studies (four variants x {1D linear, 1D nonlinear, 2D})
-    and gates the finest-pair L^2 and H^1 rates of every meaningful
-    block per variant (psi only for Variant A; psi + phi_n + phi_p for
-    Variants B, C, D). Variant D adds M16.1 Caughey-Thomas mobility on
-    top of Variant C and is gated at the milestone-acceptance floor
-    L^2 >= 1.99 and H^1 >= 0.99 (M16.1 Acceptance test 1). The other
-    variants stay at the existing 1.75 / 0.80 floor (the pytest gate
-    uses the same floor; see docs/mms_dd_derivation.md).
+    Runs studies for every variant in {A, B, C, D, E, F, G} across
+    {1D linear, 1D nonlinear, 2D} and gates the finest-pair L^2 and
+    H^1 rates of every meaningful block per variant (psi only for
+    Variant A; psi + phi_n + phi_p otherwise). Variants D, E, F, and
+    G carry the M16.x milestone-acceptance floor L^2 >= 1.99 and
+    H^1 >= 0.99 (D: M16.1, E: M16.2, F: M16.3, G: M16.4). Variants
+    A, B, and C stay at the existing 1.75 / 0.80 floor (the pytest
+    gate uses the same floor; see docs/mms_dd_derivation.md).
     """
     from semi.verification.mms_dd import report_table, run_cli_study
 
@@ -334,11 +334,17 @@ def cmd_mms_dd(args) -> int:
             variant = "B"
         elif "_D_" in label or label.endswith("_D"):
             variant = "D"
+        elif "_E_" in label or label.endswith("_E"):
+            variant = "E"
+        elif "_F_" in label or label.endswith("_F"):
+            variant = "F"
+        elif "_G_" in label or label.endswith("_G"):
+            variant = "G"
         else:
             variant = "C"
         blocks = ("psi",) if variant == "A" else ("psi", "phi_n", "phi_p")
-        # Variant D is the M16.1 acceptance gate: tighter rate floor.
-        if variant == "D":
+        # Variants D, E, F, G are M16.x acceptance gates: tighter floor.
+        if variant in ("D", "E", "F", "G"):
             l2_floor = 1.99
             h1_floor = 0.99
         else:

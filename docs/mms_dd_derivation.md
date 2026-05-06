@@ -415,6 +415,103 @@ mesh sequences mirror Variants D and E (1D `[40, 80, 160]`, 2D
 Auger kernel is a closed-form algebraic substitution into the
 existing source rate, not a new primary unknown.
 
+**Variant G -- Fermi-Dirac statistics (M16.4).** Variant C
+electronics plus the generalized-Slotboom substitution under the
+basic Blakemore approximation. The Boltzmann Slotboom helper
+
+```
+n_hat = ni_hat * exp(psi_hat - phi_n_hat)
+```
+
+is replaced by the FD-corrected expression
+
+```
+n_hat = ni_hat * gamma_n(eta_n) * exp(psi_hat - phi_n_hat)
+gamma_n(eta) = F_{1/2}(eta) / exp(eta)
+```
+
+with `eta_n = (psi_hat - phi_n_hat) + ln(n_i / N_C)`. Substituting
+the basic Blakemore approximation `F_{1/2}(eta) ~ 1 / (exp(-eta) +
+0.27)` gives the closed-form prefactor
+
+```
+gamma_n_blakemore(eta) = 1 / (1 + 0.27 * exp(eta))
+```
+
+(see `semi/physics/statistics.py`). The hole side mirrors with
+`eta_p = (phi_p_hat - psi_hat) + ln(n_i / N_V)`.
+
+Einstein-factor cancellation. The DD continuity flux is, in
+unscaled form, `J_n = q mu_n n grad(phi_F_n)` where `phi_F_n` is
+the electron quasi-Fermi level. Under Boltzmann the chain rule
+relating `n` to `(psi - phi_n)` gives the Slotboom expression
+above; under FD the same chain rule applied to `n = N_C F_{1/2}(eta_n)`
+gives `J_n = -q mu_n n F_{1/2}(eta_n) / F_{-1/2}(eta_n) grad(phi_n)`,
+i.e. an extra Einstein factor `g(eta) = F_{1/2} / F_{-1/2}`. The
+basic Blakemore identity
+
+```
+F_{-1/2}(eta) = d/d eta F_{1/2}(eta)
+              = exp(-eta) / (exp(-eta) + 0.27)^2
+```
+
+(differentiating the basic form) gives
+
+```
+g(eta) = F_{1/2}(eta) / F_{-1/2}(eta)
+       = (1 / (exp(-eta) + 0.27)) * (exp(-eta) + 0.27)^2 / exp(-eta)
+       = (exp(-eta) + 0.27) / exp(-eta)
+       = 1 + 0.27 * exp(eta)
+       = 1 / gamma_n_blakemore(eta).
+```
+
+The product `g(eta) * gamma_n(eta) = 1` exactly under the basic
+Blakemore form. Substituting `n` in the FD-Slotboom continuity
+flux and applying this identity collapses the Einstein factor:
+
+```
+J_n = -q mu_n [N_C F_{1/2}(eta_n)] g(eta_n) grad(phi_n)
+    = -q mu_n [n / gamma_n(eta_n)] [1 / gamma_n(eta_n)]^{-1} grad(phi_n)
+                                   wait, substitute
+                                   N_C F_{1/2} = ni gamma exp(...)
+    = -q mu_n n grad(phi_n).
+```
+
+(The substitution `n = N_C F_{1/2}(eta_n)` and the identity
+`g(eta) = 1 / gamma_n(eta)` rewrite the FD flux as the same Slotboom-
+form Boltzmann flux `-q mu_n n grad(phi_n)`; only the substitution
+rule for `n` in terms of the primary unknowns has changed.) ADR 0004
+is therefore preserved: the continuity-row shape is unchanged, and
+the only edit to `build_dd_block_residual` is to forward
+`statistics_cfg` to `n_from_slotboom` / `p_from_slotboom`. The
+manufactured weak source uses the same FD-Slotboom helpers, so the
+production form sees the identical closed expression at the exact
+solution.
+
+`MMS_G_ETA_OFFSET_*` engineering. The FD-vs-Boltzmann shift on the
+density is `1 - gamma_n(eta_n)`. With the default amplitudes
+`(A_psi, A_n, A_p) = (0.5, 0.3, -0.3)` the Slotboom drives
+`(psi_e - phi_n_e)` and `(phi_p_e - psi_e)` range over `[-0.8, +0.8]`.
+Setting `MMS_G_ETA_OFFSET_N = MMS_G_ETA_OFFSET_P = -1.0` shifts
+eta into `[-1.8, -0.2]`, where gamma ranges from ~0.96 to ~0.82.
+The 4-18 % FD-vs-Boltzmann shift is squarely in the
+materially-exercised regime (the same O(0.1) target M16.1 used for
+Variant D).
+
+The reverse-engineered `Scaling.N_C` / `Scaling.N_V` values are
+`sc.n_i * exp(-MMS_G_ETA_OFFSET_*)`, which `run_one_level` writes to
+the scaling object before invoking `build_dd_block_residual` so
+`sc.eta_offset_n = ln(sc.n_i / sc.N_C) = MMS_G_ETA_OFFSET_N`
+(and similarly for p). The production form's
+`statistics_cfg = {"statistics": "fermi_dirac"}` then routes the
+exact same closed expression that `_build_weak_sources` uses.
+
+Variant G is gated at the M16.4 acceptance floor L^2 >= 1.99 and
+H^1 >= 0.99 on every block (`docs/IMPROVEMENT_GUIDE.md` § M16.4
+Acceptance test; pytest module `tests/fem/test_mms_fermi_dirac.py`).
+Mesh sequences mirror Variants D / E / F (1D `[40, 80, 160]`, 2D
+`[32, 64, 128]`).
+
 ## 4. Boundary conditions
 
 All three fields vanish identically on `boundary(Omega)` by construction
