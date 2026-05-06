@@ -53,7 +53,12 @@ def run_equilibrium(cfg: dict[str, Any], *, progress_callback=None):
         bc.set(psi.x.array)
     psi.x.scatter_forward()
 
-    F = build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, ref_mat.epsilon_r)
+    phys = cfg.get("physics", {})
+    stat_cfg = {"statistics": phys.get("statistics", "boltzmann")}
+    F = build_equilibrium_poisson_form(
+        V, psi, N_hat_fn, sc, ref_mat.epsilon_r,
+        statistics_cfg=stat_cfg,
+    )
     if progress_callback is not None:
         progress_callback({"type": "step_started", "bias_step": 0, "V_applied": 0.0})
     info = solve_nonlinear(F, psi, bcs, prefix=f"{cfg['name']}_", cfg=cfg)
@@ -65,8 +70,16 @@ def run_equilibrium(cfg: dict[str, Any], *, progress_callback=None):
 
     x_dof = V.tabulate_dof_coordinates()
     psi_phys = psi.x.array * sc.V0
-    n_phys = ref_mat.n_i * np.exp(psi.x.array)
-    p_phys = ref_mat.n_i * np.exp(-psi.x.array)
+    if stat_cfg.get("statistics", "boltzmann") == "fermi_dirac":
+        # Equilibrium FD: n = n_i * gamma_n * exp(psi), with phi_n = 0.
+        from ..physics.statistics import gamma_n_blakemore, gamma_p_blakemore
+        gamma_n = gamma_n_blakemore(psi.x.array, sc.eta_offset_n)
+        gamma_p = gamma_p_blakemore(-psi.x.array, sc.eta_offset_p)
+        n_phys = ref_mat.n_i * gamma_n * np.exp(psi.x.array)
+        p_phys = ref_mat.n_i * gamma_p * np.exp(-psi.x.array)
+    else:
+        n_phys = ref_mat.n_i * np.exp(psi.x.array)
+        p_phys = ref_mat.n_i * np.exp(-psi.x.array)
 
     return SimulationResult(
         cfg=cfg, mesh=msh, V=V, psi=psi,

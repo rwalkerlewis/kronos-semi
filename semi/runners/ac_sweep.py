@@ -282,10 +282,13 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
     #    (SRH recombination) and the n*grad(phi_n) drift coupling
     #    consistently.
     # ------------------------------------------------------------------
+    stat_cfg = {"statistics": phys.get("statistics", "boltzmann")}
+
     F_list = build_dd_block_residual(
         spaces, N_hat_fn, sc, ref_mat.epsilon_r,
         mu_n_hat, mu_p_hat, tau_n_hat_v, tau_p_hat_v, E_t_over_Vt,
         recomb_cfg=rec,
+        statistics_cfg=stat_cfg,
     )
     a_blocks = [
         [ufl.derivative(F_list[i], u_j) for u_j in (psi, phi_n, phi_p)]
@@ -352,8 +355,24 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
     from petsc4py import PETSc as _PETSc
 
     ni_hat_c = fem.Constant(msh, _PETSc.ScalarType(sc.n_i / sc.C0))
-    n_ufl = n_from_slotboom(psi, phi_n, ni_hat_c)
-    p_ufl = p_from_slotboom(psi, phi_p, ni_hat_c)
+    eta_offset_n_val = (
+        sc.eta_offset_n
+        if stat_cfg.get("statistics", "boltzmann") == "fermi_dirac"
+        else None
+    )
+    eta_offset_p_val = (
+        sc.eta_offset_p
+        if stat_cfg.get("statistics", "boltzmann") == "fermi_dirac"
+        else None
+    )
+    n_ufl = n_from_slotboom(
+        psi, phi_n, ni_hat_c,
+        statistics_cfg=stat_cfg, eta_offset_n=eta_offset_n_val,
+    )
+    p_ufl = p_from_slotboom(
+        psi, phi_p, ni_hat_c,
+        statistics_cfg=stat_cfg, eta_offset_p=eta_offset_p_val,
+    )
 
     v_psi = ufl.TestFunction(V_psi)
     v_n = ufl.TestFunction(V_phi_n)
@@ -423,6 +442,7 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
         psi_pert, phi_n_pert, phi_p_pert,
         sc, ref_mat, mu_n_SI, mu_p_SI,
         sweep_facet_info, msh,
+        statistics_cfg=stat_cfg,
     )
 
     for k, f in enumerate(frequencies):
@@ -597,6 +617,7 @@ def _make_terminal_current_forms(
     psi_pert, phi_n_pert, phi_p_pert,
     sc, ref_mat, mu_n_SI: float, mu_p_SI: float,
     facet_info, msh,
+    *, statistics_cfg: dict | None = None,
 ):
     """Build the linearised Slotboom-form terminal-current form.
 
@@ -645,9 +666,29 @@ def _make_terminal_current_forms(
 
     ni_hat_c = fem.Constant(msh, PETSc.ScalarType(ref_mat.n_i / sc.C0))
 
-    # Slotboom carrier densities in physical (per-m^3) units.
-    n_phys = n_from_slotboom(psi, phi_n, ni_hat_c) * sc.C0
-    p_phys = p_from_slotboom(psi, phi_p, ni_hat_c) * sc.C0
+    # Slotboom carrier densities in physical (per-m^3) units. Threads
+    # the M16.4 statistics dispatch so the FD path picks up the
+    # Blakemore prefactor in the terminal-current expression.
+    eta_offset_n_t = (
+        sc.eta_offset_n
+        if statistics_cfg is not None
+        and statistics_cfg.get("statistics", "boltzmann") == "fermi_dirac"
+        else None
+    )
+    eta_offset_p_t = (
+        sc.eta_offset_p
+        if statistics_cfg is not None
+        and statistics_cfg.get("statistics", "boltzmann") == "fermi_dirac"
+        else None
+    )
+    n_phys = n_from_slotboom(
+        psi, phi_n, ni_hat_c,
+        statistics_cfg=statistics_cfg, eta_offset_n=eta_offset_n_t,
+    ) * sc.C0
+    p_phys = p_from_slotboom(
+        psi, phi_p, ni_hat_c,
+        statistics_cfg=statistics_cfg, eta_offset_p=eta_offset_p_t,
+    ) * sc.C0
     grad_phi_n_phys = sc.V0 * ufl.grad(phi_n)
     grad_phi_p_phys = sc.V0 * ufl.grad(phi_p)
 

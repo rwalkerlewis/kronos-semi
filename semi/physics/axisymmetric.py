@@ -52,36 +52,23 @@ def _radial_coord(msh):
     return ufl.SpatialCoordinate(msh)[0]
 
 
-def build_equilibrium_poisson_form_axisym(V, psi, N_hat_fn, sc, eps_r):
+def build_equilibrium_poisson_form_axisym(V, psi, N_hat_fn, sc, eps_r,
+                                          *, statistics_cfg=None):
     """
     Axisymmetric counterpart of
     :func:`semi.physics.poisson.build_equilibrium_poisson_form`.
 
     The single structural difference is the factor of r in both the
     stiffness and the source integrands; see equation (1) in the
-    module docstring.
-
-    Parameters
-    ----------
-    V : dolfinx.fem.FunctionSpace
-        P1 Lagrange space for psi_hat on the meridian mesh.
-    psi : dolfinx.fem.Function
-        Scaled potential unknown.
-    N_hat_fn : dolfinx.fem.Function
-        Scaled net doping.
-    sc : semi.scaling.Scaling
-        Scaling object.
-    eps_r : float | dolfinx.fem.Function
-        Relative permittivity (scalar or DG0 cellwise).
-
-    Returns
-    -------
-    F : ufl.Form
-        Residual in scaled units, r-weighted.
+    module docstring. The `statistics_cfg` keyword threads the M16.4
+    Fermi-Dirac dispatch identically to the cartesian path; the
+    Boltzmann default remains bit-identical to pre-M16.4.
     """
     import ufl
     from dolfinx import fem
     from petsc4py import PETSc
+
+    from .poisson import _equilibrium_space_charge
 
     msh = V.mesh
     v = ufl.TestFunction(V)
@@ -94,7 +81,9 @@ def build_equilibrium_poisson_form_axisym(V, psi, N_hat_fn, sc, eps_r):
         eps_r_ufl = eps_r
     ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
 
-    rho_hat = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
+    rho_hat = _equilibrium_space_charge(
+        psi, ni_hat, N_hat_fn, sc, statistics_cfg, msh,
+    )
 
     F = (
         L_D2 * eps_r_ufl * ufl.inner(ufl.grad(psi), ufl.grad(v)) * r * ufl.dx
@@ -105,6 +94,7 @@ def build_equilibrium_poisson_form_axisym(V, psi, N_hat_fn, sc, eps_r):
 
 def build_equilibrium_poisson_form_axisym_mr(
     V, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
+    *, statistics_cfg=None,
 ):
     """
     Multi-region axisymmetric Poisson, mirroring
@@ -112,11 +102,14 @@ def build_equilibrium_poisson_form_axisym_mr(
 
     Stiffness integrates over the full meridian mesh with the cellwise
     DG0 ``eps_r_fn``; the Boltzmann space-charge term is restricted to
-    semiconductor cells. Both integrals carry the radial weight r.
+    semiconductor cells. Both integrals carry the radial weight r. The
+    `statistics_cfg` keyword threads the M16.4 Fermi-Dirac dispatch.
     """
     import ufl
     from dolfinx import fem
     from petsc4py import PETSc
+
+    from .poisson import _equilibrium_space_charge
 
     msh = V.mesh
     v = ufl.TestFunction(V)
@@ -130,7 +123,9 @@ def build_equilibrium_poisson_form_axisym_mr(
         "dx", domain=msh, subdomain_data=cell_tags, subdomain_id=int(semi_tag),
     )
 
-    rho_hat = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
+    rho_hat = _equilibrium_space_charge(
+        psi, ni_hat, N_hat_fn, sc, statistics_cfg, msh,
+    )
 
     F = (
         L_D2 * eps_r_fn * ufl.inner(ufl.grad(psi), ufl.grad(v)) * r * dx_full

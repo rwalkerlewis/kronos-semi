@@ -111,13 +111,17 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
     two_ni = 2.0 * ref_mat.n_i
     psi.interpolate(lambda x: np.arcsinh(N_raw_fn(x) / two_ni))
 
+    phys = cfg.get("physics", {})
+    stat_cfg = {"statistics": phys.get("statistics", "boltzmann")}
     if is_axisym:
         F = build_equilibrium_poisson_form_axisym_mr(
             V_psi, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
+            statistics_cfg=stat_cfg,
         )
     else:
         F = build_equilibrium_poisson_form_mr(
             V_psi, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
+            statistics_cfg=stat_cfg,
         )
 
     sweep_contact, sweep_values = _resolve_gate_sweep(cfg)
@@ -135,34 +139,54 @@ def run_mos_cap_ac(cfg: dict[str, Any], *, progress_callback=None):
         static_voltages[c["name"]] = float(c.get("voltage", 0.0))
 
     ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
+    is_fd = stat_cfg.get("statistics", "boltzmann") == "fermi_dirac"
     if is_axisym:
         # r-weighted measures: dV_3D/(2*pi) = r dr dz on the meridian.
         r_coord = ufl.SpatialCoordinate(msh)[0]
         dx_semi = ufl.Measure(
             "dx", domain=msh, subdomain_data=cell_tags, subdomain_id=int(semi_tag),
         )
-        rho_hat_scaled = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
-        charge_form = fem.form(rho_hat_scaled * r_coord * dx_semi)
     else:
         dx_semi = ufl.Measure(
             "dx", domain=msh, subdomain_data=cell_tags, subdomain_id=int(semi_tag),
         )
-        rho_hat_scaled = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
-        charge_form = fem.form(rho_hat_scaled * dx_semi)
 
-    # Sensitivity charge form: dQ_gate/dV = (q C0 / L_gate) *
-    # integral_Si [ni_hat * (exp(-psi) + exp(psi))] * delta_psi (r) dx.
-    # We hold delta_psi as a fem.Function and reuse the same form
-    # across bias points (psi mutates in place; ni_hat is constant).
+    # Charge and sensitivity forms. The Boltzmann branch keeps the
+    # explicit closed forms used pre-M16.4 so the assembled charge
+    # integral is byte-identical to v0.19.0 on every existing
+    # benchmark. The Fermi-Dirac branch builds rho_hat from the
+    # generalized-Slotboom helpers and gets the sensitivity form via
+    # UFL automatic differentiation (the Blakemore-corrected analogue
+    # of `-d rho_hat / d psi`).
     delta_psi = fem.Function(V_psi, name="delta_psi_hat")
-    if is_axisym:
-        sensitivity_form = fem.form(
-            ni_hat * (ufl.exp(-psi) + ufl.exp(psi)) * delta_psi * r_coord * dx_semi
+    if is_fd:
+        from ..physics.poisson import _equilibrium_space_charge
+        rho_hat_scaled = _equilibrium_space_charge(
+            psi, ni_hat, N_hat_fn, sc, stat_cfg, msh,
         )
+        drho_dpsi = ufl.diff(rho_hat_scaled, psi)
+        if is_axisym:
+            charge_form = fem.form(rho_hat_scaled * r_coord * dx_semi)
+            sensitivity_form = fem.form(
+                -drho_dpsi * delta_psi * r_coord * dx_semi
+            )
+        else:
+            charge_form = fem.form(rho_hat_scaled * dx_semi)
+            sensitivity_form = fem.form(
+                -drho_dpsi * delta_psi * dx_semi
+            )
     else:
-        sensitivity_form = fem.form(
-            ni_hat * (ufl.exp(-psi) + ufl.exp(psi)) * delta_psi * dx_semi
-        )
+        rho_hat_scaled = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
+        if is_axisym:
+            charge_form = fem.form(rho_hat_scaled * r_coord * dx_semi)
+            sensitivity_form = fem.form(
+                ni_hat * (ufl.exp(-psi) + ufl.exp(psi)) * delta_psi * r_coord * dx_semi
+            )
+        else:
+            charge_form = fem.form(rho_hat_scaled * dx_semi)
+            sensitivity_form = fem.form(
+                ni_hat * (ufl.exp(-psi) + ufl.exp(psi)) * delta_psi * dx_semi
+            )
 
     # Bilinear form for the sensitivity solve: a(d, v) = d/dpsi F(psi, v)
     # at the converged psi. ufl.derivative gives this directly.

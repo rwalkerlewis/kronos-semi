@@ -110,12 +110,15 @@ def run_bias_sweep(
         "snes_max_it": int(snes_opts.get("max_it", 100)),
     }
 
+    stat_cfg = {"statistics": phys.get("statistics", "boltzmann")}
+
     F_list = build_dd_block_residual(
         spaces, N_hat_fn, sc, ref_mat.epsilon_r,
         mu_n_hat, mu_p_hat, tau_n_hat, tau_p_hat, E_t_over_Vt,
         mobility_cfg=mob,
         facet_tags=facet_tags,
         recomb_cfg=rec,
+        statistics_cfg=stat_cfg,
     )
 
     # Both ohmic and gate contacts can carry static or swept voltages. The

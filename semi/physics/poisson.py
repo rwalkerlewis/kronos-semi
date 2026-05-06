@@ -22,7 +22,8 @@ this module is M1 scope.
 from __future__ import annotations
 
 
-def build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, eps_r):
+def build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, eps_r,
+                                   *, statistics_cfg=None):
     """
     Build the UFL residual form for equilibrium Poisson.
 
@@ -43,6 +44,17 @@ def build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, eps_r):
         `fem.Constant`; the Function branch uses it directly in the
         bilinear form so coefficient-jump assembly picks up the
         piecewise eps_r at quadrature.
+    statistics_cfg : dict, optional
+        The `cfg["physics"]` sub-slice for carrier statistics. `None`
+        (default) or `{"statistics": "boltzmann"}` is bit-identical to
+        pre-M16.4 (Boltzmann space-charge `n_i (exp(-psi) - exp(psi))`).
+        When `statistics_cfg["statistics"] == "fermi_dirac"` the
+        equilibrium electron and hole densities are built via the
+        generalized-Slotboom helpers in `semi.physics.slotboom`
+        evaluated at `phi_n = phi_p = 0` (equilibrium), which is the
+        Blakemore-corrected analogue of the textbook expression. The
+        eta_offset values are read from `sc.eta_offset_n` /
+        `sc.eta_offset_p` (M16.4).
 
     Returns
     -------
@@ -70,7 +82,9 @@ def build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, eps_r):
         eps_r_ufl = eps_r
     ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
 
-    rho_hat = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
+    rho_hat = _equilibrium_space_charge(
+        psi, ni_hat, N_hat_fn, sc, statistics_cfg, msh,
+    )
 
     F = (
         L_D2 * eps_r_ufl * ufl.inner(ufl.grad(psi), ufl.grad(v)) * ufl.dx
@@ -79,8 +93,45 @@ def build_equilibrium_poisson_form(V, psi, N_hat_fn, sc, eps_r):
     return F
 
 
+def _equilibrium_space_charge(psi, ni_hat, N_hat_fn, sc, statistics_cfg, msh):
+    """
+    Equilibrium scaled charge density `rho_hat = p_hat - n_hat + N_hat`.
+
+    Boltzmann (default): `n_hat = ni_hat * exp(psi)`, `p_hat = ni_hat
+    * exp(-psi)` (phi_n = phi_p = 0 at equilibrium, so the textbook
+    `n_i (exp(-psi) - exp(psi))` factor falls out unchanged).
+
+    Fermi-Dirac: builds n_hat / p_hat via the generalized-Slotboom
+    helpers in `semi.physics.slotboom`, which apply the Blakemore
+    prefactor consistent with the DD residual builder. Threads the
+    per-material eta offsets from `sc.eta_offset_n` /
+    `sc.eta_offset_p`. M16.4.
+    """
+    import ufl
+    from dolfinx import fem
+    from petsc4py import PETSc
+
+    if statistics_cfg is None or statistics_cfg.get(
+        "statistics", "boltzmann"
+    ) == "boltzmann":
+        return ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
+
+    from .slotboom import n_from_slotboom, p_from_slotboom
+    phi0 = fem.Constant(msh, PETSc.ScalarType(0.0))
+    n_hat = n_from_slotboom(
+        psi, phi0, ni_hat,
+        statistics_cfg=statistics_cfg, eta_offset_n=sc.eta_offset_n,
+    )
+    p_hat = p_from_slotboom(
+        psi, phi0, ni_hat,
+        statistics_cfg=statistics_cfg, eta_offset_p=sc.eta_offset_p,
+    )
+    return p_hat - n_hat + N_hat_fn
+
+
 def build_equilibrium_poisson_form_mr(
     V, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
+    *, statistics_cfg=None,
 ):
     """
     Build the UFL residual for multi-region equilibrium Poisson (MOS).
@@ -93,6 +144,11 @@ def build_equilibrium_poisson_form_mr(
     eps_r_Si grad psi . n = eps_r_ox grad psi . n
     is enforced automatically by the piecewise eps_r in the bilinear
     form (docs/mos_derivation.md section 3.1).
+
+    `statistics_cfg` (M16.4): same dispatch as the single-region
+    builder. The Boltzmann path is bit-identical to pre-M16.4; the
+    Fermi-Dirac path threads `sc.eta_offset_n` / `sc.eta_offset_p`
+    through the generalized-Slotboom helpers.
     """
     import ufl
     from dolfinx import fem
@@ -109,7 +165,9 @@ def build_equilibrium_poisson_form_mr(
         "dx", domain=msh, subdomain_data=cell_tags, subdomain_id=int(semi_tag),
     )
 
-    rho_hat = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
+    rho_hat = _equilibrium_space_charge(
+        psi, ni_hat, N_hat_fn, sc, statistics_cfg, msh,
+    )
 
     F = (
         L_D2 * eps_r_fn * ufl.inner(ufl.grad(psi), ufl.grad(v)) * dx_full
