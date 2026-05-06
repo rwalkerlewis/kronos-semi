@@ -230,6 +230,26 @@ def test_p_from_slotboom_np_fd_requires_eta_offset():
                            statistics_cfg={"statistics": "fermi_dirac"})
 
 
+def test_p_from_slotboom_np_fd_with_eta_offset_matches_direct_form():
+    """Mirror of `test_fd_density_consistent_two_ways` for the hole side:
+    `p_from_slotboom_np` under FD must equal `N_V * F_{1/2}(eta_p)` where
+    `eta_p = (phi_p - psi) + eta_offset_p`."""
+    n_i = 1.0e10
+    N_V = 3.10e19
+    n_i_hat = 1.0
+    eta_offset_p = math.log(n_i / N_V)
+    cfg = {"statistics": "fermi_dirac"}
+    pairs = [(0.0, -3.0), (0.0, -1.0), (0.0, 0.0), (0.0, 2.0)]
+    for psi, phi_p in pairs:
+        p_residual = float(p_from_slotboom_np(
+            psi, phi_p, n_i_hat,
+            statistics_cfg=cfg, eta_offset_p=eta_offset_p,
+        ))
+        eta_p = (phi_p - psi) + eta_offset_p
+        p_direct = (N_V / n_i) * float(fermi_dirac_half_blakemore(eta_p))
+        assert p_residual == pytest.approx(p_direct, rel=1.0e-12)
+
+
 # ---------------------------------------------------------------------------
 # Scaling.eta_offset_n / eta_offset_p.
 # ---------------------------------------------------------------------------
