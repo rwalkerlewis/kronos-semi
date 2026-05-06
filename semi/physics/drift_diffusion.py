@@ -233,18 +233,21 @@ def build_dd_block_residual(
         tau_p * (n_hat + n1) + tau_n * (p_hat + p1)
     )
     # M16.6: shared dimensionless field magnitude. Kane BBT and Hurkx
-    # TAT both read |grad(psi_hat)|; compute once, factor out via UFL
-    # CSE. The eps_F term is a tiny additive guard so the ufl.sqrt
-    # derivative remains finite at the rare interior points where
-    # grad(psi_hat) is exactly zero (typical solves never see this in
-    # practice but the SNES Jacobian assembly evaluates derivatives at
-    # the initial guess where the field can be zero).
+    # TAT both read the L_0-scaled magnitude `L_0 * |grad(psi_hat)|`,
+    # which is the natural dimensionless ratio because
+    # `|E_phys| = (V_0 / L_0) * (L_0 * |grad(psi_hat)|)`. The eps_F
+    # term is a tiny additive guard so the ufl.sqrt derivative
+    # remains finite at the rare interior points where grad(psi_hat)
+    # is exactly zero (typical solves never see this in practice but
+    # the SNES Jacobian assembly evaluates derivatives at the initial
+    # guess where the field can be zero).
     tun_cfg = recomb_cfg or {}
     bbt_on = bool(tun_cfg.get("bbt", False))
     tat_on = bool(tun_cfg.get("tat", False))
     if bbt_on or tat_on:
         eps_F_const = fem.Constant(msh, PETSc.ScalarType(1.0e-30))
-        F_hat_mag = ufl.sqrt(
+        L0_const = fem.Constant(msh, PETSc.ScalarType(sc.L0))
+        F_hat_mag = L0_const * ufl.sqrt(
             ufl.dot(ufl.grad(psi), ufl.grad(psi)) + eps_F_const
         )
     else:
@@ -681,16 +684,16 @@ def build_dd_block_residual_mr(
     R_base_mr = np_minus_nieq_sub / (
         tau_p * (n_hat_sub + n1) + tau_n * (p_hat_sub + p1)
     )
-    # M16.6: shared scaled field magnitude on the parent mesh; psi
-    # lives on the parent so |grad(psi_hat)| is evaluated there. The
-    # field is then read on the semiconductor submesh through
-    # entity_maps when assembling the continuity rows.
+    # M16.6: shared L_0-scaled field magnitude on the parent mesh
+    # (psi lives there). See the docstring of the single-region path
+    # above for the dimensionless-ratio rationale.
     tun_cfg_mr = recomb_cfg or {}
     bbt_on_mr = bool(tun_cfg_mr.get("bbt", False))
     tat_on_mr = bool(tun_cfg_mr.get("tat", False))
     if bbt_on_mr or tat_on_mr:
         eps_F_const_mr = fem.Constant(msh, PETSc.ScalarType(1.0e-30))
-        F_hat_mag_mr = ufl.sqrt(
+        L0_const_mr = fem.Constant(msh, PETSc.ScalarType(sc.L0))
+        F_hat_mag_mr = L0_const_mr * ufl.sqrt(
             ufl.dot(ufl.grad(psi), ufl.grad(psi)) + eps_F_const_mr
         )
     else:
