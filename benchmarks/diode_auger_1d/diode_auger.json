@@ -1,7 +1,7 @@
 {
   "schema_version": "2.3.0",
   "name": "diode_auger_1d",
-  "description": "1D pn diode forward sweep V_F in [0.0, 0.9] V (19 points, 0.05 V step) to expose Auger recombination (M16.3). Symmetric N_A = N_D = 1e15 cm^-3, 20 um total, junction at the midplane. Engineered Auger coefficients (C_n = C_p = 1.0e-29 cm^6/s, ~30x Si Dziewior-Schmid) so the Auger contribution is materially exercised at the typical high-injection delta this geometry reaches at V_F = 0.9 V (delta(0) ~ 3.7e17 cm^-3). The companion verifier (scripts/run_benchmark.py verify_diode_auger_1d) compares this run to an SRH-only run of the same biases and asserts >20% I-V divergence at V_F = 0.9 V (Auger materially boosts recombination current) plus an analytical high-injection long-diode match within 10% (a Hall-Auger ambipolar approximation; see semi/diode_analytical.py::shockley_iv_with_auger).",
+  "description": "1D pn diode forward sweep V_F in [0.0, 0.9] V (19 points, 0.05 V step) to expose Auger recombination (M16.3). Symmetric N_A = N_D = 1e17 cm^-3, 20 um total, junction at the midplane. Engineered Auger coefficients (C_n = C_p = 1.0e-27 cm^6/s, ~3000x Si Dziewior-Schmid) chosen so the Auger contribution is materially exercised at the FEM-simulated injection level this geometry actually reaches at V_F = 0.9 V (n ~ p ~ 1.5e17 cm^-3 at the junction; bulk series resistance limits the actual junction voltage well below the applied bias, so the asymptotic long-diode delta_0 = n_i exp(V/2V_t) is not realized). The companion verifier (scripts/run_benchmark.py verify_diode_auger_1d) compares this run to an SRH-only run of the same biases and asserts >20% I-V divergence at V_F = 0.9 V (Auger materially boosts recombination current). The analytical Hall-Auger reference (semi/diode_analytical.py::shockley_iv_with_auger) is printed alongside for diagnostics but is not a hard gate because the closed form assumes pure long-diode high-injection without bulk series resistance.",
   "dimension": 1,
   "mesh": {
     "source": "builtin",
@@ -56,8 +56,8 @@
         "axis": 0,
         "location": 1e-05,
         "N_D_left": 0.0,
-        "N_A_left": 1e+15,
-        "N_D_right": 1e+15,
+        "N_A_left": 1e+17,
+        "N_D_right": 1e+17,
         "N_A_right": 0.0
       }
     }
@@ -95,8 +95,8 @@
       "tau_p": 1e-07,
       "E_t": 0.0,
       "auger": true,
-      "C_n": 1.0e-29,
-      "C_p": 1.0e-29
+      "C_n": 1.0e-27,
+      "C_p": 1.0e-27
     }
   },
   "solver": {
