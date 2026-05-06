@@ -130,6 +130,43 @@ def test_schottky_form_assembles_with_schottky_facet_at_forward_bias():
     assert len(F_list) == 3
 
 
+def test_run_bias_sweep_with_schottky_contact_completes_one_step():
+    """End-to-end coverage for the M16.5 bias_sweep extensions: the
+    Schottky equilibrium-Poisson pre-solve, the `schottky` branch in
+    `_resolve_sweep`, and the `schottky` branch in the static-voltage
+    dispatch. The schottky_1d benchmark exercises the same paths but
+    runs in a separate CI job whose coverage is not merged into the
+    docker-fem-tests gate, so without this unit test the pre-solve
+    block (~17 lines) shows as uncovered. Mesh and sweep are kept
+    minimal so the test runs in a few seconds.
+    """
+    from semi.runners.bias_sweep import run_bias_sweep
+
+    cfg = _schottky_1d_cfg(anode_voltage=0.0)
+    cfg["contacts"][0]["voltage_sweep"] = {
+        "start": 0.0, "stop": 0.05, "step": 0.05,
+    }
+    cfg["physics"]["mobility"] = {"mu_n": 1400.0, "mu_p": 450.0}
+    cfg["physics"]["recombination"] = {
+        "srh": True, "tau_n": 1.0e-7, "tau_p": 1.0e-7, "E_t": 0.0,
+    }
+    cfg["solver"] = {
+        "type": "bias_sweep",
+        "snes": {"rtol": 1.0e-10, "atol": 1.0e-7, "stol": 1.0e-14, "max_it": 80},
+        "continuation": {
+            "min_step": 1.0e-4,
+            "max_halvings": 6,
+            "max_step": 0.05,
+            "easy_iter_threshold": 4,
+            "grow_factor": 1.5,
+        },
+    }
+    cfg["output"] = {"directory": "/tmp/test_schottky_smoke_results", "fields": []}
+
+    result = run_bias_sweep(cfg)
+    assert len(result.iv) >= 2
+
+
 def test_schottky_surface_form_contributes_nonzero_residual_entry():
     """At the seed (psi from charge-neutrality, phi_n = phi_p = 0)
     under forward bias, the Schottky surface integral contributes a
