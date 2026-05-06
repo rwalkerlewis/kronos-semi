@@ -320,6 +320,7 @@ def run_transient(
         spaces, sc, ref_mat.epsilon_r,
         mu_n_hat, mu_p_hat, tau_n_hat, tau_p_hat, E_t_over_Vt,
         dt_const, alpha0_const,
+        recomb_cfg=rec,
     )
 
     # ------------------------------------------------------------------
@@ -538,6 +539,8 @@ def _build_transient_residual(
     E_t_over_Vt: float,
     dt_const,
     alpha0_const,
+    *,
+    recomb_cfg: dict | None = None,
 ):
     """
     Build the three-block transient residual in Slotboom form.
@@ -607,12 +610,23 @@ def _build_transient_residual(
     n_ufl = n_from_slotboom(psi, phi_n, ni_hat_c)
     p_ufl = p_from_slotboom(psi, phi_p, ni_hat_c)
 
-    # SRH recombination (same as bias_sweep)
+    # SRH (and optional Auger, M16.3) recombination, same shape as
+    # bias_sweep so the steady-state limit of the transient is bit-
+    # identical to the DD form builder's output.
     n1 = ni_hat_c * _math.exp(E_t_over_Vt)
     p1 = ni_hat_c * _math.exp(-E_t_over_Vt)
-    R = (n_ufl * p_ufl - ni_hat_c * ni_hat_c) / (
+    np_minus_nieq = n_ufl * p_ufl - ni_hat_c * ni_hat_c
+    R = np_minus_nieq / (
         tau_p_c * (n_ufl + n1) + tau_n_c * (p_ufl + p1)
     )
+    if recomb_cfg is not None and recomb_cfg.get("auger", False):
+        C_n_hat_val_t = float(recomb_cfg.get("C_n", 2.8e-31)) * 1.0e-12 \
+            * sc.C0 ** 2 * sc.t0
+        C_p_hat_val_t = float(recomb_cfg.get("C_p", 9.9e-32)) * 1.0e-12 \
+            * sc.C0 ** 2 * sc.t0
+        C_n_hat_t = fem.Constant(msh, PETSc.ScalarType(C_n_hat_val_t))
+        C_p_hat_t = fem.Constant(msh, PETSc.ScalarType(C_p_hat_val_t))
+        R = R + (C_n_hat_t * n_ufl + C_p_hat_t * p_ufl) * np_minus_nieq
 
     # Poisson block (identical to bias_sweep)
     rho_hat = p_ufl - n_ufl + N_hat_fn

@@ -285,6 +285,7 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
     F_list = build_dd_block_residual(
         spaces, N_hat_fn, sc, ref_mat.epsilon_r,
         mu_n_hat, mu_p_hat, tau_n_hat_v, tau_p_hat_v, E_t_over_Vt,
+        recomb_cfg=rec,
     )
     a_blocks = [
         [ufl.derivative(F_list[i], u_j) for u_j in (psi, phi_n, phi_p)]
