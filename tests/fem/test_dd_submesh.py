@@ -273,3 +273,29 @@ def test_mr_dd_assembly_pn_junction_matches_vbi_theory():
     n_bulk = Si.n_i * float(np.exp(psi_sorted[-2] - phin_sorted[-2]))
     assert p_bulk == pytest.approx(N_A, rel=5.0e-3)
     assert n_bulk == pytest.approx(N_D, rel=5.0e-3)
+
+
+def test_mr_dd_auger_branch_assembles():
+    """
+    M16.3: the multiregion form builder accepts `recomb_cfg` with
+    `auger=True` and emits a residual that includes the Auger term
+    on the submesh integration domain.
+
+    The single-region (`build_dd_block_residual`) Auger path is
+    exercised end-to-end by the diode_auger_1d benchmark; the MR
+    counterpart has no benchmark today, so this assembly smoke test
+    pins the M16.3 inline at the multiregion path against
+    regressions.
+    """
+    from semi.physics.drift_diffusion import build_dd_block_residual_mr
+
+    spaces, sc, Si, cell_tags, N_hat_fn, _L, _N = _build_1d_uniform_problem()
+
+    F_list = build_dd_block_residual_mr(
+        spaces, N_hat_fn, sc, Si.epsilon_r,
+        Si.mu_n / sc.mu0, Si.mu_p / sc.mu0,
+        1.0e-7 / sc.t0, 1.0e-7 / sc.t0,
+        cell_tags, semi_tag=1,
+        recomb_cfg={"auger": True, "C_n": 1.0e-29, "C_p": 1.0e-29},
+    )
+    assert len(F_list) == 3
