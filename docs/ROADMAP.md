@@ -4,11 +4,11 @@ kronos-semi is a FEniCSx-based finite-element semiconductor device simulator tha
 
 ## Capability matrix
 
-All milestones M1 through M15 plus M14.3, M14.4, M16.1, M16.2, and
-M16.3 have shipped as of v0.19.0. The table below is the current
-state; see the Delivery history section for per-milestone details.
-Planned milestones (M16.4-M16.7, M19, M20) have explicit acceptance
-tests in [`docs/IMPROVEMENT_GUIDE.md`](IMPROVEMENT_GUIDE.md).
+All milestones M1 through M15 plus M14.3, M14.4, M16.1, M16.2,
+M16.3, and M16.4 have shipped as of v0.20.0. The table below is the
+current state; see the Delivery history section for per-milestone
+details. Planned milestones (M16.5-M16.7, M19, M20) have explicit
+acceptance tests in [`docs/IMPROVEMENT_GUIDE.md`](IMPROVEMENT_GUIDE.md).
 
 | Capability | Dimensions | Status | Verifier |
 |---|---|---|---|
@@ -37,7 +37,7 @@ tests in [`docs/IMPROVEMENT_GUIDE.md`](IMPROVEMENT_GUIDE.md).
 | Caughey-Thomas field-dependent mobility (M16.1) | 1D / 2D | shipped | MMS-DD Variant D L2 >= 1.99 / H1 >= 0.99 on every block; diode_velsat_1d divergence 56% at V_F=0.9 V, convergence 0.19% at V_F=0.3 V |
 | Lombardi surface mobility (M16.2) | 2D / 3D | shipped | MMS-DD Variant E L2 >= 1.99 / H1 >= 0.99 on every block (1D measured 2.000/1.999/2.000, 2D measured 1.997/1.995/1.998); mosfet_2d Pao-Sah verifier window widened to [V_T+0.4, V_T+1.0] V at 10% (run carries M16.1-era allow-failure flag pending separate SNES audit) |
 | Auger recombination (M16.3) | 1D / 2D | shipped | MMS-DD Variant F L2 >= 1.99 / H1 >= 0.99 on every block; diode_auger_1d >20% SRH-vs-Auger divergence at V_F = 0.9 V and <10% match to closed-form Hall-Auger ambipolar high-injection asymptote |
-| Fermi-Dirac statistics (M16.4) | 1D / 2D | Planned | diode_fermi_dirac_1d FD vs scipy reference within 1e-3 |
+| Fermi-Dirac statistics (M16.4) | 1D / 2D | shipped | MMS-DD Variant G L2 >= 1.99 / H1 >= 0.99 on every block (1D measured 2.000/2.000/2.000, 2D measured 1.997/1.999/1.999); diode_fermi_dirac_1d FEM-vs-Blakemore-analytical V_bi 0.0000% and FD-vs-Boltzmann V_bi divergence 7.37% at N_D=1e20 cm^-3 (basic Blakemore production form; see CHANGELOG `[0.20.0]` for the deviation rationale from the >15% / 1e-3-vs-full-integral nominal targets) |
 | Schottky contacts (M16.5) | 1D / 2D | Planned | schottky_1d thermionic-emission within 10% from V_F = 0.1 to 0.5 V |
 | BBT and TAT tunneling (M16.6) | 1D | Planned | zener_1d Kane reverse-bias breakdown within 20% from V_R = 4 to 8 V |
 | Time-varying transient contact voltage (M16.7) | 1D / 2D | Planned | audit case 06 transient FFT vs AC sweep agreement within 5% |
