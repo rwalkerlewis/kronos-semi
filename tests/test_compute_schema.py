@@ -52,9 +52,10 @@ def test_supported_minor_resets_for_v2():
     """v2.0.0 reset SCHEMA_SUPPORTED_MINOR to 0 per M14.3.
     M16.1 bumped it to 1 (v2.1.0 caughey_thomas mobility dispatch);
     M16.2 bumped it to 2 (v2.2.0 lombardi surface mobility); M16.3
-    bumped it to 3 (v2.3.0 Auger recombination); the M14.3 reset
+    bumped it to 3 (v2.3.0 Auger recombination); M16.4 bumped it to
+    4 (v2.4.0 Fermi-Dirac statistics dispatch); the M14.3 reset
     semantics survive (no major bump means no minor reset)."""
-    assert schema.SCHEMA_SUPPORTED_MINOR == 3
+    assert schema.SCHEMA_SUPPORTED_MINOR == 4
 
 
 def test_schema_version_140_accepted_with_deprecation(minimal_cfg):

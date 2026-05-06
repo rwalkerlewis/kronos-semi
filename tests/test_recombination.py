@@ -275,10 +275,12 @@ def test_v2_2_0_input_still_validates_after_minor_bump():
 
 
 def test_schema_supported_minor_is_3():
-    """Sanity: SCHEMA_SUPPORTED_MINOR was bumped to 3 in M16.3."""
+    """Sanity: SCHEMA_SUPPORTED_MINOR is at least 3 (M16.3 bumped it
+    from 2 to 3 for the Auger recombination dispatch). Subsequent
+    additive minors only widen the engine's accepted range."""
     from semi import schema as schema_mod
 
-    assert schema_mod.SCHEMA_SUPPORTED_MINOR == 3
+    assert schema_mod.SCHEMA_SUPPORTED_MINOR >= 3
 
 
 # ---------------------------------------------------------------------------

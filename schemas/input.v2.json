@@ -16,8 +16,9 @@
     "schema_version": {
       "type": "string",
       "pattern": "^2\\.\\d+\\.\\d+$",
-      "description": "Schema version in semver form. v2 enforces additionalProperties:false on every object node (typos in input keys fail validation rather than being silently ignored). Engine refuses inputs whose major does not match the engine's supported major. Current schema: 2.3.0; v2.0.0, v2.1.0, and v2.2.0 inputs continue to validate (additive minors for the M16.1 caughey_thomas, M16.2 lombardi mobility, and M16.3 Auger recombination dispatches).",
+      "description": "Schema version in semver form. v2 enforces additionalProperties:false on every object node (typos in input keys fail validation rather than being silently ignored). Engine refuses inputs whose major does not match the engine's supported major. Current schema: 2.4.0; v2.0.0, v2.1.0, v2.2.0, and v2.3.0 inputs continue to validate (additive minors for the M16.1 caughey_thomas, M16.2 lombardi mobility, M16.3 Auger recombination, and M16.4 Fermi-Dirac statistics dispatches).",
       "examples": [
+        "2.4.0",
         "2.3.0",
         "2.2.0",
         "2.1.0",
@@ -707,9 +708,10 @@
         "statistics": {
           "type": "string",
           "enum": [
-            "boltzmann"
+            "boltzmann",
+            "fermi_dirac"
           ],
-          "description": "Carrier statistics model. Boltzmann is the only supported option today; Fermi-Dirac is scheduled for M16.",
+          "description": "Carrier statistics. boltzmann (default) is the V&V reference and is bit-identical to v0.19.0. fermi_dirac substitutes the Blakemore approximation for F_{1/2} in the Poisson source and the Slotboom carrier-density helpers; required for quantitative I-V at heavy doping (>~1e19 cm^-3) where Boltzmann breaks. Added in schema 2.4.0 (M16.4).",
           "default": "boltzmann"
         }
       },
