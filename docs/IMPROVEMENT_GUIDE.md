@@ -985,7 +985,10 @@ The engine is ready for a UI when all of these are green:
 
 ### [Unreleased]
 
-(Empty.)
+- **2026-05-06**, author M16.6 starter prompt
+  ([M16_6_STARTER_PROMPT.md](M16_6_STARTER_PROMPT.md)) on branch
+  `dev/m16.6-tunneling`; phases ship per
+  [PR template at the bottom of the prompt](M16_6_STARTER_PROMPT.md).
 
 ### [0.21.0]
 
