@@ -75,6 +75,42 @@ def run_bias_sweep(
         fn.x.scatter_forward()
 
     phys = cfg.get("physics", {})
+
+    # M16.5: configs with Schottky contacts need a proper equilibrium
+    # Poisson pre-solve to set the psi profile near the metal-
+    # semiconductor barrier; the doping-based asinh seed is correct in
+    # the bulk but ignores the band-bending caused by the Schottky
+    # Dirichlet, leaving the coupled DD seed solve far from a valid
+    # Newton basin. The Poisson pre-solve uses the same psi Dirichlet
+    # the DD solve does, populating spaces.psi with the depletion-
+    # region profile so the DD seed solve can converge in a few
+    # iterations. Devices with no Schottky contacts skip this branch
+    # (bit-identical to v0.20.0).
+    has_schottky_pre = any(
+        c["type"] == "schottky" for c in cfg["contacts"]
+    )
+    if has_schottky_pre:
+        from ..bcs import build_psi_dirichlet_bcs
+        from ..physics.poisson import build_equilibrium_poisson_form
+        from ..solver import solve_nonlinear
+
+        contacts_eq = resolve_contacts(cfg, facet_tags=facet_tags)
+        bcs_psi_only = build_psi_dirichlet_bcs(
+            spaces.V_psi, msh, facet_tags, contacts_eq, sc, ref_mat,
+            N_raw_fn,
+        )
+        for bc in bcs_psi_only:
+            bc.set(spaces.psi.x.array)
+        spaces.psi.x.scatter_forward()
+        F_psi_eq = build_equilibrium_poisson_form(
+            spaces.V_psi, spaces.psi, N_hat_fn, sc, ref_mat.epsilon_r,
+            statistics_cfg={"statistics": phys.get("statistics", "boltzmann")},
+        )
+        solve_nonlinear(
+            F_psi_eq, spaces.psi, bcs_psi_only,
+            prefix=f"{cfg['name']}_schottky_psi_seed_", cfg=cfg,
+        )
+
     mob = phys.get("mobility", {})
     mu_n_SI = float(mob.get("mu_n", 1400.0)) * 1.0e-4
     mu_p_SI = float(mob.get("mu_p", 450.0)) * 1.0e-4
@@ -147,15 +183,16 @@ def run_bias_sweep(
 
     F_list = _build_F_list({})
 
-    # Both ohmic and gate contacts can carry static or swept voltages. The
-    # runner historically only swept ohmic contacts; gate-sweep support was
-    # added so the mosfet_2d benchmark can drive V_GS at fixed V_DS for the
-    # M14.3 Pao-Sah verifier. Schottky and insulating contacts stay
-    # untouched (the schema already permits at most a static voltage on
-    # each).
+    # Ohmic, gate, and (since M16.5) Schottky contacts can carry
+    # static or swept voltages. The runner historically only swept
+    # ohmic contacts; gate-sweep support was added so the mosfet_2d
+    # benchmark can drive V_GS at fixed V_DS for the M14.3 Pao-Sah
+    # verifier. M16.5 widened the dispatch to include `schottky` so the
+    # schottky_1d benchmark can sweep its Schottky anode. Insulating
+    # contacts contribute no Dirichlet row and stay untouched.
     static_voltages: dict[str, float] = {}
     for c in cfg["contacts"]:
-        if c["type"] not in ("ohmic", "gate"):
+        if c["type"] not in ("ohmic", "gate", "schottky"):
             continue
         if sweep_contact is not None and c["name"] == sweep_contact:
             continue
@@ -396,13 +433,12 @@ def compute_bipolar_legs(v_sweep_list: list[float]) -> list[float]:
 def _resolve_sweep(cfg):
     """Return (contact_name, list_of_voltage_values) or (None, []) if none.
 
-    Ohmic and gate contacts are both sweepable. Ohmic-with-voltage_sweep
-    wins over gate-with-voltage_sweep when both are present (precedence
-    follows the JSON contact order; in practice a benchmark declares at
-    most one swept contact).
+    Ohmic, gate, and (since M16.5) Schottky contacts are sweepable.
+    Precedence follows the JSON contact order; in practice a
+    benchmark declares at most one swept contact.
     """
     for c in cfg["contacts"]:
-        if c["type"] not in ("ohmic", "gate"):
+        if c["type"] not in ("ohmic", "gate", "schottky"):
             continue
         sweep = c.get("voltage_sweep")
         if sweep is None:
