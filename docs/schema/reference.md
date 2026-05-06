@@ -26,8 +26,9 @@ the full annotated source of truth is the JSON file.
   contact / mesh / solver fields fail validation rather than being
   silently dropped).
 - Minor/patch skew is accepted silently within a major.
-- Current schema version: **2.3.0** (M16.3 Auger recombination kernel);
-  v2.0.0, v2.1.0, and v2.2.0 inputs continue to validate (additive minors).
+- Current schema version: **2.4.0** (M16.4 Fermi-Dirac statistics dispatch);
+  v2.0.0, v2.1.0, v2.2.0, and v2.3.0 inputs continue to validate (additive
+  minors).
 
 Schemas are published to
 `https://rwalkerlewis.github.io/kronos-semi/schemas/` on every release
@@ -67,6 +68,14 @@ History:
   9.9e-32 cm^6/s; both Dziewior-Schmid). When `auger == false` (the
   default), the recombination kernel is bit-identical to v0.18.0.
   v2.0.0, v2.1.0, and v2.2.0 inputs continue to validate.
+- **2.4.0** (M16.4): additive Fermi-Dirac statistics gated by
+  `physics.statistics` dispatch. Widens the `physics.statistics`
+  enum from `["boltzmann"]` to `["boltzmann", "fermi_dirac"]`. The
+  `boltzmann` branch (default) is bit-identical to v0.19.0; the
+  `fermi_dirac` branch substitutes the Blakemore approximation for
+  F_{1/2} in the generalized-Slotboom helpers (ADR 0004) and the
+  Poisson source. v2.0.0, v2.1.0, v2.2.0, and v2.3.0 inputs continue
+  to validate.
 
 ## Top-level fields
 

@@ -33,11 +33,19 @@ from .constants import EPS0, Q, thermal_voltage
 class Scaling:
     """Scale factors for nondimensionalizing the device equations."""
 
-    L0: float      # characteristic length, m
-    C0: float      # characteristic density, m^-3
-    T: float       # temperature, K
-    mu0: float     # reference mobility, m^2/(V s)
-    n_i: float     # intrinsic density of reference material, m^-3
+    L0: float                    # characteristic length, m
+    C0: float                    # characteristic density, m^-3
+    T: float                     # temperature, K
+    mu0: float                   # reference mobility, m^2/(V s)
+    n_i: float                   # intrinsic density of reference material, m^-3
+    # M16.4: effective conduction- and valence-band density of states
+    # for the reference material, in m^-3. Optional because pre-M16.4
+    # callers (and many tests) instantiate Scaling directly without an
+    # FD path. The Boltzmann branch never reads them; the Fermi-Dirac
+    # branch reads `eta_offset_n` / `eta_offset_p`, both of which
+    # raise a clear error when N_C or N_V is None.
+    N_C: float | None = None
+    N_V: float | None = None
 
     @property
     def V0(self) -> float:
@@ -69,6 +77,43 @@ class Scaling:
         """
         return EPS0 * self.V0 / (Q * self.C0 * self.L0 ** 2)
 
+    @property
+    def eta_offset_n(self) -> float:
+        """
+        Reduced Fermi-level offset for electrons, ln(n_i / N_C).
+
+        Used by the M16.4 Fermi-Dirac dispatch in
+        :mod:`semi.physics.statistics` to turn the Slotboom drive
+        `(psi - phi_n)/V_t` into the absolute reduced Fermi level
+        `eta_n`. Raises ValueError if N_C is unset (the Boltzmann
+        branch never asks for this, so existing call sites are
+        unaffected).
+        """
+        if self.N_C is None:
+            raise ValueError(
+                "Scaling.N_C is not populated; the Fermi-Dirac dispatch "
+                "(physics.statistics='fermi_dirac') requires the reference "
+                "material to expose a non-zero conduction-band density of "
+                "states (Material.Nc). Boltzmann-default solves do not "
+                "read this property and remain unaffected."
+            )
+        from .physics.statistics import _eta_offset_for_material
+        return _eta_offset_for_material(self.N_C, self.n_i)
+
+    @property
+    def eta_offset_p(self) -> float:
+        """Hole counterpart of :attr:`eta_offset_n`, ln(n_i / N_V)."""
+        if self.N_V is None:
+            raise ValueError(
+                "Scaling.N_V is not populated; the Fermi-Dirac dispatch "
+                "(physics.statistics='fermi_dirac') requires the reference "
+                "material to expose a non-zero valence-band density of "
+                "states (Material.Nv). Boltzmann-default solves do not "
+                "read this property and remain unaffected."
+            )
+        from .physics.statistics import _eta_offset_for_material
+        return _eta_offset_for_material(self.N_V, self.n_i)
+
     def debye_length(self, n_ref: float | None = None) -> float:
         """
         Debye length in meters for a reference carrier density n_ref (m^-3).
@@ -96,10 +141,18 @@ def make_scaling_from_config(cfg: dict, reference_material) -> Scaling:
     L0 = _infer_length(cfg)
     C0 = _infer_density(cfg)
     T = cfg["physics"]["temperature"]
+    # M16.4: pull N_C / N_V from the reference material if the slot
+    # carries a positive value. Insulators and pre-M16.4 materials
+    # default to 0.0 in `semi.materials`; map zero to None so the
+    # FD-dispatch property surfaces a clear error rather than a silent
+    # log(0) on the Fermi-Dirac path.
+    N_C = reference_material.Nc if reference_material.Nc > 0.0 else None
+    N_V = reference_material.Nv if reference_material.Nv > 0.0 else None
     return Scaling(
         L0=L0, C0=C0, T=T,
         mu0=reference_material.mu_n,
         n_i=reference_material.n_i,
+        N_C=N_C, N_V=N_V,
     )
 
 

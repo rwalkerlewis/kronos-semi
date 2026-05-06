@@ -77,8 +77,11 @@ def run_mos_cv(cfg: dict[str, Any], *, progress_callback=None):
     two_ni = 2.0 * ref_mat.n_i
     psi.interpolate(lambda x: np.arcsinh(N_raw_fn(x) / two_ni))
 
+    phys = cfg.get("physics", {})
+    stat_cfg = {"statistics": phys.get("statistics", "boltzmann")}
     F = build_equilibrium_poisson_form_mr(
         V, psi, N_hat_fn, sc, eps_r_fn, cell_tags, semi_tag,
+        statistics_cfg=stat_cfg,
     )
 
     sweep_contact, sweep_values = _resolve_gate_sweep(cfg)
@@ -97,13 +100,20 @@ def run_mos_cv(cfg: dict[str, Any], *, progress_callback=None):
 
     # Per-cycle charge form (rebuilt each iteration is overkill; rho_hat
     # is built off `psi` which is mutated in place, so one form suffices).
+    # Under FD the same Blakemore prefactor that the residual sees must
+    # be applied here, otherwise the gate-charge integral would not be
+    # consistent with the solved psi profile.
     import ufl
     from petsc4py import PETSc
+
+    from ..physics.poisson import _equilibrium_space_charge
     ni_hat = fem.Constant(msh, PETSc.ScalarType(sc.n_i / sc.C0))
     dx_semi = ufl.Measure(
         "dx", domain=msh, subdomain_data=cell_tags, subdomain_id=int(semi_tag),
     )
-    rho_hat_scaled = ni_hat * (ufl.exp(-psi) - ufl.exp(psi)) + N_hat_fn
+    rho_hat_scaled = _equilibrium_space_charge(
+        psi, ni_hat, N_hat_fn, sc, stat_cfg, msh,
+    )
     charge_form = fem.form(rho_hat_scaled * dx_semi)
 
     extents = cfg["mesh"]["extents"]

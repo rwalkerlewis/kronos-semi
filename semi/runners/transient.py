@@ -315,12 +315,15 @@ def run_transient(
     dt_const = fem.Constant(msh, PETSc.ScalarType(dt_hat))
     alpha0_const = fem.Constant(msh, PETSc.ScalarType(alpha_0))
 
+    stat_cfg = {"statistics": phys.get("statistics", "boltzmann")}
+
     F_list = _build_transient_residual(
         psi, phi_n, phi_p, N_hat_fn, f_hist_n, f_hist_p,
         spaces, sc, ref_mat.epsilon_r,
         mu_n_hat, mu_p_hat, tau_n_hat, tau_p_hat, E_t_over_Vt,
         dt_const, alpha0_const,
         recomb_cfg=rec,
+        statistics_cfg=stat_cfg,
     )
 
     # ------------------------------------------------------------------
@@ -541,6 +544,7 @@ def _build_transient_residual(
     alpha0_const,
     *,
     recomb_cfg: dict | None = None,
+    statistics_cfg: dict | None = None,
 ):
     """
     Build the three-block transient residual in Slotboom form.
@@ -606,9 +610,30 @@ def _build_transient_residual(
     tau_n_c = fem.Constant(msh, PETSc.ScalarType(tau_n_hat))
     tau_p_c = fem.Constant(msh, PETSc.ScalarType(tau_p_hat))
 
-    # Slotboom carrier densities (always positive)
-    n_ufl = n_from_slotboom(psi, phi_n, ni_hat_c)
-    p_ufl = p_from_slotboom(psi, phi_p, ni_hat_c)
+    # Slotboom carrier densities (always positive). Under
+    # statistics_cfg["statistics"] == "fermi_dirac" the helpers apply
+    # the Blakemore prefactor; the Boltzmann default is bit-identical
+    # to pre-M16.4. M16.4.
+    eta_offset_n_val = (
+        sc.eta_offset_n
+        if statistics_cfg is not None
+        and statistics_cfg.get("statistics", "boltzmann") == "fermi_dirac"
+        else None
+    )
+    eta_offset_p_val = (
+        sc.eta_offset_p
+        if statistics_cfg is not None
+        and statistics_cfg.get("statistics", "boltzmann") == "fermi_dirac"
+        else None
+    )
+    n_ufl = n_from_slotboom(
+        psi, phi_n, ni_hat_c,
+        statistics_cfg=statistics_cfg, eta_offset_n=eta_offset_n_val,
+    )
+    p_ufl = p_from_slotboom(
+        psi, phi_p, ni_hat_c,
+        statistics_cfg=statistics_cfg, eta_offset_p=eta_offset_p_val,
+    )
 
     # SRH (and optional Auger, M16.3) recombination, same shape as
     # bias_sweep so the steady-state limit of the transient is bit-

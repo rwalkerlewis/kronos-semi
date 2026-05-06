@@ -649,6 +649,28 @@ in weak form:
   per the M16.3 acceptance gate in
   `docs/IMPROVEMENT_GUIDE.md` § M16.3; pytest module
   `tests/fem/test_mms_auger.py`.
+- **Variant G (Fermi-Dirac statistics, M16.4).** Variant C
+  electronics plus the generalized-Slotboom substitution under the
+  basic Blakemore approximation
+  `F_{1/2}(eta) ~ 1 / (exp(-eta) + 0.27)` (see `semi/physics/statistics.py`).
+  The substitution multiplies `n` and `p` by smooth bounded
+  prefactors `gamma_n(eta_n)` and `gamma_p(eta_p)` evaluated at the
+  same Slotboom argument that Variants B-F use; the continuity-row
+  shape `J = -q mu n grad(phi)` is unchanged because the FD
+  Einstein-factor cancels against gamma in the Slotboom-form current
+  expression (ADR 0004 derivation note). The MMS engineers
+  `MMS_G_ETA_OFFSET_N = MMS_G_ETA_OFFSET_P = -1.0` so eta_n / eta_p
+  range over roughly `[-1.8, -0.2]` at the default amplitudes,
+  pushing the Blakemore prefactor through a 4-18 % FD-vs-Boltzmann
+  shift and materially exercising the new closed form. The
+  reverse-engineered `Scaling.N_C` / `Scaling.N_V` values are
+  written by `run_one_level` so `sc.eta_offset_n` /
+  `sc.eta_offset_p` resolve to the same constants the manufactured
+  weak source uses, and the production form sees the identical
+  closed form via `statistics_cfg = {"statistics": "fermi_dirac"}`.
+  Gated at L^2 >= 1.99 / H^1 >= 0.99 per the M16.4 acceptance gate
+  in `docs/IMPROVEMENT_GUIDE.md` § M16.4; pytest module
+  `tests/fem/test_mms_fermi_dirac.py`.
 
 Finest-pair rates (N = 320 for 1D, N = 64 for 2D), default
 amplitudes (A_psi, A_n, A_p) = (0.5, 0.3, -0.3):
@@ -687,20 +709,26 @@ amplitudes (A_psi, A_n, A_p) = (0.5, 0.3, -0.3):
 | 2D F (M16.3)         | psi    | (CI)     | (CI)     |
 | 2D F (M16.3)         | phi_n  | (CI)     | (CI)     |
 | 2D F (M16.3)         | phi_p  | (CI)     | (CI)     |
+| 1D G (linear, M16.4) | psi    | 2.000    | 1.000    |
+| 1D G (linear, M16.4) | phi_n  | 2.000    | 1.000    |
+| 1D G (linear, M16.4) | phi_p  | 2.000    | 1.000    |
+| 2D G (M16.4)         | psi    | 1.997    | 0.999    |
+| 2D G (M16.4)         | phi_n  | 1.999    | 1.000    |
+| 2D G (M16.4)         | phi_p  | 1.999    | 1.000    |
 
 Every gated rate clears the L^2 >= 1.75 / H^1 >= 0.80 floor with
 >= 0.19 of headroom (Variants A/B/C), or the L^2 >= 1.99 / H^1 >= 0.99
-floor (Variants D, E, and F, M16.1 / M16.2 / M16.3 acceptance gates),
-matching theoretical P1 Lagrange rates to within roundoff. The derivation
-(`mms_dd_derivation.md`) documents the block-residual scale-disparity
-issue that forced the SNES tolerance tweak to `atol = 0.0` with
-`stol = 1e-12`. The 2D Variant D pytest test uses Ns = [32, 64, 128]
-(one extra refinement compared to A/B/C) so the finest-pair rate
-clears 1.99 cleanly; the [16, 32, 64] sequence used by A/B/C bottoms
-out at 1.990 from triangle-mesh boundary-layer effects. Variants E
-and F adopt the same N-sequence overrides Variant D pioneered.
-Variant F rates marked (CI) are filled in from the docker-fem CI run
-in the M16.3 PR (this section is updated in Phase F closeout).
+floor (Variants D, E, F, and G, M16.1 / M16.2 / M16.3 / M16.4
+acceptance gates), matching theoretical P1 Lagrange rates to within
+roundoff. The derivation (`mms_dd_derivation.md`) documents the
+block-residual scale-disparity issue that forced the SNES tolerance
+tweak to `atol = 0.0` with `stol = 1e-12`. The 2D Variant D pytest
+test uses Ns = [32, 64, 128] (one extra refinement compared to
+A/B/C) so the finest-pair rate clears 1.99 cleanly; the [16, 32,
+64] sequence used by A/B/C bottoms out at 1.990 from triangle-mesh
+boundary-layer effects. Variants E, F, and G adopt the same
+N-sequence overrides Variant D pioneered. Variant F rates marked
+(CI) are filled in from the docker-fem CI run in the M16.3 PR.
 
 ### 5.5 MMS for multi-region Poisson (M6: 2D MOS capacitor)
 

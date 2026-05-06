@@ -1,0 +1,111 @@
+{
+  "schema_version": "2.4.0",
+  "name": "diode_fermi_dirac_1d",
+  "description": "1D pn diode equilibrium under Fermi-Dirac statistics (M16.4). N_A = 1e17 cm^-3 (p-side), N_D = 1e20 cm^-3 (n+ side; deep into the regime where the Boltzmann approximation breaks down). 20 um total device, junction at the midplane. The companion verifier (scripts/run_benchmark.py verify_diode_fermi_dirac_1d) re-runs this geometry under physics.statistics='boltzmann' and compares the equilibrium V_bi values from both runs to the analytical Boltzmann V_bi formula and to the analytical Blakemore-FD V_bi (the closed form the production residual evaluates). The full Fermi-Dirac integral via mpmath is printed alongside as a diagnostic; see docs/IMPROVEMENT_GUIDE.md M16.4 acceptance test for the gates. The benchmark uses the equilibrium runner (no bias sweep) because the M16.4 acceptance gate is on V_bi, not on the I-V curve.",
+  "dimension": 1,
+  "mesh": {
+    "source": "builtin",
+    "extents": [
+      [
+        0.0,
+        2e-05
+      ]
+    ],
+    "resolution": [
+      800
+    ],
+    "regions_by_box": [
+      {
+        "name": "silicon",
+        "tag": 1,
+        "bounds": [
+          [
+            0.0,
+            2e-05
+          ]
+        ]
+      }
+    ],
+    "facets_by_plane": [
+      {
+        "name": "anode",
+        "tag": 1,
+        "axis": 0,
+        "value": 0.0
+      },
+      {
+        "name": "cathode",
+        "tag": 2,
+        "axis": 0,
+        "value": 2e-05
+      }
+    ]
+  },
+  "regions": {
+    "silicon": {
+      "material": "Si",
+      "tag": 1,
+      "role": "semiconductor"
+    }
+  },
+  "doping": [
+    {
+      "region": "silicon",
+      "profile": {
+        "type": "step",
+        "axis": 0,
+        "location": 1e-05,
+        "N_D_left": 0.0,
+        "N_A_left": 1e+17,
+        "N_D_right": 1e+20,
+        "N_A_right": 0.0
+      }
+    }
+  ],
+  "contacts": [
+    {
+      "name": "anode",
+      "facet": "anode",
+      "type": "ohmic",
+      "voltage": 0.0
+    },
+    {
+      "name": "cathode",
+      "facet": "cathode",
+      "type": "ohmic",
+      "voltage": 0.0
+    }
+  ],
+  "physics": {
+    "temperature": 300.0,
+    "statistics": "fermi_dirac",
+    "mobility": {
+      "model": "constant",
+      "mu_n": 1400.0,
+      "mu_p": 450.0
+    },
+    "recombination": {
+      "srh": true,
+      "tau_n": 1e-07,
+      "tau_p": 1e-07,
+      "E_t": 0.0
+    }
+  },
+  "solver": {
+    "type": "equilibrium",
+    "snes": {
+      "rtol": 1e-12,
+      "atol": 1e-10,
+      "stol": 1e-14,
+      "max_it": 80
+    }
+  },
+  "output": {
+    "directory": "./results/diode_fermi_dirac_1d",
+    "fields": [
+      "potential",
+      "n",
+      "p"
+    ]
+  }
+}

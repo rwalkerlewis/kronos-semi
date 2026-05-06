@@ -77,6 +77,7 @@ def build_dd_block_residual(
     *,
     facet_tags=None,
     recomb_cfg: dict | None = None,
+    statistics_cfg: dict | None = None,
 ):
     """
     Build the three-block residual for the coupled drift-diffusion system.
@@ -120,6 +121,18 @@ def build_dd_block_residual(
         cm^6/s; converted to scaled units inline). See
         `semi.physics.recombination` for the closed form and the unit
         derivation. M16.3.
+    statistics_cfg : dict, optional
+        The `cfg["physics"]` sub-slice for carrier statistics. `None`
+        (default) or `{"statistics": "boltzmann"}` is bit-identical
+        to pre-M16.4 (textbook Slotboom). When
+        `statistics_cfg["statistics"] == "fermi_dirac"`, the
+        electron and hole densities are built via the generalized-
+        Slotboom helpers in `semi.physics.slotboom` (Blakemore
+        prefactor); the eta_offset values are read from
+        `sc.eta_offset_n` / `sc.eta_offset_p`. ADR 0004 is preserved
+        because the Einstein-factor cancellation in the
+        generalized-Slotboom current means the continuity-row shape
+        `J = -q mu n grad(phi)` is unchanged. M16.4.
 
     Returns
     -------
@@ -159,8 +172,26 @@ def build_dd_block_residual(
     tau_n = fem.Constant(msh, PETSc.ScalarType(tau_n_hat))
     tau_p = fem.Constant(msh, PETSc.ScalarType(tau_p_hat))
 
-    n_hat = n_from_slotboom(psi, phi_n, ni_hat)
-    p_hat = p_from_slotboom(psi, phi_p, ni_hat)
+    eta_offset_n_val = (
+        sc.eta_offset_n
+        if statistics_cfg is not None
+        and statistics_cfg.get("statistics", "boltzmann") == "fermi_dirac"
+        else None
+    )
+    eta_offset_p_val = (
+        sc.eta_offset_p
+        if statistics_cfg is not None
+        and statistics_cfg.get("statistics", "boltzmann") == "fermi_dirac"
+        else None
+    )
+    n_hat = n_from_slotboom(
+        psi, phi_n, ni_hat,
+        statistics_cfg=statistics_cfg, eta_offset_n=eta_offset_n_val,
+    )
+    p_hat = p_from_slotboom(
+        psi, phi_p, ni_hat,
+        statistics_cfg=statistics_cfg, eta_offset_p=eta_offset_p_val,
+    )
 
     # SRH (and optional Auger, M16.3) rate inlined here so we can share
     # the same ni_hat Constant with the Poisson block and avoid UFL-type
@@ -263,6 +294,7 @@ def build_dd_block_residual_mr(
     *,
     facet_tags=None,
     recomb_cfg: dict | None = None,
+    statistics_cfg: dict | None = None,
 ):
     """Multi-region (submesh-based) block residual for the coupled DD system.
 
@@ -329,17 +361,42 @@ def build_dd_block_residual_mr(
     dx_semi_parent = dx_parent(int(semi_tag))
     dx_sub = ufl.Measure("dx", domain=submesh)
 
+    eta_offset_n_val = (
+        sc.eta_offset_n
+        if statistics_cfg is not None
+        and statistics_cfg.get("statistics", "boltzmann") == "fermi_dirac"
+        else None
+    )
+    eta_offset_p_val = (
+        sc.eta_offset_p
+        if statistics_cfg is not None
+        and statistics_cfg.get("statistics", "boltzmann") == "fermi_dirac"
+        else None
+    )
+
     # Parent-mesh Slotboom (for the Poisson source term, which is integrated
     # over silicon cells of the parent mesh). phi_n, phi_p live on the
     # submesh; entity_maps threads them through at form compilation.
-    n_hat_parent = n_from_slotboom(psi, phi_n, ni_hat_parent)
-    p_hat_parent = p_from_slotboom(psi, phi_p, ni_hat_parent)
+    n_hat_parent = n_from_slotboom(
+        psi, phi_n, ni_hat_parent,
+        statistics_cfg=statistics_cfg, eta_offset_n=eta_offset_n_val,
+    )
+    p_hat_parent = p_from_slotboom(
+        psi, phi_p, ni_hat_parent,
+        statistics_cfg=statistics_cfg, eta_offset_p=eta_offset_p_val,
+    )
     rho_hat = p_hat_parent - n_hat_parent + N_hat_fn
 
     # Submesh-mesh Slotboom (for the continuity blocks). Here psi is the
     # parent-mesh Function and entity_maps pulls it onto submesh cells.
-    n_hat_sub = n_from_slotboom(psi, phi_n, ni_hat_sub)
-    p_hat_sub = p_from_slotboom(psi, phi_p, ni_hat_sub)
+    n_hat_sub = n_from_slotboom(
+        psi, phi_n, ni_hat_sub,
+        statistics_cfg=statistics_cfg, eta_offset_n=eta_offset_n_val,
+    )
+    p_hat_sub = p_from_slotboom(
+        psi, phi_p, ni_hat_sub,
+        statistics_cfg=statistics_cfg, eta_offset_p=eta_offset_p_val,
+    )
 
     import math as _math
     n1 = ni_hat_sub * _math.exp(E_t_over_Vt)

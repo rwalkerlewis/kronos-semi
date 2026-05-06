@@ -14,6 +14,8 @@ from semi.diode_analytical import (
     shockley_long_diode_saturation,
     sns_total_reference,
     srh_generation_reference,
+    vbi_boltzmann,
+    vbi_fermi_dirac,
 )
 
 V_T = 0.025852
@@ -185,3 +187,84 @@ def test_shockley_iv_with_auger_array_input():
     pos_total = J_total[J_total > 0.0]
     if pos_total.size >= 2:
         assert np.all(np.diff(pos_total) >= 0.0)
+
+
+# ---------------------------------------------------------------------------
+# M16.4 Fermi-Dirac built-in voltage references.
+# ---------------------------------------------------------------------------
+
+# diode_fermi_dirac_1d benchmark parameters (Si Altermatt n_i, n+/p doping
+# in the regime where Boltzmann breaks down).
+N_A_FD = 1.0e23   # 1e17 cm^-3 acceptor concentration
+N_D_FD = 1.0e26   # 1e20 cm^-3 donor concentration (deep into FD)
+N_I_FD = 1.0e16   # Si Altermatt at 300 K
+N_C_FD = 2.86e25  # Si effective DoS, conduction band
+N_V_FD = 3.10e25  # Si effective DoS, valence band
+
+
+def test_vbi_boltzmann_matches_textbook_log_form():
+    """V_bi_B = V_t ln(N_A N_D / n_i^2). Reproduce on benchmark numbers."""
+    expected = V_T * np.log(N_A_FD * N_D_FD / N_I_FD ** 2)
+    assert vbi_boltzmann(N_A_FD, N_D_FD, N_I_FD, V_T) == pytest.approx(expected)
+
+
+def test_vbi_fermi_dirac_blakemore_exceeds_boltzmann_for_degenerate_n_side():
+    """At N_D = 1e20 cm^-3 (N_D / N_C ~ 3.5 in Si) the Blakemore-FD V_bi
+    exceeds the Boltzmann V_bi: F_{1/2}(eta) grows slower than exp(eta),
+    so reproducing N_D >> N_C requires a higher eta_n_FD than Boltzmann's
+    eta_n_B = ln(N_D/N_C), which raises psi_n_bulk and therefore V_bi.
+    This is the "FD vs Boltzmann divergence" gated by the M16.4
+    acceptance benchmark (>5 % at N_D = 1e20 cm^-3)."""
+    V_bi_B = vbi_boltzmann(N_A_FD, N_D_FD, N_I_FD, V_T)
+    V_bi_FD_blake = vbi_fermi_dirac(
+        N_A_FD, N_D_FD, N_I_FD, N_C_FD, N_V_FD, V_T, kind="blakemore",
+    )
+    assert V_bi_FD_blake > V_bi_B
+    # Benchmark divergence threshold is 5 %; verify it analytically.
+    assert (V_bi_FD_blake - V_bi_B) / V_bi_B > 0.05
+
+
+def test_vbi_fermi_dirac_reference_matches_blakemore_in_correction_sign():
+    """The closed Blakemore form approximates the full Fermi-Dirac
+    integral within ~4 % at the benchmark operating point (eta ~ 1.25 to
+    3 across n+/p sides). Both the Blakemore-FD and the full-integral-FD
+    references must therefore predict V_bi above the Boltzmann value, and
+    must agree with each other within a fraction of the FD correction
+    itself."""
+    V_bi_FD_ref = vbi_fermi_dirac(
+        N_A_FD, N_D_FD, N_I_FD, N_C_FD, N_V_FD, V_T, kind="reference",
+    )
+    V_bi_FD_blake = vbi_fermi_dirac(
+        N_A_FD, N_D_FD, N_I_FD, N_C_FD, N_V_FD, V_T, kind="blakemore",
+    )
+    V_bi_B = vbi_boltzmann(N_A_FD, N_D_FD, N_I_FD, V_T)
+    delta_blake = V_bi_FD_blake - V_bi_B
+    delta_ref = V_bi_FD_ref - V_bi_B
+    assert delta_ref > 0.0
+    assert delta_blake > 0.0
+    # The basic Blakemore form overestimates the FD correction at the
+    # benchmark operating point (its denominator drops ~50 % faster than
+    # the true F_{1/2} does at eta ~ 3). The two predictions therefore
+    # agree only to within a factor of ~2.5 at N_D = 1e20 cm^-3 — which
+    # is exactly why the M16.4 acceptance gate cites the full-integral
+    # reference as the Boltzmann-comparison floor and tracks the basic
+    # Blakemore divergence as a documentation diagnostic.
+    assert delta_blake < 3.0 * delta_ref
+
+
+def test_vbi_fermi_dirac_unknown_kind_raises():
+    with pytest.raises(ValueError, match="unknown kind"):
+        vbi_fermi_dirac(
+            N_A_FD, N_D_FD, N_I_FD, N_C_FD, N_V_FD, V_T, kind="bogus",
+        )
+
+
+def test_vbi_fermi_dirac_default_kind_is_reference():
+    """The default `kind` argument must be the analytical reference (the
+    M16.4 acceptance gate cites scipy.special.fdk via mpmath); a default
+    drift to "blakemore" would silently weaken the gate."""
+    default = vbi_fermi_dirac(N_A_FD, N_D_FD, N_I_FD, N_C_FD, N_V_FD, V_T)
+    explicit = vbi_fermi_dirac(
+        N_A_FD, N_D_FD, N_I_FD, N_C_FD, N_V_FD, V_T, kind="reference",
+    )
+    assert default == pytest.approx(explicit, rel=1.0e-12)

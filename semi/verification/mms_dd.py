@@ -16,7 +16,7 @@ from each block so that a chosen smooth exact triple
 `(psi_e, phi_n_e, phi_p_e)` is the solution of the modified coupled
 system. Each block's discretization error then decays at the FE rate.
 
-Five variants exercise progressively more of the residual:
+Seven variants exercise progressively more of the residual:
 
     A  `phi_n_e = phi_p_e = 0`, `tau_hat = infinity`:   Poisson block only
     B  full triple, `tau_hat = infinity`:               full coupling, R ~ 0
@@ -47,6 +47,18 @@ Five variants exercise progressively more of the residual:
        reverse-engineered JSON Auger coefficients are passed via
        `recomb_cfg = {"auger": True, "C_n": ..., "C_p": ...}` so
        `build_dd_block_residual` produces the same expression the
+       manufactured weak source uses.
+    G  Variant C plus the Fermi-Dirac generalized-Slotboom
+       substitution (M16.4). The Slotboom helpers gain the Blakemore
+       prefactor `gamma(eta) = 1 / (1 + 0.27 * exp(eta))` so the
+       densities become `n = ni * gamma_n * exp(psi - phi_n)` and the
+       hole counterpart. ADR 0004 (Slotboom variables) is preserved
+       because the FD Einstein factor cancels against gamma in the
+       continuity flux (the closed identity `g(eta) * gamma(eta) = 1`
+       holds exactly under the basic Blakemore form). The
+       reverse-engineered `Scaling.N_C` / `Scaling.N_V` values are
+       written by `run_one_level` so `sc.eta_offset_n` /
+       `sc.eta_offset_p` resolve to the engineered constants the
        manufactured weak source uses.
 
 Variant D substitutes the closed-form
@@ -95,7 +107,7 @@ from .mms_poisson import (
 # ---------------------------------------------------------------------------
 # Module-level constants. See derivation Section 2.
 # ---------------------------------------------------------------------------
-VARIANTS: tuple[str, ...] = ("A", "B", "C", "D", "E", "F")
+VARIANTS: tuple[str, ...] = ("A", "B", "C", "D", "E", "F", "G")
 
 #: Default amplitude triple `(A_psi, A_n, A_p)` used by the pytest gate.
 #: `A_p = -A_n` ensures Variant C's SRH numerator
@@ -180,6 +192,22 @@ MMS_E_INTERFACE_NORMAL_AXIS: int = 0
 MMS_F_C_N_HAT_FOR_FORM: float = 8.0e8
 MMS_F_C_P_HAT_FOR_FORM: float = 8.0e8
 
+#: Variant G Fermi-Dirac eta-offsets. The reduced Fermi level under
+#: the generalized-Slotboom substitution is
+#:     eta_n = (psi_e - phi_n_e) + eta_offset_n
+#: With the default amplitudes (A_psi=0.5, A_n=0.3) the (psi - phi_n)
+#: drive ranges over roughly [-0.8, +0.8]. Setting eta_offset_n = -1.0
+#: pushes the typical eta to roughly [-1.8, -0.2], so the Blakemore
+#: prefactor gamma_n = 1 / (1 + 0.27 * exp(eta)) ranges from ~0.96
+#: (~4 % FD-vs-Boltzmann shift in the deep-non-degenerate region) to
+#: ~0.82 (~18 % shift in the manufactured-degenerate peak), materially
+#: exercising the Blakemore branch without driving the closed form
+#: outside its sub-5 % accuracy window. The hole side mirrors the
+#: electron side; eta_offset_p = -1.0 is the symmetric choice.
+#: M16.4.
+MMS_G_ETA_OFFSET_N: float = -1.0
+MMS_G_ETA_OFFSET_P: float = -1.0
+
 
 @dataclass(frozen=True)
 class MMSDDCase:
@@ -239,12 +267,12 @@ def _exact_triple_ufl(mesh, dim: int, L: float,
     """
     import ufl
 
-    # Variants D, E, and F share the Variant B/C smooth-sin triple; the
-    # active branch is what differs (CT mobility for D, Lombardi
-    # mobility for E, Auger recombination for F), evaluated in
-    # `_build_weak_sources` and dispatched into the production form via
-    # `run_one_level`.
-    full_triple = variant in ("B", "C", "D", "E", "F")
+    # Variants D, E, F, and G share the Variant B/C smooth-sin triple;
+    # the active branch is what differs (CT mobility for D, Lombardi
+    # mobility for E, Auger recombination for F, Fermi-Dirac
+    # statistics for G), evaluated in `_build_weak_sources` and
+    # dispatched into the production form via `run_one_level`.
+    full_triple = variant in ("B", "C", "D", "E", "F", "G")
     x = ufl.SpatialCoordinate(mesh)
     if dim == 1:
         psi_e = A_psi * ufl.sin(2.0 * ufl.pi * x[0] / L)
@@ -342,9 +370,27 @@ def _build_weak_sources(
         ) * ufl.dx
         return f_psi_weak, None, None
 
-    # Variants B, C, and D: full triple.
-    n_e = n_from_slotboom(psi_e, phi_n_e, ni_hat)
-    p_e = p_from_slotboom(psi_e, phi_p_e, ni_hat)
+    # Variants B, C, D, E, F, G: full triple. Variant G activates the
+    # Fermi-Dirac dispatch on the Slotboom helpers (the generalized-
+    # Slotboom substitution under Blakemore basic). The eta_offset
+    # values match what `run_one_level` writes to `sc.N_C` / `sc.N_V`,
+    # so the production form sees the identical closed form.
+    if variant == "G":
+        stat_cfg_local = {"statistics": "fermi_dirac"}
+        eta_off_n_local = MMS_G_ETA_OFFSET_N
+        eta_off_p_local = MMS_G_ETA_OFFSET_P
+    else:
+        stat_cfg_local = None
+        eta_off_n_local = None
+        eta_off_p_local = None
+    n_e = n_from_slotboom(
+        psi_e, phi_n_e, ni_hat,
+        statistics_cfg=stat_cfg_local, eta_offset_n=eta_off_n_local,
+    )
+    p_e = p_from_slotboom(
+        psi_e, phi_p_e, ni_hat,
+        statistics_cfg=stat_cfg_local, eta_offset_p=eta_off_p_local,
+    )
 
     # SRH rate, inlined to share the same ni_hat Constant with the Poisson
     # block (matches production code in `build_dd_block_residual`). E_t = 0
@@ -506,13 +552,24 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
         fn.x.scatter_forward()
 
     # Per-variant lifetime choice (derivation Section 2, SRH row).
-    # Variants C, D, E, and F use Si lifetimes (D adds CT mobility,
-    # E adds the Lombardi composite, F adds Auger recombination, all
-    # on top of the C electronics).
-    if case.variant in ("C", "D", "E", "F"):
+    # Variants C, D, E, F, and G use Si lifetimes (D adds CT
+    # mobility, E adds the Lombardi composite, F adds Auger
+    # recombination, G adds Fermi-Dirac statistics, all on top of
+    # the C electronics).
+    if case.variant in ("C", "D", "E", "F", "G"):
         tau_n_hat = tau_p_hat = TAU_SI_S / sc.t0
     else:
         tau_n_hat = tau_p_hat = TAU_OFF_HAT
+
+    # Variant G writes engineered N_C / N_V values to the Scaling
+    # object so `sc.eta_offset_n` and `sc.eta_offset_p` resolve to the
+    # MMS_G_ETA_OFFSET_* constants the manufactured weak source uses.
+    # eta_offset = ln(n_i / N_C) so N_C = n_i * exp(-eta_offset). The
+    # boltzmann-default branches on every other variant skip this
+    # write; sc.eta_offset_n is never read on those branches.
+    if case.variant == "G":
+        sc.N_C = sc.n_i * math.exp(-MMS_G_ETA_OFFSET_N)
+        sc.N_V = sc.n_i * math.exp(-MMS_G_ETA_OFFSET_P)
 
     # Per-variant mobility dispatch. Variant D activates Caughey-Thomas
     # via the production-form mobility_cfg; the JSON-side vsat_*_cm_per_s
@@ -610,6 +667,13 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
             mesh, fdim_local, indices[order], values[order]
         )
 
+    # Variant G activates the Fermi-Dirac dispatch on the production
+    # residual; eta_offset_n / eta_offset_p come from the engineered
+    # sc.N_C / sc.N_V written above.
+    statistics_cfg = (
+        {"statistics": "fermi_dirac"} if case.variant == "G" else None
+    )
+
     # Production residual, per-block.
     F_prod = build_dd_block_residual(
         spaces, N_hat_fn, sc,
@@ -618,6 +682,7 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
         mobility_cfg=mobility_cfg,
         facet_tags=variant_facet_tags,
         recomb_cfg=recomb_cfg,
+        statistics_cfg=statistics_cfg,
     )
 
     # Manufactured weak sources.
@@ -867,7 +932,7 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
     """
     Artifact-production sweep used by `scripts/run_verification.py`.
 
-    Runs (per variant, six variants total) three studies:
+    Runs (per variant, seven variants total) three studies:
       - `1d_<variant>_linear`     (default amps, Ns=CLI_NS_1D)
       - `1d_<variant>_nonlinear`  (NONLINEAR_AMPS, Ns=CLI_NS_1D)
       - `2d_<variant>`            (default amps, Ns=CLI_NS_2D)
@@ -875,7 +940,8 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
     Variant D activates the M16.1 Caughey-Thomas mobility dispatch on
     top of the Variant C electronics; Variant E activates the M16.2
     Lombardi composite; Variant F activates the M16.3 Auger
-    recombination kernel. D, E, and F share the residual-floor
+    recombination kernel; Variant G activates the M16.4 Fermi-Dirac
+    statistics dispatch. D, E, F, and G share the residual-floor
     sensitivity and boundary-layer behavior so each reuses the
     truncated-1D / extended-2D N sequences D pioneered.
 
@@ -899,9 +965,9 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
         # at N=80 and 2.000 at N=160 in the linear-amp run). M16.3
         # Variant F shares the same nonlinear-residual behavior as D
         # and E.
-        ns_1d = CLI_NS_1D[:-1] if variant in ("D", "E", "F") else CLI_NS_1D
+        ns_1d = CLI_NS_1D[:-1] if variant in ("D", "E", "F", "G") else CLI_NS_1D
         ns_1d_d_nonlinear = (
-            CLI_NS_1D[:-1] if variant in ("D", "E", "F") else CLI_NS_1D
+            CLI_NS_1D[:-1] if variant in ("D", "E", "F", "G") else CLI_NS_1D
         )
         res = run_convergence_study(
             dim=1, variant=variant, Ns=ns_1d,
@@ -943,7 +1009,7 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
         # (rate >= 1.99); the [16, 32, 64] sequence used by A/B/C
         # bottoms out at ~1.99 from triangle-mesh boundary-layer
         # effects. See CLI_NS_2D_D for the rationale.
-        ns_2d = CLI_NS_2D_D if variant in ("D", "E", "F") else CLI_NS_2D
+        ns_2d = CLI_NS_2D_D if variant in ("D", "E", "F", "G") else CLI_NS_2D
         res = run_convergence_study(
             dim=2, variant=variant, Ns=ns_2d,
             A_psi=DEFAULT_AMPS[0], A_n=DEFAULT_AMPS[1], A_p=DEFAULT_AMPS[2],

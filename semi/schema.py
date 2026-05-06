@@ -102,7 +102,15 @@ ENGINE_SUPPORTED_SCHEMA_MAJOR = max(ENGINE_SUPPORTED_SCHEMA_MAJORS)
 #                  bit-identical to v0.18.0; C_n and C_p are filled to
 #                  defaults but unused. Additive bump: v2.0.0, v2.1.0,
 #                  and v2.2.0 inputs continue to validate.
-SCHEMA_SUPPORTED_MINOR = 3
+#   M16.4 (2.4.0): widened physics.statistics enum from ["boltzmann"]
+#                  to ["boltzmann", "fermi_dirac"]. Default stays
+#                  "boltzmann"; the boltzmann branch is bit-identical
+#                  to v0.19.0 on every benchmark. The fermi_dirac
+#                  branch substitutes the Blakemore approximation in
+#                  the generalized-Slotboom helpers (ADR 0004) and the
+#                  Poisson source. Additive bump: v2.0.0, v2.1.0,
+#                  v2.2.0, and v2.3.0 inputs continue to validate.
+SCHEMA_SUPPORTED_MINOR = 4
 
 
 @lru_cache(maxsize=8)

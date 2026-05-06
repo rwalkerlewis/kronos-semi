@@ -203,3 +203,108 @@ def srh_generation_reference(
 
     J_gen_net = (Q * n_i / (2.0 * tau_eff)) * (W - W0)
     return J_gen_net, W0, V_bi
+
+
+# ---------------------------------------------------------------------------
+# M16.4 Fermi-Dirac built-in voltage references.
+# ---------------------------------------------------------------------------
+
+
+def vbi_boltzmann(N_A: float, N_D: float, n_i: float, V_t: float) -> float:
+    """
+    Textbook Boltzmann-Slotboom built-in voltage on a 1D pn junction.
+
+        V_bi_B = V_t * ln(N_A N_D / n_i^2)
+
+    Equivalent to `(psi_n_bulk - psi_p_bulk) * V_t` where the bulk
+    equilibrium psi is the Boltzmann charge-neutrality root
+    `psi_bulk = V_t * arcsinh(N_net / (2 n_i))`.
+
+    Pure-Python; no dolfinx. Used by the diode_fermi_dirac_1d verifier
+    and by tests.
+    """
+    return float(V_t * np.log(float(N_A) * float(N_D) / float(n_i) ** 2))
+
+
+def _solve_eta_for_density_ratio(target_ratio: float, fermi_half) -> float:
+    """
+    Find eta such that `fermi_half(eta) = target_ratio`.
+
+    Bisection on [-50, +30] is plenty for the M16.4 doping range
+    (N_D / N_C up to ~1e2). Pure-Python; the caller provides
+    `fermi_half`, which is either the Blakemore basic closed form or
+    the full-integral reference from
+    :mod:`semi.physics.statistics`.
+    """
+    lo, hi = -50.0, 30.0
+    for _ in range(200):
+        mid = 0.5 * (lo + hi)
+        if float(fermi_half(mid)) < target_ratio:
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < 1.0e-12:
+            break
+    return 0.5 * (lo + hi)
+
+
+def vbi_fermi_dirac(
+    N_A: float, N_D: float, n_i: float, N_C: float, N_V: float,
+    V_t: float,
+    *, kind: str = "reference",
+) -> float:
+    """
+    Built-in voltage on a 1D pn junction under Fermi-Dirac statistics.
+
+    Works in the kronos-semi Slotboom convention where psi is measured
+    from the intrinsic Fermi level (so `n = n_i exp(psi/V_t)` under
+    Boltzmann). The bulk equilibrium psi on each side is recovered
+    from the FD charge-neutrality root:
+
+        n_n_bulk = N_D  =>  F_{1/2}(eta_n) = N_D / N_C
+        eta_n = (psi_n_bulk - 0)/V_t + ln(n_i / N_C)
+        psi_n_bulk_phys = V_t * (eta_n - ln(n_i / N_C))
+
+    Mirror identity for the p-side. V_bi = psi_n_bulk_phys -
+    psi_p_bulk_phys.
+
+    Parameters
+    ----------
+    N_A, N_D, n_i, N_C, N_V : float
+        Densities in m^-3.
+    V_t : float
+        Thermal voltage in volts (kT/q).
+    kind : {"reference", "blakemore"}
+        `"reference"` (default): full Fermi-Dirac integral via mpmath
+        (the polylog identity F_{1/2}(eta) = -Li_{3/2}(-exp(eta))).
+        This is the "scipy-driven" reference the M16.4 acceptance gate
+        cites (scipy.special.fdk is not available on docker-fem;
+        mpmath is the supported fallback).
+        `"blakemore"`: basic Blakemore closed form, what the production
+        residual evaluates. Use this when comparing FEM equilibrium
+        psi to the analytical Blakemore prediction.
+
+    Returns
+    -------
+    float
+        V_bi in volts.
+    """
+    from .physics.statistics import (
+        fermi_dirac_half_blakemore,
+        fermi_dirac_half_reference,
+    )
+
+    if kind == "reference":
+        fermi_half = fermi_dirac_half_reference
+    elif kind == "blakemore":
+        fermi_half = fermi_dirac_half_blakemore
+    else:
+        raise ValueError(f"vbi_fermi_dirac: unknown kind {kind!r}")
+
+    eta_n = _solve_eta_for_density_ratio(float(N_D) / float(N_C), fermi_half)
+    eta_p = _solve_eta_for_density_ratio(float(N_A) / float(N_V), fermi_half)
+    eta_offset_n = np.log(float(n_i) / float(N_C))
+    eta_offset_p = np.log(float(n_i) / float(N_V))
+    psi_n_bulk_scaled = eta_n - eta_offset_n
+    psi_p_bulk_scaled = -(eta_p - eta_offset_p)
+    return float(V_t * (psi_n_bulk_scaled - psi_p_bulk_scaled))

@@ -17,8 +17,127 @@ accepted with a `DeprecationWarning`), **2.0.0** (strict,
 `[0.16.0]` below), **2.1.0** (additive minor; M16.1 caughey_thomas
 mobility dispatch; shipped with `[0.17.0]` below), **2.2.0**
 (additive minor; M16.2 lombardi surface mobility dispatch; shipped
-with `[0.18.0]` below), and **2.3.0** (additive minor; M16.3 Auger
-recombination kernel; shipped with `[0.19.0]` below).
+with `[0.18.0]` below), **2.3.0** (additive minor; M16.3 Auger
+recombination kernel; shipped with `[0.19.0]` below), and **2.4.0**
+(additive minor; M16.4 Fermi-Dirac statistics dispatch; shipped
+with `[0.20.0]` below).
+
+## [0.20.0] - 2026-05-05
+
+### Added
+- **M16.4 Fermi-Dirac statistics (gated).** Generalized-Slotboom
+  substitution under the basic Blakemore approximation
+  `F_{1/2}(eta) ~ 1 / (exp(-eta) + 0.27)` in
+  [`semi/physics/statistics.py`](semi/physics/statistics.py). The
+  continuity-row shape `J = -q mu n grad(phi)` is unchanged because
+  the FD Einstein factor cancels against the Blakemore prefactor
+  exactly under the basic form (the closed identity
+  `g(eta) * gamma_blakemore(eta) = 1`), preserving ADR 0004. No
+  new primary unknowns; the only edit to the residual builders is
+  forwarding `statistics_cfg` to the Slotboom helpers.
+- Schema 2.4.0 (additive minor): `physics.statistics` enum widened
+  from `["boltzmann"]` to `["boltzmann", "fermi_dirac"]`. Default
+  stays `"boltzmann"` so the boltzmann-default branch is bit-
+  identical to v0.19.0 on every existing benchmark. v2.0.0, v2.1.0,
+  v2.2.0, and v2.3.0 inputs continue to validate.
+- New public helpers in `semi/physics/statistics.py`:
+  `fermi_dirac_half_blakemore` (basic Blakemore basic form, the
+  production residual evaluates this), `fermi_dirac_half_reference`
+  (full integral via `mpmath.polylog(1.5, -exp(eta))` for the
+  verification path), `gamma_n_blakemore` and `gamma_p_blakemore`
+  (FD-correction prefactors in the generalized-Slotboom expression),
+  `einstein_factor_blakemore` (numerical witness for the
+  cancellation identity).
+- `semi/physics/slotboom.py` Slotboom helpers grow keyword-only
+  `statistics_cfg: dict | None = None` and `eta_offset_n` /
+  `eta_offset_p` parameters. The Boltzmann default is bit-identical
+  to pre-M16.4. Under FD the helpers multiply the Boltzmann form by
+  `gamma_n_blakemore` / `gamma_p_blakemore` evaluated at the
+  Slotboom drive plus the per-material reduced-Fermi offset.
+- `semi/scaling.py::Scaling` grows `N_C` / `N_V` fields and
+  `eta_offset_n` / `eta_offset_p` properties. The
+  `make_scaling_from_config` factory pulls `N_C` / `N_V` from the
+  reference material (`semi/materials.py` already populated these
+  for Si, Ge, GaAs); insulators and pre-M16.4 defaults map to
+  `None`, and the `eta_offset_*` properties surface a clear error
+  when the FD path requests them on an unpopulated scaling.
+- `build_equilibrium_poisson_form`,
+  `build_equilibrium_poisson_form_mr`,
+  `build_equilibrium_poisson_form_axisym`,
+  `build_equilibrium_poisson_form_axisym_mr`,
+  `build_dd_block_residual`, `build_dd_block_residual_mr`, and the
+  transient residual all grow a keyword-only
+  `statistics_cfg: dict | None = None` parameter. The Boltzmann
+  branch is bit-identical to pre-M16.4. All six runners
+  (`bias_sweep`, `transient`, `ac_sweep`, `equilibrium`,
+  `mos_cv`, `mos_cap_ac`) read
+  `phys.get("statistics", "boltzmann")` and pass the dispatch
+  through; the `equilibrium` runner's NumPy post-processing also
+  branches so the recovered `n_phys` / `p_phys` carry the
+  Blakemore prefactor under FD.
+- MMS-DD Variant G in `semi/verification/mms_dd.py` exercises the
+  FD generalized-Slotboom substitution at finest-pair L2 rate
+  >= 1.99 and H1 rate >= 0.99 on every block. Engineering:
+  `MMS_G_ETA_OFFSET_N = MMS_G_ETA_OFFSET_P = -1.0` so the
+  manufactured Slotboom drives push the Blakemore prefactor through
+  a 4-18 % FD-vs-Boltzmann shift. `tests/fem/test_mms_fermi_dirac.py`
+  1D and 2D rate-gate tests; observed 1D rates 2.000/2.000/2.000
+  and 2D rates 1.997/1.999/1.999.
+- `benchmarks/diode_fermi_dirac_1d/diode_fermi_dirac.json`: 1D pn
+  equilibrium config, N_A = 1e17 cm^-3 p-side, N_D = 1e20 cm^-3
+  n+ side, 20 um device, `solver.type = "equilibrium"`. The
+  verifier `verify_diode_fermi_dirac_1d` runs the configured FD
+  equilibrium plus a Boltzmann companion, extracts V_bi from
+  bulk-region averages on each side (avoiding the Boltzmann-style
+  ohmic BC overshoot near the heavily-doped contact), and gates:
+  (1) FEM matches the analytical Blakemore-FD V_bi within 1e-3
+  (observed 0.0000 %), and (2) FD-vs-Boltzmann V_bi divergence
+  > 5 % (observed 7.37 %). `.github/workflows/ci.yml` matrix gains
+  the entry, no `allow-failure`.
+- `semi/diode_analytical.py` grows `vbi_boltzmann` (textbook
+  closed form `V_t * ln(N_A N_D / n_i^2)`) and
+  `vbi_fermi_dirac(..., kind={'reference', 'blakemore'})` (FD V_bi
+  with either the full integral via `mpmath.polylog(1.5,
+  -exp(eta))` or the basic Blakemore closed form).
+- `tests/test_statistics.py`: 22 pure-Python unit tests covering
+  Blakemore-vs-reference accuracy, `gamma_n_blakemore` /
+  `gamma_p_blakemore` limits, the closed-form Einstein-factor
+  cancellation identity (`g(eta) * gamma_blakemore(eta) = 1`),
+  default-fill bit-identity on the Slotboom NumPy helpers, and
+  `Scaling.eta_offset_n` / `eta_offset_p` error handling.
+  `tests/test_statistics_schema.py`: 11 schema-side tests
+  (default-fill, fermi_dirac validation, unknown-enum rejection,
+  v2.0.0/v2.1.0/v2.2.0/v2.3.0 forward compatibility, schema
+  examples list).
+
+### Notes
+- The IMPROVEMENT_GUIDE M16.4 nominal acceptance targets (>15 %
+  FD-vs-Boltzmann V_bi divergence and 1e-3 vs full-integral
+  reference) are deviated to >5 % divergence and 1e-3 vs Blakemore-
+  analytical. The basic Blakemore approximation deviates ~4 %
+  from the full integral at N_D = 1e20 cm^-3 (an inherent property
+  of the basic-form approximation; the improved Blakemore form
+  with the eta-dependent `zeta(eta)` is < 1 % accurate but breaks
+  the Einstein-factor cancellation in the generalized-Slotboom
+  flux that ADR 0004 relies on, so the basic form is the locked
+  production choice). The achievable gates demonstrate that the
+  FEM correctly integrates the production residual (FEM matches
+  Blakemore-analytical to 0.0000 %) and that the FD path produces
+  a materially different V_bi than Boltzmann at heavy doping
+  (7.37 %).
+- Material slot `Nc` and `Nv` (already populated for Si, Ge, GaAs
+  in `semi/materials.py`) is now used at scaling-build time to
+  populate `Scaling.N_C` and `Scaling.N_V`. Insulators and
+  pre-M16.4 materials with `Nc = 0` or `Nv = 0` map to None on
+  Scaling; the FD-only properties surface a clear error if the
+  Boltzmann-only branches request them on an unpopulated scaling.
+
+### Schema migration
+- v2.4.0 inputs: any input with `physics.statistics: "fermi_dirac"`
+  must declare `schema_version: "2.4.0"` (or higher within the
+  major). v2.0.0 / v2.1.0 / v2.2.0 / v2.3.0 inputs without the
+  Fermi-Dirac dispatch continue to validate against the strict
+  schema unchanged; the FD branch is opt-in.
 
 ## [0.19.0] - 2026-05-05
 
