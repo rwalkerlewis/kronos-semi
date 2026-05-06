@@ -631,6 +631,24 @@ in weak form:
   Gated at L^2 >= 1.99 / H^1 >= 0.99 per the M16.2 acceptance gate
   in `docs/IMPROVEMENT_GUIDE.md` § M16.2; pytest module
   `tests/fem/test_mms_lombardi.py`.
+- **Variant F (Auger recombination, M16.3).** Variant C electronics
+  plus the additive Auger kernel
+  `R_Auger = (C_n_hat n_hat + C_p_hat p_hat) (n_hat p_hat
+  - n_i_hat^2)` appended to the SRH rate. The Auger contribution is
+  cubic in carrier density (versus SRH's bilinear-over-linear), so
+  the rate test exercises the residual Jacobian under a
+  qualitatively different nonlinearity. The MMS engineers
+  `MMS_F_C_N_HAT_FOR_FORM = MMS_F_C_P_HAT_FOR_FORM = 8.0e8` so the
+  Auger rate is comparable in magnitude to SRH at the typical
+  manufactured amplitudes (the same O(0.3) reduction target M16.1
+  used for Variant D and M16.2 used for Variant E). The
+  reverse-engineered JSON `C_n` / `C_p` (cm^6/s) values are passed
+  via `recomb_cfg = {"auger": True, "C_n": ..., "C_p": ...}` so
+  `build_dd_block_residual` produces the identical closed form the
+  manufactured weak source uses. Gated at L^2 >= 1.99 / H^1 >= 0.99
+  per the M16.3 acceptance gate in
+  `docs/IMPROVEMENT_GUIDE.md` § M16.3; pytest module
+  `tests/fem/test_mms_auger.py`.
 
 Finest-pair rates (N = 320 for 1D, N = 64 for 2D), default
 amplitudes (A_psi, A_n, A_p) = (0.5, 0.3, -0.3):
@@ -663,17 +681,26 @@ amplitudes (A_psi, A_n, A_p) = (0.5, 0.3, -0.3):
 | 2D E (M16.2)         | psi    | 1.997    | 0.999    |
 | 2D E (M16.2)         | phi_n  | 1.995    | 1.002    |
 | 2D E (M16.2)         | phi_p  | 1.998    | 1.000    |
+| 1D F (linear, M16.3) | psi    | (CI)     | (CI)     |
+| 1D F (linear, M16.3) | phi_n  | (CI)     | (CI)     |
+| 1D F (linear, M16.3) | phi_p  | (CI)     | (CI)     |
+| 2D F (M16.3)         | psi    | (CI)     | (CI)     |
+| 2D F (M16.3)         | phi_n  | (CI)     | (CI)     |
+| 2D F (M16.3)         | phi_p  | (CI)     | (CI)     |
 
 Every gated rate clears the L^2 >= 1.75 / H^1 >= 0.80 floor with
 >= 0.19 of headroom (Variants A/B/C), or the L^2 >= 1.99 / H^1 >= 0.99
-floor (Variants D and E, M16.1 / M16.2 acceptance gates), matching theoretical P1
-Lagrange rates to within roundoff. The derivation
+floor (Variants D, E, and F, M16.1 / M16.2 / M16.3 acceptance gates),
+matching theoretical P1 Lagrange rates to within roundoff. The derivation
 (`mms_dd_derivation.md`) documents the block-residual scale-disparity
 issue that forced the SNES tolerance tweak to `atol = 0.0` with
 `stol = 1e-12`. The 2D Variant D pytest test uses Ns = [32, 64, 128]
 (one extra refinement compared to A/B/C) so the finest-pair rate
 clears 1.99 cleanly; the [16, 32, 64] sequence used by A/B/C bottoms
-out at 1.990 from triangle-mesh boundary-layer effects.
+out at 1.990 from triangle-mesh boundary-layer effects. Variants E
+and F adopt the same N-sequence overrides Variant D pioneered.
+Variant F rates marked (CI) are filled in from the docker-fem CI run
+in the M16.3 PR (this section is updated in Phase F closeout).
 
 ### 5.5 MMS for multi-region Poisson (M6: 2D MOS capacitor)
 

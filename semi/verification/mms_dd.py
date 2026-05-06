@@ -36,6 +36,18 @@ Five variants exercise progressively more of the residual:
        N_hat is held at a constant `MMS_E_N_HAT_CONST` so the
        Lombardi C-term sees a non-zero N_total^lambda; the manufactured
        Poisson source absorbs the constant N contribution.
+    F  Variant C plus the Auger recombination kernel (M16.3). The
+       additive Auger term
+           R_Auger = (C_n_hat n_hat + C_p_hat p_hat)
+                     * (n_hat p_hat - n_i_hat^2)
+       is appended to the SRH rate. C_n_hat and C_p_hat are engineered
+       so the Auger contribution is comparable in magnitude to SRH at
+       the typical manufactured amplitudes (cubic-in-density vs SRH's
+       bilinear-over-linear; see derivation Section 3.5). The
+       reverse-engineered JSON Auger coefficients are passed via
+       `recomb_cfg = {"auger": True, "C_n": ..., "C_p": ...}` so
+       `build_dd_block_residual` produces the same expression the
+       manufactured weak source uses.
 
 Variant D substitutes the closed-form
     mu(F) = mu0 / (1 + (mu0 * F_par / vsat)^beta)^(1/beta)
@@ -83,7 +95,7 @@ from .mms_poisson import (
 # ---------------------------------------------------------------------------
 # Module-level constants. See derivation Section 2.
 # ---------------------------------------------------------------------------
-VARIANTS: tuple[str, ...] = ("A", "B", "C", "D", "E")
+VARIANTS: tuple[str, ...] = ("A", "B", "C", "D", "E", "F")
 
 #: Default amplitude triple `(A_psi, A_n, A_p)` used by the pytest gate.
 #: `A_p = -A_n` ensures Variant C's SRH numerator
@@ -152,6 +164,22 @@ MMS_E_N_HAT_CONST: float = 1.0
 #: x = 0 (the boundary) for both 1D and 2D MMS meshes; n_hat = e_x.
 MMS_E_INTERFACE_NORMAL_AXIS: int = 0
 
+#: Variant F Auger coefficients in for-form (scaled) units. With
+#: C_0_REF = 1e22 m^-3, t_0 ~ 1.1e-9 s, and the default amplitudes
+#: (psi 0.5, phi_n 0.3, phi_p -0.3), n_hat / p_hat at the manufactured
+#: peak are O(1e-6) (= ni_hat = 1e-6 inflated by exp(O(0.5))). The
+#: ratio R_Auger / R_SRH at the peak is approximately
+#: 4 * C_n_hat * n_hat^2 * tau_n_hat ~ 4 * C_n_hat * 1e-12 * 91, so
+#: C_n_hat ~ 8e8 brings the Auger contribution to ~30 % of SRH (the
+#: same O(0.3) reduction target M16.1 used for Variant D and M16.2
+#: used for Variant E). Values are engineered for materially-exercised
+#: discretization, not physical Si; the JSON Auger coefficients passed
+#: to build_dd_block_residual are reverse-engineered from these
+#: for-form constants in run_one_level so the production form sees
+#: the identical closed form.
+MMS_F_C_N_HAT_FOR_FORM: float = 8.0e8
+MMS_F_C_P_HAT_FOR_FORM: float = 8.0e8
+
 
 @dataclass(frozen=True)
 class MMSDDCase:
@@ -211,11 +239,12 @@ def _exact_triple_ufl(mesh, dim: int, L: float,
     """
     import ufl
 
-    # Variants D and E share the Variant B/C smooth-sin triple; the
-    # mobility branch is what differs (CT for D, Lombardi for E),
-    # evaluated in `_build_weak_sources` and dispatched into the
-    # production form via `run_one_level`.
-    full_triple = variant in ("B", "C", "D", "E")
+    # Variants D, E, and F share the Variant B/C smooth-sin triple; the
+    # active branch is what differs (CT mobility for D, Lombardi
+    # mobility for E, Auger recombination for F), evaluated in
+    # `_build_weak_sources` and dispatched into the production form via
+    # `run_one_level`.
+    full_triple = variant in ("B", "C", "D", "E", "F")
     x = ufl.SpatialCoordinate(mesh)
     if dim == 1:
         psi_e = A_psi * ufl.sin(2.0 * ufl.pi * x[0] / L)
@@ -322,9 +351,19 @@ def _build_weak_sources(
     # is enforced module-wide, so n1 = p1 = ni_hat.
     n1 = ni_hat * math.exp(0.0)
     p1 = ni_hat * math.exp(-0.0)
-    R_e = (n_e * p_e - ni_hat * ni_hat) / (
+    np_minus_nieq_e = n_e * p_e - ni_hat * ni_hat
+    R_e = np_minus_nieq_e / (
         tau_p * (n_e + n1) + tau_n * (p_e + p1)
     )
+    if variant == "F":
+        # Auger contribution at the manufactured triple, using the
+        # for-form C_n_hat / C_p_hat. The reverse-engineered JSON
+        # values fed into build_dd_block_residual via run_one_level
+        # produce the identical closed form when their cm^6/s ->
+        # m^6/s -> dimensionless conversion lands on these constants.
+        C_n_hat_c = fem.Constant(mesh, PETSc.ScalarType(MMS_F_C_N_HAT_FOR_FORM))
+        C_p_hat_c = fem.Constant(mesh, PETSc.ScalarType(MMS_F_C_P_HAT_FOR_FORM))
+        R_e = R_e + (C_n_hat_c * n_e + C_p_hat_c * p_e) * np_minus_nieq_e
 
     if variant == "D":
         # Caughey-Thomas: substitute the closed-form mobility evaluated
@@ -467,9 +506,10 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
         fn.x.scatter_forward()
 
     # Per-variant lifetime choice (derivation Section 2, SRH row).
-    # Variants C, D, and E use Si lifetimes (D adds CT mobility, E
-    # adds the Lombardi composite, both on top of the C electronics).
-    if case.variant in ("C", "D", "E"):
+    # Variants C, D, E, and F use Si lifetimes (D adds CT mobility,
+    # E adds the Lombardi composite, F adds Auger recombination, all
+    # on top of the C electronics).
+    if case.variant in ("C", "D", "E", "F"):
         tau_n_hat = tau_p_hat = TAU_SI_S / sc.t0
     else:
         tau_n_hat = tau_p_hat = TAU_OFF_HAT
@@ -535,6 +575,22 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
     else:
         mobility_cfg = None
 
+    # Variant F passes recomb_cfg to build_dd_block_residual so the
+    # production form sees the identical Auger closed form the
+    # manufactured weak source uses. The runner-side conversion is
+    #   C_n_hat = C_n_cm * 1e-12 * sc.C0**2 * sc.t0
+    # so we invert to obtain the cm^6/s value the JSON contract
+    # accepts.
+    recomb_cfg = None
+    if case.variant == "F":
+        cm_to_si = 1.0e-12
+        scale_aug = cm_to_si * (sc.C0 ** 2) * sc.t0
+        recomb_cfg = {
+            "auger": True,
+            "C_n": MMS_F_C_N_HAT_FOR_FORM / scale_aug,
+            "C_p": MMS_F_C_P_HAT_FOR_FORM / scale_aug,
+        }
+
     # Variant E needs a `facet_tags` MeshTags so the lombardi UFL
     # dispatch passes the runner-wiring guard. The MMS doesn't have a
     # geometrically meaningful Si/SiO2 interface; `_build_lombardi`
@@ -561,6 +617,7 @@ def run_one_level(case: MMSDDCase, *, sc=None) -> MMSDDResult:
         tau_n_hat, tau_p_hat, 0.0,   # E_t / V_t = 0 (mid-gap traps)
         mobility_cfg=mobility_cfg,
         facet_tags=variant_facet_tags,
+        recomb_cfg=recomb_cfg,
     )
 
     # Manufactured weak sources.
@@ -810,16 +867,17 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
     """
     Artifact-production sweep used by `scripts/run_verification.py`.
 
-    Runs twelve studies in total:
-      - `1d_<variant>_linear`     for variant in A-E (default amps, Ns=CLI_NS_1D)
-      - `1d_<variant>_nonlinear`  for variant in A-E (NONLINEAR_AMPS, Ns=CLI_NS_1D)
-      - `2d_<variant>`            for variant in A-E (default amps, Ns=CLI_NS_2D)
+    Runs (per variant, six variants total) three studies:
+      - `1d_<variant>_linear`     (default amps, Ns=CLI_NS_1D)
+      - `1d_<variant>_nonlinear`  (NONLINEAR_AMPS, Ns=CLI_NS_1D)
+      - `2d_<variant>`            (default amps, Ns=CLI_NS_2D)
 
     Variant D activates the M16.1 Caughey-Thomas mobility dispatch on
     top of the Variant C electronics; Variant E activates the M16.2
-    Lombardi composite. Both share the residual-floor sensitivity and
-    boundary-layer behavior so Variant E reuses Variant D's N
-    sequence overrides.
+    Lombardi composite; Variant F activates the M16.3 Auger
+    recombination kernel. D, E, and F share the residual-floor
+    sensitivity and boundary-layer behavior so each reuses the
+    truncated-1D / extended-2D N sequences D pioneered.
 
     Each study writes `convergence.csv` and `convergence.png` into
     `out_dir/<label>/`, mirroring the Poisson MMS artifact layout.
@@ -838,10 +896,12 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
         # the residual is effectively zero. Use one less refinement
         # level so SNES converges cleanly; the discretization rate is
         # already demonstrated at N=160 with rate ~ 2.000 (rates 1.999
-        # at N=80 and 2.000 at N=160 in the linear-amp run).
-        ns_1d = CLI_NS_1D[:-1] if variant in ("D", "E") else CLI_NS_1D
+        # at N=80 and 2.000 at N=160 in the linear-amp run). M16.3
+        # Variant F shares the same nonlinear-residual behavior as D
+        # and E.
+        ns_1d = CLI_NS_1D[:-1] if variant in ("D", "E", "F") else CLI_NS_1D
         ns_1d_d_nonlinear = (
-            CLI_NS_1D[:-1] if variant in ("D", "E") else CLI_NS_1D
+            CLI_NS_1D[:-1] if variant in ("D", "E", "F") else CLI_NS_1D
         )
         res = run_convergence_study(
             dim=1, variant=variant, Ns=ns_1d,
@@ -883,7 +943,7 @@ def run_cli_study(out_dir: Path) -> dict[str, list[dict]]:  # pragma: no cover
         # (rate >= 1.99); the [16, 32, 64] sequence used by A/B/C
         # bottoms out at ~1.99 from triangle-mesh boundary-layer
         # effects. See CLI_NS_2D_D for the rationale.
-        ns_2d = CLI_NS_2D_D if variant in ("D", "E") else CLI_NS_2D
+        ns_2d = CLI_NS_2D_D if variant in ("D", "E", "F") else CLI_NS_2D
         res = run_convergence_study(
             dim=2, variant=variant, Ns=ns_2d,
             A_psi=DEFAULT_AMPS[0], A_n=DEFAULT_AMPS[1], A_p=DEFAULT_AMPS[2],

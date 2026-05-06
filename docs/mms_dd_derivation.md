@@ -349,6 +349,72 @@ MOSFET capstone is M19). The factorization above isolates the
 surface-normal direction as a separate input so a future 3D variant
 can extend it without re-deriving the resistor-sum composition.
 
+**Variant F -- Auger recombination (M16.3).** Variant C electronics
+(full coupling, Si lifetimes) plus the additive Auger kernel
+
+```
+R_Auger = (C_n_hat n_hat + C_p_hat p_hat) (n_hat p_hat - n_i_hat^2)
+```
+
+appended to the SRH rate so the per-block forcing absorbs both
+contributions:
+
+```
+R_e = (n_e p_e - n_i_hat^2) / [tau_p (n_e + n_i_hat) + tau_n (p_e + n_i_hat)]
+      + (C_n_hat n_e + C_p_hat p_e) (n_e p_e - n_i_hat^2)
+
+f_psi_weak = L_D^2 eps_r inner(grad(psi_e), grad(v_psi))
+             - (p_e - n_e) v_psi                (N_hat = 0)
+f_n_weak   = L0^2 mu_n n_e inner(grad(phi_n_e), grad(v_n))
+             - R_e v_n
+f_p_weak   = L0^2 mu_p p_e inner(grad(phi_p_e), grad(v_p))
+             + R_e v_p
+```
+
+The `(n_e p_e - n_i_hat^2)` factor is shared with the SRH numerator
+via UFL's automatic common-subexpression elimination; the production
+form (`build_dd_block_residual`) takes the same approach when its
+`recomb_cfg` argument carries `auger == True`.
+
+The `MMS_F_C_*_HAT_FOR_FORM` constants are engineered so the Auger
+contribution is comparable in magnitude to the SRH rate at the
+typical manufactured amplitudes (the cubic-in-density Auger kernel
+versus SRH's bilinear-over-linear). With `(A_psi, A_n, A_p) =
+(0.5, 0.3, -0.3)`, peak `n_hat ~ p_hat ~ ni_hat * exp(O(0.5)) ~
+2e-6`, peak `(n p - ni^2)` is `O(-0.45 ni_hat^2) ~ -4.5e-13`. SRH
+peak rate `R_SRH ~ 4.5e-13 / [tau_hat * 1e-6] ~ 5e-9` for
+`tau_hat ~ 91` (Si lifetime / t_0). At
+`C_n_hat ~ C_p_hat ~ 8e8`, peak `R_Auger ~ 1.6e9 * 1e-6 * (-4.5e-13)
+~ -7e-10`, which is `O(0.15)` of SRH and squarely in the
+materially-exercised regime.
+
+The reverse-engineered JSON `C_n` / `C_p` (cm^6/s) values that
+`build_dd_block_residual` consumes are obtained by inverting the
+runner-side conversion
+
+```
+C_n_hat = C_n[cm^6/s] * 1e-12 * sc.C0^2 * sc.t0
+```
+
+so
+
+```
+C_n[cm^6/s] = MMS_F_C_N_HAT_FOR_FORM / (1e-12 * sc.C0^2 * sc.t0)
+```
+
+(see `run_one_level`'s Variant-F branch). This matches the M16.1
+Variant-D and M16.2 Variant-E reverse-engineering pattern: the
+manufactured weak source is built from the for-form constant; the
+production form sees the same closed form via the JSON contract.
+
+Variant F is gated at the M16.3 acceptance floor L^2 >= 1.99 and
+H^1 >= 0.99 on every block (`docs/IMPROVEMENT_GUIDE.md` § M16.3
+Acceptance test; pytest module `tests/fem/test_mms_auger.py`). The
+mesh sequences mirror Variants D and E (1D `[40, 80, 160]`, 2D
+`[32, 64, 128]`). ADR 0004 (Slotboom variables) is preserved: the
+Auger kernel is a closed-form algebraic substitution into the
+existing source rate, not a new primary unknown.
+
 ## 4. Boundary conditions
 
 All three fields vanish identically on `boundary(Omega)` by construction
