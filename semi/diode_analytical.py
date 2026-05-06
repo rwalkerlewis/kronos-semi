@@ -93,6 +93,90 @@ def sns_total_reference(
     return J_diff + J_rec, J_diff, J_rec, J_s
 
 
+def shockley_iv_with_auger(
+    N_A: float, N_D: float, n_i: float, eps: float,
+    mu_n_SI: float, mu_p_SI: float,
+    tau_n: float, tau_p: float,
+    C_n_SI: float, C_p_SI: float,
+    V_t: float, V,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    High-injection long-diode I-V with additive Auger recombination
+    (M16.3).
+
+    For a symmetric pn junction at high injection (`V_F` well above
+    `V_bi`), excess carrier densities approximately satisfy the
+    ambipolar diffusion equation in the bulk:
+
+        D_a * d^2 delta / dx^2 - delta / tau_eff = 0
+
+    with the effective lifetime that includes both SRH and Auger
+    branches:
+
+        1 / tau_eff = 1 / tau_SRH_eff + (C_n + C_p) * delta_avg^2
+
+    The closed form J_total = 2 q D_a delta(0) / L_a, where
+    `delta(0) = n_i exp(V / 2 V_t)` is the high-injection boundary
+    density and `L_a = sqrt(D_a tau_eff)`.
+
+    Approximations:
+      - `delta_avg = delta(0) / 2` (the leading-order average of an
+        exponential decay over a long bulk; gives a bias-dependent
+        Auger lifetime without iterating on `delta`).
+      - `tau_SRH_eff = sqrt(tau_n tau_p)`, the geometric-mean SRH
+        lifetime at high injection.
+      - `D_a = 2 D_n D_p / (D_n + D_p)`, the ambipolar diffusivity.
+
+    Returns
+    -------
+    (J_total, J_SRH_only, tau_eff_per_V)
+        `J_total` includes both SRH and Auger; `J_SRH_only` is
+        the same formula with `(C_n + C_p) -> 0`. `tau_eff_per_V`
+        is the effective lifetime at each V (numpy array), exposed
+        so the verifier can print it on failure.
+
+    SI inputs throughout (densities m^-3, lengths m, lifetimes s,
+    Auger coefficients m^6/s, current density A/m^2). The verifier
+    converts JSON cm^6/s to m^6/s before invoking.
+    """
+    V_arr = np.asarray(V, dtype=float)
+    V_bi = V_t * np.log(N_A * N_D / n_i ** 2)
+
+    D_n = V_t * mu_n_SI
+    D_p = V_t * mu_p_SI
+    D_a = 2.0 * D_n * D_p / (D_n + D_p)
+    tau_SRH_eff = np.sqrt(tau_n * tau_p)
+
+    # High-injection boundary: delta_0 = n_i exp(V / 2 V_t).
+    delta_0 = n_i * np.exp(V_arr / (2.0 * V_t))
+    delta_avg = delta_0 / 2.0
+
+    # Effective lifetime including Auger.
+    inv_tau = 1.0 / tau_SRH_eff + (C_n_SI + C_p_SI) * delta_avg ** 2
+    tau_eff = 1.0 / inv_tau
+    L_a = np.sqrt(D_a * tau_eff)
+
+    # Long-diode current: contributions from both bulks scale with
+    # delta_0 / L_a; the factor of 2 accounts for the two sides.
+    J_total = 2.0 * Q * D_a * delta_0 / L_a
+
+    # SRH-only counterpart (Auger -> 0).
+    inv_tau_srh = 1.0 / tau_SRH_eff
+    tau_srh = 1.0 / inv_tau_srh
+    L_srh = np.sqrt(D_a * tau_srh)
+    J_srh_only = 2.0 * Q * D_a * delta_0 / L_srh
+
+    # Suppress the V < V_bi tail (the formula is the high-injection
+    # asymptote; below V_bi the diffusion-dominated Shockley J ~
+    # exp(V/V_t) law is the better reference, which the existing
+    # sns_total_reference covers).
+    below_bi = V_arr < V_bi
+    J_total = np.where(below_bi, 0.0, J_total)
+    J_srh_only = np.where(below_bi, 0.0, J_srh_only)
+
+    return J_total, J_srh_only, tau_eff
+
+
 def srh_generation_reference(
     N_A: float, N_D: float, n_i: float, eps: float,
     tau_n: float, tau_p: float,

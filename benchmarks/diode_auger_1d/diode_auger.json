@@ -1,0 +1,129 @@
+{
+  "schema_version": "2.3.0",
+  "name": "diode_auger_1d",
+  "description": "1D pn diode forward sweep V_F in [0.0, 0.9] V (19 points, 0.05 V step) to expose Auger recombination (M16.3). Symmetric N_A = N_D = 1e15 cm^-3, 20 um total, junction at the midplane. Engineered Auger coefficients (C_n = C_p = 1.0e-29 cm^6/s, ~30x Si Dziewior-Schmid) so the Auger contribution is materially exercised at the typical high-injection delta this geometry reaches at V_F = 0.9 V (delta(0) ~ 3.7e17 cm^-3). The companion verifier (scripts/run_benchmark.py verify_diode_auger_1d) compares this run to an SRH-only run of the same biases and asserts >20% I-V divergence at V_F = 0.9 V (Auger materially boosts recombination current) plus an analytical high-injection long-diode match within 10% (a Hall-Auger ambipolar approximation; see semi/diode_analytical.py::shockley_iv_with_auger).",
+  "dimension": 1,
+  "mesh": {
+    "source": "builtin",
+    "extents": [
+      [
+        0.0,
+        2e-05
+      ]
+    ],
+    "resolution": [
+      800
+    ],
+    "regions_by_box": [
+      {
+        "name": "silicon",
+        "tag": 1,
+        "bounds": [
+          [
+            0.0,
+            2e-05
+          ]
+        ]
+      }
+    ],
+    "facets_by_plane": [
+      {
+        "name": "anode",
+        "tag": 1,
+        "axis": 0,
+        "value": 0.0
+      },
+      {
+        "name": "cathode",
+        "tag": 2,
+        "axis": 0,
+        "value": 2e-05
+      }
+    ]
+  },
+  "regions": {
+    "silicon": {
+      "material": "Si",
+      "tag": 1,
+      "role": "semiconductor"
+    }
+  },
+  "doping": [
+    {
+      "region": "silicon",
+      "profile": {
+        "type": "step",
+        "axis": 0,
+        "location": 1e-05,
+        "N_D_left": 0.0,
+        "N_A_left": 1e+15,
+        "N_D_right": 1e+15,
+        "N_A_right": 0.0
+      }
+    }
+  ],
+  "contacts": [
+    {
+      "name": "anode",
+      "facet": "anode",
+      "type": "ohmic",
+      "voltage": 0.0,
+      "voltage_sweep": {
+        "start": 0.0,
+        "stop": 0.9,
+        "step": 0.05
+      }
+    },
+    {
+      "name": "cathode",
+      "facet": "cathode",
+      "type": "ohmic",
+      "voltage": 0.0
+    }
+  ],
+  "physics": {
+    "temperature": 300.0,
+    "statistics": "boltzmann",
+    "mobility": {
+      "model": "constant",
+      "mu_n": 1400.0,
+      "mu_p": 450.0
+    },
+    "recombination": {
+      "srh": true,
+      "tau_n": 1e-07,
+      "tau_p": 1e-07,
+      "E_t": 0.0,
+      "auger": true,
+      "C_n": 1.0e-29,
+      "C_p": 1.0e-29
+    }
+  },
+  "solver": {
+    "type": "bias_sweep",
+    "snes": {
+      "rtol": 1e-12,
+      "atol": 1e-10,
+      "stol": 1e-14,
+      "max_it": 80
+    },
+    "continuation": {
+      "min_step": 0.0001,
+      "max_halvings": 6,
+      "max_step": 0.1,
+      "easy_iter_threshold": 4,
+      "grow_factor": 2.0
+    }
+  },
+  "output": {
+    "directory": "./results/diode_auger_1d",
+    "fields": [
+      "potential",
+      "n",
+      "p",
+      "phi_n",
+      "phi_p",
+      "iv"
+    ]
+  }
+}
