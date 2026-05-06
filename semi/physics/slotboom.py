@@ -13,6 +13,22 @@ psi, phi_n, phi_p are divided by V_t and densities are divided by C_0;
 `n_i_hat = n_i / C_0` is the only material-specific constant that shows
 up here.
 
+Under Fermi-Dirac (M16.4, gated by `physics.statistics: "fermi_dirac"`),
+the substitution rule keeps the Slotboom shape and grows a smooth
+bounded prefactor (see `semi.physics.statistics` module docstring for
+the derivation):
+
+    n = n_i * gamma_n(eta_n) * exp(psi - phi_n)         (scaled)
+    p = n_i * gamma_p(eta_p) * exp(phi_p - psi)         (scaled)
+
+with `gamma_n(eta) = 1 / (1 + 0.27 * exp(eta))` (Blakemore basic) and
+`eta_n = (psi - phi_n)/V_t + eta_offset_n`. Boltzmann is recovered as
+gamma -> 1, which the closed Blakemore form approaches smoothly as
+`eta -> -inf`. The continuity-row shape (`J = -q mu n grad(phi)`) is
+unchanged: the Einstein-factor cancellation in the generalized-Slotboom
+current expression (see ADR 0004 derivation note) means no FD-specific
+correction enters the residual beyond the `n` / `p` substitution.
+
 UFL expressions in this module work with either dolfinx Functions or
 fem.Constants for `psi`, `phi_n`, `phi_p`. The NumPy helpers are pure
 Python and are imported for tests and post-processing. This module must
@@ -23,33 +39,126 @@ from __future__ import annotations
 
 import numpy as np
 
+from .statistics import _BLAKEMORE_BASIC_OFFSET, gamma_n_blakemore, gamma_p_blakemore
 
-def n_from_slotboom(psi_hat, phi_n_hat, n_i_hat):
+
+def _is_fermi_dirac(statistics_cfg):
+    """True iff statistics_cfg dispatches to the Fermi-Dirac branch."""
+    if statistics_cfg is None:
+        return False
+    return statistics_cfg.get("statistics", "boltzmann") == "fermi_dirac"
+
+
+def n_from_slotboom(
+    psi_hat, phi_n_hat, n_i_hat,
+    *, statistics_cfg=None, eta_offset_n=None,
+):
     """
-    Scaled electron density, n_hat = n_i_hat * exp(psi_hat - phi_n_hat).
+    Scaled electron density.
+
+    Boltzmann (default, statistics_cfg=None or "boltzmann"):
+
+        n_hat = n_i_hat * exp(psi_hat - phi_n_hat)
+
+    Fermi-Dirac (statistics_cfg["statistics"] == "fermi_dirac"):
+
+        n_hat = n_i_hat * gamma_n(eta_n) * exp(psi_hat - phi_n_hat)
+        eta_n = (psi_hat - phi_n_hat) + eta_offset_n
+        gamma_n_blakemore(eta) = 1 / (1 + 0.27 * exp(eta))
 
     All arguments are UFL-compatible (Functions, Constants, expressions)
     or plain floats / numpy arrays. Returns an expression of the same
     flavor.
+
+    Parameters
+    ----------
+    psi_hat, phi_n_hat, n_i_hat
+        Scaled primary unknowns and intrinsic density.
+    statistics_cfg : dict, optional
+        Carrier-statistics dispatch; `None` (default) is bit-identical
+        to pre-M16.4 (Boltzmann).
+    eta_offset_n : float, optional
+        Per-material reduced-Fermi offset `ln(n_i / N_C)`. Required
+        when `statistics_cfg["statistics"] == "fermi_dirac"`; ignored
+        on the Boltzmann path.
     """
     import ufl
-    return n_i_hat * ufl.exp(psi_hat - phi_n_hat)
+    boltzmann = n_i_hat * ufl.exp(psi_hat - phi_n_hat)
+    if not _is_fermi_dirac(statistics_cfg):
+        return boltzmann
+    if eta_offset_n is None:
+        raise ValueError(
+            "n_from_slotboom: statistics_cfg requests fermi_dirac but "
+            "eta_offset_n is None. Pass Scaling.eta_offset_n through "
+            "the form builder."
+        )
+    eta = (psi_hat - phi_n_hat) + ufl.as_ufl(float(eta_offset_n))
+    gamma = ufl.as_ufl(1.0) / (
+        ufl.as_ufl(1.0)
+        + ufl.as_ufl(_BLAKEMORE_BASIC_OFFSET) * ufl.exp(eta)
+    )
+    return gamma * boltzmann
 
 
-def p_from_slotboom(psi_hat, phi_p_hat, n_i_hat):
-    """Scaled hole density, p_hat = n_i_hat * exp(phi_p_hat - psi_hat)."""
+def p_from_slotboom(
+    psi_hat, phi_p_hat, n_i_hat,
+    *, statistics_cfg=None, eta_offset_p=None,
+):
+    """
+    Scaled hole density. Boltzmann default; Fermi-Dirac dispatch by
+    analogy with :func:`n_from_slotboom` using the hole-side reduced
+    Fermi level `eta_p = (phi_p_hat - psi_hat) + eta_offset_p`.
+    """
     import ufl
-    return n_i_hat * ufl.exp(phi_p_hat - psi_hat)
+    boltzmann = n_i_hat * ufl.exp(phi_p_hat - psi_hat)
+    if not _is_fermi_dirac(statistics_cfg):
+        return boltzmann
+    if eta_offset_p is None:
+        raise ValueError(
+            "p_from_slotboom: statistics_cfg requests fermi_dirac but "
+            "eta_offset_p is None. Pass Scaling.eta_offset_p through "
+            "the form builder."
+        )
+    eta = (phi_p_hat - psi_hat) + ufl.as_ufl(float(eta_offset_p))
+    gamma = ufl.as_ufl(1.0) / (
+        ufl.as_ufl(1.0)
+        + ufl.as_ufl(_BLAKEMORE_BASIC_OFFSET) * ufl.exp(eta)
+    )
+    return gamma * boltzmann
 
 
-def n_from_slotboom_np(psi_hat, phi_n_hat, n_i_hat):
+def n_from_slotboom_np(
+    psi_hat, phi_n_hat, n_i_hat,
+    *, statistics_cfg=None, eta_offset_n=None,
+):
     """NumPy counterpart of :func:`n_from_slotboom` for post-processing."""
-    return n_i_hat * np.exp(psi_hat - phi_n_hat)
+    boltzmann = n_i_hat * np.exp(psi_hat - phi_n_hat)
+    if not _is_fermi_dirac(statistics_cfg):
+        return boltzmann
+    if eta_offset_n is None:
+        raise ValueError(
+            "n_from_slotboom_np: statistics_cfg requests fermi_dirac "
+            "but eta_offset_n is None."
+        )
+    drive = np.asarray(psi_hat, dtype=float) - np.asarray(phi_n_hat, dtype=float)
+    return gamma_n_blakemore(drive, eta_offset_n) * boltzmann
 
 
-def p_from_slotboom_np(psi_hat, phi_p_hat, n_i_hat):
+def p_from_slotboom_np(
+    psi_hat, phi_p_hat, n_i_hat,
+    *, statistics_cfg=None, eta_offset_p=None,
+):
     """NumPy counterpart of :func:`p_from_slotboom` for post-processing."""
-    return n_i_hat * np.exp(phi_p_hat - psi_hat)
+    boltzmann = n_i_hat * np.exp(phi_p_hat - psi_hat)
+    if not _is_fermi_dirac(statistics_cfg):
+        return boltzmann
+    if eta_offset_p is None:
+        raise ValueError(
+            "p_from_slotboom_np: statistics_cfg requests fermi_dirac "
+            "but eta_offset_p is None."
+        )
+    drive = np.asarray(phi_p_hat, dtype=float) - np.asarray(psi_hat, dtype=float)
+    return gamma_p_blakemore(drive, eta_offset_p) * boltzmann
 
 
 def phi_n_from_np(psi_hat, n_hat, n_i_hat):
