@@ -112,14 +112,40 @@ def run_bias_sweep(
 
     stat_cfg = {"statistics": phys.get("statistics", "boltzmann")}
 
-    F_list = build_dd_block_residual(
-        spaces, N_hat_fn, sc, ref_mat.epsilon_r,
-        mu_n_hat, mu_p_hat, tau_n_hat, tau_p_hat, E_t_over_Vt,
-        mobility_cfg=mob,
-        facet_tags=facet_tags,
-        recomb_cfg=rec,
-        statistics_cfg=stat_cfg,
-    )
+    # M16.5: the Schottky thermionic-emission Robin form depends on
+    # the per-contact applied voltage, so the residual is rebuilt per
+    # bias step inside `solve_at`. Devices with no Schottky contacts
+    # see an empty list and the Robin branch is skipped (bit-identical
+    # to v0.20.0).
+    has_schottky = any(c["type"] == "schottky" for c in cfg["contacts"])
+
+    def _build_F_list(voltages_for_step: dict[str, float]):
+        schottky_facets_step: list[tuple[int, dict]] = []
+        if has_schottky:
+            contacts_step = resolve_contacts(
+                cfg, facet_tags=facet_tags, voltages=voltages_for_step,
+            )
+            for c in contacts_step:
+                if c.kind != "schottky":
+                    continue
+                schottky_facets_step.append(
+                    (int(c.facet_tag), {
+                        "barrier_height_eV": float(c.barrier_height_eV),
+                        "V_applied": float(c.V_applied),
+                    })
+                )
+        return build_dd_block_residual(
+            spaces, N_hat_fn, sc, ref_mat.epsilon_r,
+            mu_n_hat, mu_p_hat, tau_n_hat, tau_p_hat, E_t_over_Vt,
+            mobility_cfg=mob,
+            facet_tags=facet_tags,
+            recomb_cfg=rec,
+            statistics_cfg=stat_cfg,
+            schottky_facets=schottky_facets_step,
+            ref_mat=ref_mat,
+        )
+
+    F_list = _build_F_list({})
 
     # Both ohmic and gate contacts can carry static or swept voltages. The
     # runner historically only swept ohmic contacts; gate-sweep support was
@@ -190,8 +216,9 @@ def run_bias_sweep(
                 bc.set(fn.x.array)
         for fn in (spaces.psi, spaces.phi_n, spaces.phi_p):
             fn.x.scatter_forward()
+        F_list_step = _build_F_list(V_by_contact) if has_schottky else F_list
         return solve_nonlinear_block(
-            F_list, [spaces.psi, spaces.phi_n, spaces.phi_p],
+            F_list_step, [spaces.psi, spaces.phi_n, spaces.phi_p],
             bcs, prefix=f"{cfg['name']}_dd_{tag}_",
             petsc_options=snes_petsc_options,
             cfg=cfg,

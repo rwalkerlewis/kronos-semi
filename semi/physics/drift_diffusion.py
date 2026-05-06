@@ -78,6 +78,8 @@ def build_dd_block_residual(
     facet_tags=None,
     recomb_cfg: dict | None = None,
     statistics_cfg: dict | None = None,
+    schottky_facets: list | None = None,
+    ref_mat=None,
 ):
     """
     Build the three-block residual for the coupled drift-diffusion system.
@@ -133,6 +135,23 @@ def build_dd_block_residual(
         because the Einstein-factor cancellation in the
         generalized-Slotboom current means the continuity-row shape
         `J = -q mu n grad(phi)` is unchanged. M16.4.
+    schottky_facets : list, optional
+        List of ``(facet_tag, params)`` entries describing each
+        Schottky contact whose continuity rows should carry the
+        thermionic-emission Robin surface form. ``params`` must
+        provide ``barrier_height_eV`` (the metal-semiconductor barrier
+        in eV; Sze 3rd ed Table 5) and ``V_applied`` (the applied
+        voltage in volts at this contact). ``ref_mat`` is consulted
+        for ``Nc``, ``Nv``, and ``n_i`` so the thermionic equilibrium
+        densities ``n_eq = N_C exp(-phi_B / V_t)`` and
+        ``p_eq = N_V exp(-(E_g - phi_B) / V_t) = n_i^2 / n_eq`` can be
+        formed in scaled units. ``None`` (default) or empty list is
+        bit-identical to v0.20.0. When non-empty, ``facet_tags`` and
+        ``ref_mat`` must also be supplied. M16.5.
+    ref_mat : Material, optional
+        Reference material; required when ``schottky_facets`` is
+        non-empty. Used for the thermionic equilibrium-density
+        formula. M16.5.
 
     Returns
     -------
@@ -229,7 +248,127 @@ def build_dd_block_residual(
         L0_sq * mu_p_hat * p_hat * ufl.inner(ufl.grad(phi_p), ufl.grad(v_p)) * ufl.dx
         + R * v_p * ufl.dx
     )
+
+    if schottky_facets:
+        F_phi_n_extra, F_phi_p_extra = _build_schottky_surface_forms(
+            msh, facet_tags, schottky_facets, sc, ref_mat,
+            psi=psi, phi_n=phi_n, phi_p=phi_p, v_n=v_n, v_p=v_p,
+            statistics_cfg=statistics_cfg,
+            eta_offset_n=eta_offset_n_val,
+            eta_offset_p=eta_offset_p_val,
+        )
+        F_phi_n = F_phi_n + F_phi_n_extra
+        F_phi_p = F_phi_p + F_phi_p_extra
     return [F_psi, F_phi_n, F_phi_p]
+
+
+def _build_schottky_surface_forms(
+    msh, facet_tags, schottky_facets, sc, ref_mat,
+    *, psi, phi_n, phi_p, v_n, v_p,
+    statistics_cfg=None, eta_offset_n=None, eta_offset_p=None,
+    submesh_kwargs: dict | None = None,
+):
+    """
+    Assemble the M16.5 Schottky thermionic-emission surface forms on the
+    electron and hole continuity rows.
+
+    The Robin condition at a Schottky contact reads (Sze 3rd ed eq 3.4.7,
+    with the metal-Fermi-level convention used by Selberherr 1984)
+
+        J_n . n_face = q v_n_th (n - n_eq exp((V_a - phi_n) / V_t))
+        J_p . n_face = -q v_p_th (p - p_eq exp((phi_p - V_a) / V_t))
+
+    where ``v_n_th = sqrt(kT / (2 pi m_n*))`` is the electron thermal
+    velocity (Si: ~2.05e7 cm/s at 300 K), ``n_eq = N_C exp(-phi_B / V_t)``
+    is the metal-side equilibrium electron density, and ``p_eq`` is its
+    hole counterpart. Mass-action law preserves
+    ``n_eq * p_eq = n_i^2``. Substituting the Robin condition into the
+    weak form's IBP boundary integral gives a residual prefactor of
+    ``sc.t0 * v_n_th`` on the carrier-density / thermionic-flux
+    difference, integrated against the test function on the Schottky
+    facet.
+
+    See ADR 0015 for the V&V scope (analytical-benchmark plus byte-
+    identity gates instead of an MMS rate gate, since the existing MMS
+    harness uses Dirichlet BCs everywhere by construction).
+    """
+    import math as _math
+
+    import ufl
+    from dolfinx import fem
+    from petsc4py import PETSc
+
+    from .slotboom import n_from_slotboom, p_from_slotboom
+
+    if facet_tags is None:
+        raise RuntimeError(
+            "Schottky surface form requested but facet_tags is None; "
+            "the form builder cannot resolve the Schottky facet measure."
+        )
+    if ref_mat is None:
+        raise RuntimeError(
+            "Schottky surface form requested but ref_mat is None; "
+            "the thermionic equilibrium density formula needs Nc, Nv, "
+            "and n_i from the reference material."
+        )
+
+    submesh_kwargs = submesh_kwargs or {}
+    ds = ufl.Measure("ds", domain=msh, subdomain_data=facet_tags,
+                     **submesh_kwargs)
+    V_t = sc.V0
+    C0 = sc.C0
+    n_i = ref_mat.n_i
+    Nc = ref_mat.Nc
+    Nv = ref_mat.Nv
+    if Nc is None or Nc <= 0.0 or Nv is None or Nv <= 0.0 or n_i <= 0.0:
+        raise RuntimeError(
+            "Schottky surface form requires the reference material to "
+            "expose positive Nc, Nv, and n_i; got "
+            f"Nc={Nc}, Nv={Nv}, n_i={n_i}."
+        )
+
+    # Precompute sc.v_n_thermal / sc.v_p_thermal once so the property
+    # accessor (which checks m_*_star) runs at form-build time, not on
+    # the SNES jacobian assembly path.
+    v_n_th = sc.v_n_thermal
+    v_p_th = sc.v_p_thermal
+    prefactor_n = sc.t0 * v_n_th
+    prefactor_p = sc.t0 * v_p_th
+
+    # The Slotboom n_from_slotboom helper expects ni_hat as a
+    # UFL-compatible Constant; build one on the same mesh that owns the
+    # surface measure.
+    ni_hat = fem.Constant(msh, PETSc.ScalarType(n_i / C0))
+
+    F_phi_n_extra = 0
+    F_phi_p_extra = 0
+    for facet_tag, params in schottky_facets:
+        phi_b = float(params["barrier_height_eV"])
+        V_app = float(params["V_applied"])
+        n_eq_phys = Nc * _math.exp(-phi_b / V_t)
+        p_eq_phys = (n_i * n_i) / n_eq_phys  # = Nv exp(-(Eg-phi_b)/V_t)
+        n_eq_hat = fem.Constant(msh, PETSc.ScalarType(n_eq_phys / C0))
+        p_eq_hat = fem.Constant(msh, PETSc.ScalarType(p_eq_phys / C0))
+        V_app_hat = fem.Constant(msh, PETSc.ScalarType(V_app / V_t))
+        pref_n = fem.Constant(msh, PETSc.ScalarType(prefactor_n))
+        pref_p = fem.Constant(msh, PETSc.ScalarType(prefactor_p))
+
+        n_hat_local = n_from_slotboom(
+            psi, phi_n, ni_hat,
+            statistics_cfg=statistics_cfg, eta_offset_n=eta_offset_n,
+        )
+        p_hat_local = p_from_slotboom(
+            psi, phi_p, ni_hat,
+            statistics_cfg=statistics_cfg, eta_offset_p=eta_offset_p,
+        )
+        ds_facet = ds(int(facet_tag))
+        F_phi_n_extra = F_phi_n_extra + pref_n * (
+            n_hat_local - n_eq_hat * ufl.exp(V_app_hat - phi_n)
+        ) * v_n * ds_facet
+        F_phi_p_extra = F_phi_p_extra - pref_p * (
+            p_hat_local - p_eq_hat * ufl.exp(phi_p - V_app_hat)
+        ) * v_p * ds_facet
+    return F_phi_n_extra, F_phi_p_extra
 
 
 @dataclass
@@ -295,6 +434,8 @@ def build_dd_block_residual_mr(
     facet_tags=None,
     recomb_cfg: dict | None = None,
     statistics_cfg: dict | None = None,
+    schottky_facets: list | None = None,
+    ref_mat=None,
 ):
     """Multi-region (submesh-based) block residual for the coupled DD system.
 
@@ -433,4 +574,22 @@ def build_dd_block_residual_mr(
         * ufl.inner(ufl.grad(phi_p), ufl.grad(v_p)) * dx_sub
         + R * v_p * dx_sub
     )
+
+    if schottky_facets:
+        # Schottky contacts on the multi-region path are unusual (the
+        # MOSCAP / MOSFET 2D devices have no metal-semiconductor
+        # contacts on the silicon submesh), but the API accepts them
+        # for completeness. The thermionic-emission Robin form is
+        # applied on the parent mesh's facet measure, with phi_n and
+        # phi_p restricted to the semiconductor submesh via the same
+        # entity_maps mechanism the volume continuity rows already use.
+        F_phi_n_extra, F_phi_p_extra = _build_schottky_surface_forms(
+            msh, facet_tags, schottky_facets, sc, ref_mat,
+            psi=psi, phi_n=phi_n, phi_p=phi_p, v_n=v_n, v_p=v_p,
+            statistics_cfg=statistics_cfg,
+            eta_offset_n=eta_offset_n_val,
+            eta_offset_p=eta_offset_p_val,
+        )
+        F_phi_n = F_phi_n + F_phi_n_extra
+        F_phi_p = F_phi_p + F_phi_p_extra
     return [F_psi, F_phi_n, F_phi_p]
