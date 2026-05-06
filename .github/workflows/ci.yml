@@ -173,6 +173,13 @@ jobs:
           # so this step is roughly 2x the runtime of pn_1d_bias.
           - name: diode_auger_1d
             args: diode_auger_1d
+          # M16.4 Acceptance test 2: Boltzmann-vs-Fermi-Dirac
+          # equilibrium V_bi divergence at N_D = 1e20 cm^-3 plus
+          # FEM-vs-Blakemore-analytical V_bi consistency. Internally
+          # runs a Boltzmann companion equilibrium solve so the step
+          # is roughly 2x the runtime of an equilibrium-only run.
+          - name: diode_fermi_dirac_1d
+            args: diode_fermi_dirac_1d
           - name: resistor_3d_builtin
             args: resistor_3d --input benchmarks/resistor_3d/resistor.json
           - name: resistor_3d_gmsh
