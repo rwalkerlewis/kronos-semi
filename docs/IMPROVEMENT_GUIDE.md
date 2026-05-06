@@ -946,6 +946,16 @@ The engine is ready for a UI when all of these are green:
 
 ## 9. Change log for this document
 
+### [Unreleased]
+
+- **2026-05-05**, author M16.5 starter prompt
+  ([M16_5_STARTER_PROMPT.md](M16_5_STARTER_PROMPT.md)) and
+  [ADR 0015](adr/0015-schottky-robin-bc.md) (Schottky contacts as
+  Robin BCs; documents the V&V departure from ADR 0006 for
+  boundary-physics milestones) on branch `dev/m16.5-schottky`;
+  phases ship per
+  [PR template at the bottom of the prompt](M16_5_STARTER_PROMPT.md).
+
 ### [0.20.0]
 
 - **2026-05-05**, M16.4 Fermi-Dirac statistics (gated) shipped
