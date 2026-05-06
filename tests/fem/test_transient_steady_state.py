@@ -186,3 +186,33 @@ def test_transient_steady_state_runs_end_to_end():
         f"Expected at least {n_steps} anode IV entries from {n_steps} BDF steps, "
         f"got {len(iv_anode)}"
     )
+
+
+def test_transient_with_auger_runs_end_to_end():
+    """
+    M16.3: smoke test that the transient runner accepts `auger=True`
+    and runs a few BDF2 steps without raising. Pins the
+    `recomb_cfg`-driven Auger inline in the transient form builder
+    against regressions; no transient + Auger benchmark exists, so
+    this is the dedicated coverage.
+    """
+    from semi.runners.transient import run_transient
+
+    dt = 5.0e-11
+    n_steps = 5
+    t_end = n_steps * dt
+    cfg = _make_cfg({
+        "type": "transient",
+        "t_end": t_end,
+        "dt": dt,
+        "order": 2,
+        "max_steps": n_steps + 5,
+        "output_every": n_steps + 5,
+        "snes": {"rtol": 1.0e-10, "atol": 1.0e-7, "stol": 1.0e-14, "max_it": 100},
+    })
+    cfg["physics"]["recombination"]["auger"] = True
+    cfg["physics"]["recombination"]["C_n"] = 1.0e-29
+    cfg["physics"]["recombination"]["C_p"] = 1.0e-29
+    result = run_transient(cfg)
+    iv_anode = [r for r in result.iv if r.get("contact") == "anode"]
+    assert len(iv_anode) >= n_steps

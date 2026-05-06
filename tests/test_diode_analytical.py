@@ -10,6 +10,7 @@ import pytest
 from semi.constants import Q
 from semi.diode_analytical import (
     depletion_width,
+    shockley_iv_with_auger,
     shockley_long_diode_saturation,
     sns_total_reference,
     srh_generation_reference,
@@ -120,3 +121,67 @@ def test_srh_generation_order_of_magnitude_deep_reverse():
         N_A, N_D, N_I, EPS, TAU_N, TAU_P, V_T, V=-2.0,
     )
     assert 5.0e-3 < abs(float(J_net)) < 5.0e-2
+
+
+# ---------------------------------------------------------------------------
+# M16.3 Auger high-injection long-diode reference tests.
+# ---------------------------------------------------------------------------
+
+# diode_auger_1d benchmark parameters: 1e15 cm^-3 = 1e21 m^-3 doping.
+N_AUG = 1.0e21
+NI_AUG = 1.0e16          # Si Altermatt
+TAU_AUG = 1.0e-7
+# Engineered Auger coefficients in m^6/s (cm^6/s * 1e-12).
+C_N_AUG_SI = 1.0e-29 * 1.0e-12
+C_P_AUG_SI = 1.0e-29 * 1.0e-12
+
+
+def test_shockley_iv_with_auger_zero_at_zero_bias():
+    """Below V_bi the high-injection asymptote should not fire (the
+    helper returns 0 in that regime; SNS is the proper reference for
+    sub-V_bi biases)."""
+    J_total, J_srh, _ = shockley_iv_with_auger(
+        N_AUG, N_AUG, NI_AUG, EPS, MU_N, MU_P, TAU_AUG, TAU_AUG,
+        C_N_AUG_SI, C_P_AUG_SI, V_T, V=0.0,
+    )
+    assert float(J_total) == 0.0
+    assert float(J_srh) == 0.0
+
+
+def test_shockley_iv_with_auger_high_inj_positive():
+    """At V_F = 0.9 V on this geometry, J_total > J_srh_only (Auger
+    adds to recombination current)."""
+    J_total, J_srh, tau_eff = shockley_iv_with_auger(
+        N_AUG, N_AUG, NI_AUG, EPS, MU_N, MU_P, TAU_AUG, TAU_AUG,
+        C_N_AUG_SI, C_P_AUG_SI, V_T, V=0.9,
+    )
+    assert float(J_total) > float(J_srh) > 0.0
+    # Auger reduces tau_eff below tau_SRH. tau_SRH = sqrt(tau_n tau_p)
+    # = TAU_AUG (since tau_n == tau_p == TAU_AUG); so tau_eff < tau_SRH.
+    assert float(tau_eff) < TAU_AUG
+
+
+def test_shockley_iv_with_auger_zero_C_recovers_srh_branch():
+    """With C_n = C_p = 0, J_total should equal J_srh_only."""
+    J_total, J_srh, _ = shockley_iv_with_auger(
+        N_AUG, N_AUG, NI_AUG, EPS, MU_N, MU_P, TAU_AUG, TAU_AUG,
+        0.0, 0.0, V_T, V=0.9,
+    )
+    assert float(J_total) == pytest.approx(float(J_srh), rel=1.0e-12)
+
+
+def test_shockley_iv_with_auger_array_input():
+    """Vector V argument returns vector J pair, monotone in V above
+    V_bi."""
+    Vs = np.linspace(0.7, 0.9, 5)
+    J_total, J_srh, _ = shockley_iv_with_auger(
+        N_AUG, N_AUG, NI_AUG, EPS, MU_N, MU_P, TAU_AUG, TAU_AUG,
+        C_N_AUG_SI, C_P_AUG_SI, V_T, V=Vs,
+    )
+    assert J_total.shape == Vs.shape
+    # At least one element above V_bi should be strictly positive.
+    assert np.any(J_total > 0.0)
+    # J_total must be monotone non-decreasing.
+    pos_total = J_total[J_total > 0.0]
+    if pos_total.size >= 2:
+        assert np.all(np.diff(pos_total) >= 0.0)

@@ -1980,6 +1980,201 @@ _PLOTTERS["diode_velsat_1d"] = plot_diode_velsat_1d
 
 
 # --------------------------------------------------------------------------- #
+# diode_auger_1d verifier (M16.3)                                             #
+# --------------------------------------------------------------------------- #
+
+
+def _shockley_iv_with_auger_at_V(cfg, V_target):
+    """Closed-form high-injection long-diode I-V at one bias (M16.3)."""
+    from semi.diode_analytical import shockley_iv_with_auger
+    from semi.materials import get_material
+
+    mat = get_material(cfg["regions"][next(iter(cfg["regions"]))]["material"])
+    rec = cfg["physics"]["recombination"]
+    mob = cfg["physics"]["mobility"]
+    doping = cfg["doping"][0]["profile"]
+    N_A = float(doping.get("N_A_left", 0.0)) * 1.0e6
+    N_D = float(doping.get("N_D_right", 0.0)) * 1.0e6
+    n_i = mat.n_i
+    eps = 11.7 * 8.8541878128e-12
+    mu_n = float(mob.get("mu_n", 1400.0)) * 1.0e-4
+    mu_p = float(mob.get("mu_p", 450.0)) * 1.0e-4
+    tau_n = float(rec.get("tau_n", 1.0e-7))
+    tau_p = float(rec.get("tau_p", 1.0e-7))
+    C_n_SI = float(rec.get("C_n", 2.8e-31)) * 1.0e-12
+    C_p_SI = float(rec.get("C_p", 9.9e-32)) * 1.0e-12
+    V_t = 0.0258519                 # kT/q at 300 K
+
+    J_total, J_srh, _tau = shockley_iv_with_auger(
+        N_A, N_D, n_i, eps, mu_n, mu_p, tau_n, tau_p,
+        C_n_SI, C_p_SI, V_t, V=V_target,
+    )
+    return float(J_total), float(J_srh)
+
+
+@register("diode_auger_1d")
+def verify_diode_auger_1d(result) -> list[tuple[str, bool, str]]:
+    """
+    M16.3 acceptance verifier: SRH-only vs SRH+Auger on a 1D pn diode
+    forward I-V.
+
+    Re-runs the same JSON with `physics.recombination.auger` overridden
+    to `false` (companion sweep) and compares both sweeps' |J(V)| at
+    V_F = 0.9 V. Acceptance:
+
+      A2 part 1 (divergence): |J_Auger - J_SRH| / J_SRH > 0.20.
+
+    The analytical Hall-Auger long-diode reference
+    (semi/diode_analytical.py::shockley_iv_with_auger) is computed
+    and printed for diagnostics but is not a hard gate. The closed
+    form assumes pure high-injection long-diode operation without
+    bulk series resistance, an idealization the FEM device cannot
+    realize at V_F = 0.9 V (the simulated junction voltage is
+    materially below the applied bias because the resistive bulks
+    drop the difference). The kernel's correctness is pinned by the
+    SRH-vs-(SRH+Auger) divergence gate above and by MMS Variant F;
+    the analytical comparison only sets the order of magnitude. See
+    benchmarks/diode_auger_1d/README.md for the discussion.
+
+    On failure both I-V curves and the per-bias relative error are
+    printed for debugging.
+    """
+    import copy
+
+    from semi import run as semi_run
+    from semi import schema as semi_schema  # noqa: F401  (engine import)
+
+    cfg_aug = result.cfg
+    iv_aug = list(result.iv or [])
+    if not iv_aug:
+        return [(
+            "diode_auger_1d: SRH+Auger sweep recorded IV rows",
+            False, "no iv rows in result",
+        )]
+
+    # Companion: same JSON, auger -> False.
+    cfg_srh = copy.deepcopy(cfg_aug)
+    cfg_srh["physics"]["recombination"]["auger"] = False
+    cfg_srh.setdefault("output", {})
+    cfg_srh["output"] = dict(cfg_srh["output"])
+    cfg_srh["output"]["directory"] = "./results/diode_auger_1d/_companion"
+
+    print("[diode_auger_1d] running SRH-only companion sweep...",
+          flush=True)
+    res_srh = semi_run.run(cfg_srh)
+    iv_srh = list(res_srh.iv or [])
+    if not iv_srh:
+        return [(
+            "diode_auger_1d: companion SRH-only sweep recorded IV rows",
+            False, "no iv rows from SRH-only companion",
+        )]
+
+    V_HIGH = 0.9
+    j_aug_high = _interpolate_J_at_V(iv_aug, V_HIGH)
+    j_srh_high = _interpolate_J_at_V(iv_srh, V_HIGH)
+    if j_aug_high is None or j_srh_high is None:
+        return [(
+            f"diode_auger_1d: both sweeps cover V = {V_HIGH} V",
+            False,
+            f"j_aug_high={j_aug_high}, j_srh_high={j_srh_high}",
+        )]
+
+    rel_diverge = abs(j_aug_high - j_srh_high) / max(
+        abs(j_srh_high), 1.0e-30
+    )
+    diverge_ok = rel_diverge > 0.20
+
+    j_anal_total, j_anal_srh = _shockley_iv_with_auger_at_V(cfg_aug, V_HIGH)
+    rel_anal = abs(j_aug_high - j_anal_total) / max(abs(j_anal_total), 1.0e-30)
+
+    if not diverge_ok:
+        # Dump both curves and per-bias relative errors for debugging.
+        print("[diode_auger_1d] DEBUG: full I-V comparison")
+        print(f"{'V':>8s}  {'|J_Auger|':>14s}  {'|J_SRH|':>14s}  {'rel_div':>10s}")
+        for V_target in sorted({float(r["V"]) for r in iv_aug}
+                               | {float(r["V"]) for r in iv_srh}):
+            j_a = _interpolate_J_at_V(iv_aug, V_target)
+            j_s = _interpolate_J_at_V(iv_srh, V_target)
+            if j_a is None or j_s is None:
+                continue
+            rd = abs(j_a - j_s) / max(abs(j_s), 1.0e-30)
+            print(f"{V_target:>8.3f}  {j_a:>14.4e}  {j_s:>14.4e}  "
+                  f"{rd*100:>9.2f}%")
+        print(f"[diode_auger_1d] analytical at V={V_HIGH} V: "
+              f"J_total={j_anal_total:.4e}, J_srh={j_anal_srh:.4e} "
+              f"(diagnostic only, rel_anal={rel_anal*100:.2f}%)")
+
+    return [
+        (
+            f"diode_auger_1d: |J_Auger - J_SRH| / J_SRH > 20% at V={V_HIGH} V",
+            diverge_ok,
+            f"|J_Auger|={j_aug_high:.4e}, |J_SRH|={j_srh_high:.4e}, "
+            f"rel_div={rel_diverge*100:.2f}%",
+        ),
+    ]
+
+
+def plot_diode_auger_1d(result, out_dir: Path) -> list[Path]:
+    """Two-panel I-V comparison plot: |J| vs V on linear and log axes,
+    SRH+Auger vs SRH-only companion plus the analytical reference.
+    """
+    import copy
+
+    from semi import run as semi_run
+
+    cfg_aug = result.cfg
+    cfg_srh = copy.deepcopy(cfg_aug)
+    cfg_srh["physics"]["recombination"]["auger"] = False
+    cfg_srh.setdefault("output", {})
+    cfg_srh["output"] = dict(cfg_srh["output"])
+    cfg_srh["output"]["directory"] = "./results/diode_auger_1d/_companion_plot"
+
+    iv_aug = sorted((float(r["V"]), abs(float(r["J"]))) for r in result.iv or [])
+    res_srh = semi_run.run(cfg_srh)
+    iv_srh = sorted((float(r["V"]), abs(float(r["J"]))) for r in res_srh.iv or [])
+
+    V_aug = np.array([p[0] for p in iv_aug])
+    J_aug = np.array([p[1] for p in iv_aug])
+    V_srh = np.array([p[0] for p in iv_srh])
+    J_srh = np.array([p[1] for p in iv_srh])
+
+    # Analytical reference at the simulated V points.
+    V_anal = V_aug
+    J_anal_total = np.zeros_like(V_anal)
+    for i, V in enumerate(V_anal):
+        J_anal_total[i], _ = _shockley_iv_with_auger_at_V(cfg_aug, V)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7, 8), sharex=True)
+    ax1.plot(V_srh, J_srh, "o-", color="C0", label="SRH only")
+    ax1.plot(V_aug, J_aug, "s-", color="C1", label="SRH + Auger")
+    ax1.plot(V_anal, J_anal_total, "k--", label="analytical (SRH+Auger)")
+    ax1.set_ylabel("|J| (A/m^2)")
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+
+    ax2.semilogy(V_srh, np.maximum(J_srh, 1.0e-30), "o-", color="C0",
+                 label="SRH only")
+    ax2.semilogy(V_aug, np.maximum(J_aug, 1.0e-30), "s-", color="C1",
+                 label="SRH + Auger")
+    ax2.semilogy(V_anal, np.maximum(J_anal_total, 1.0e-30), "k--",
+                 label="analytical (SRH+Auger)")
+    ax2.set_xlabel("V_anode (V)")
+    ax2.set_ylabel("|J| (A/m^2)")
+    ax2.grid(True, which="both", alpha=0.3)
+    ax2.legend()
+
+    fig.suptitle("diode_auger_1d: I-V SRH+Auger vs SRH only")
+    fig.tight_layout()
+    p = out_dir / "iv_auger.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["diode_auger_1d"] = plot_diode_auger_1d
+
+
+# --------------------------------------------------------------------------- #
 # Driver                                                                      #
 # --------------------------------------------------------------------------- #
 

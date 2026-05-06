@@ -76,6 +76,7 @@ def build_dd_block_residual(
     mobility_cfg: dict | None = None,
     *,
     facet_tags=None,
+    recomb_cfg: dict | None = None,
 ):
     """
     Build the three-block residual for the coupled drift-diffusion system.
@@ -108,6 +109,17 @@ def build_dd_block_residual(
         |grad(phi_n)| / |grad(phi_p)| under ADR 0004 Slotboom flux
         form; see docs/PHYSICS.md section 1.3 for the flux derivation
         and `semi.physics.mobility` for the closed form).
+    recomb_cfg : dict, optional
+        The `cfg["physics"]["recombination"]` sub-dict. `None`
+        (default) or `{"auger": False, ...}` is bit-identical to
+        pre-M16.3 (SRH-only recombination kernel). When
+        `recomb_cfg.get("auger", False)` is True, the Auger kernel
+        `R_Auger = (C_n_hat n_hat + C_p_hat p_hat) (n_hat p_hat
+        - n_i_hat^2)` is added to the SRH rate; `C_n_hat` and
+        `C_p_hat` are read from `recomb_cfg["C_n"]` / `["C_p"]` (in
+        cm^6/s; converted to scaled units inline). See
+        `semi.physics.recombination` for the closed form and the unit
+        derivation. M16.3.
 
     Returns
     -------
@@ -150,14 +162,27 @@ def build_dd_block_residual(
     n_hat = n_from_slotboom(psi, phi_n, ni_hat)
     p_hat = p_from_slotboom(psi, phi_p, ni_hat)
 
-    # SRH rate inlined here so we can share the same ni_hat Constant with
-    # the Poisson block and avoid UFL-type surprises.
+    # SRH (and optional Auger, M16.3) rate inlined here so we can share
+    # the same ni_hat Constant with the Poisson block and avoid UFL-type
+    # surprises.
     import math as _math
     n1 = ni_hat * _math.exp(E_t_over_Vt)
     p1 = ni_hat * _math.exp(-E_t_over_Vt)
-    R = (n_hat * p_hat - ni_hat * ni_hat) / (
+    np_minus_nieq = n_hat * p_hat - ni_hat * ni_hat
+    R = np_minus_nieq / (
         tau_p * (n_hat + n1) + tau_n * (p_hat + p1)
     )
+    if recomb_cfg is not None and recomb_cfg.get("auger", False):
+        # JSON contract: C_n / C_p in cm^6/s. Convert to m^6/s (1e-12)
+        # then to dimensionless C_hat = C_SI * C0^2 * t0; see ADR 0002
+        # and semi/physics/recombination.py module docstring (M16.3).
+        C_n_hat_val = float(recomb_cfg.get("C_n", 2.8e-31)) * 1.0e-12 \
+            * sc.C0 ** 2 * sc.t0
+        C_p_hat_val = float(recomb_cfg.get("C_p", 9.9e-32)) * 1.0e-12 \
+            * sc.C0 ** 2 * sc.t0
+        C_n_hat = fem.Constant(msh, PETSc.ScalarType(C_n_hat_val))
+        C_p_hat = fem.Constant(msh, PETSc.ScalarType(C_p_hat_val))
+        R = R + (C_n_hat * n_hat + C_p_hat * p_hat) * np_minus_nieq
 
     rho_hat = p_hat - n_hat + N_hat_fn
 
@@ -237,6 +262,7 @@ def build_dd_block_residual_mr(
     mobility_cfg: dict | None = None,
     *,
     facet_tags=None,
+    recomb_cfg: dict | None = None,
 ):
     """Multi-region (submesh-based) block residual for the coupled DD system.
 
@@ -318,9 +344,23 @@ def build_dd_block_residual_mr(
     import math as _math
     n1 = ni_hat_sub * _math.exp(E_t_over_Vt)
     p1 = ni_hat_sub * _math.exp(-E_t_over_Vt)
-    R = (n_hat_sub * p_hat_sub - ni_hat_sub * ni_hat_sub) / (
+    np_minus_nieq_sub = n_hat_sub * p_hat_sub - ni_hat_sub * ni_hat_sub
+    R = np_minus_nieq_sub / (
         tau_p * (n_hat_sub + n1) + tau_n * (p_hat_sub + p1)
     )
+    if recomb_cfg is not None and recomb_cfg.get("auger", False):
+        # M16.3 Auger inline. Submesh Constants because the continuity
+        # blocks integrate on the semiconductor submesh; the Auger
+        # term lives only there (no continuity rows in the oxide).
+        C_n_hat_val_mr = float(recomb_cfg.get("C_n", 2.8e-31)) * 1.0e-12 \
+            * sc.C0 ** 2 * sc.t0
+        C_p_hat_val_mr = float(recomb_cfg.get("C_p", 9.9e-32)) * 1.0e-12 \
+            * sc.C0 ** 2 * sc.t0
+        C_n_hat_sub = fem.Constant(submesh, PETSc.ScalarType(C_n_hat_val_mr))
+        C_p_hat_sub = fem.Constant(submesh, PETSc.ScalarType(C_p_hat_val_mr))
+        R = R + (
+            C_n_hat_sub * n_hat_sub + C_p_hat_sub * p_hat_sub
+        ) * np_minus_nieq_sub
 
     F_psi = (
         L_D2 * eps_r_ufl * ufl.inner(ufl.grad(psi), ufl.grad(v_psi)) * dx_parent
