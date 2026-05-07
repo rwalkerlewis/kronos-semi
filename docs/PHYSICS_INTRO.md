@@ -365,6 +365,13 @@ Beyond equilibrium, kronos-semi handles:
   generation and Hurkx-enhanced SRH, both as additive
   generation/recombination kernels (M16.6,
   `benchmarks/zener_1d/`). New in v0.22.0.
+- **Time-varying transient.** Sinusoidal, table-interpolated,
+  or step contact voltage in `run_transient` (M16.7,
+  audit case 06). The audit suite cross-checks an FFT of
+  I(t) against the M14 small-signal AC sweep at the same
+  operating point. Demonstrated by `benchmarks/pn_1d_pulse/`
+  (step variant) and `benchmarks/diode_sine_1d/` (table
+  variant). New in v0.23.0.
 
 Verification & validation: every domain-physics module has an MMS
 variant in `semi/verification/mms_dd.py` (Variants A through H).
@@ -389,12 +396,9 @@ Semiconductor Module, the remaining gaps are:
 - **No 3D MOSFET / FinFET / planar transistor.** The 3D coverage
   today is the doped resistor and a pure-Poisson box. M19 closes
   this with a 3D MOSFET on a gmsh-sourced unstructured mesh.
-- **No transient FFT vs AC sweep validation.** The transient and
-  AC paths are independently verified, but the cross-check that
-  an FFT of the transient response matches the AC sweep at the
-  same operating point is deferred. M16.7 closes this.
 
-These are all on the roadmap. See
+M17 and M19 are the next-tier milestones; the M16 umbrella
+(M16.1 through M16.7) is complete. See
 [IMPROVEMENT_GUIDE.md](IMPROVEMENT_GUIDE.md) § 4 for the per-
 milestone numerical acceptance thresholds.
 

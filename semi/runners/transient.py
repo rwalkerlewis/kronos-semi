@@ -59,6 +59,25 @@ Reuses `build_dd_dirichlet_bcs` from `semi.bcs` exactly as
 
     psi_bc   = arcsinh(N_net / (2 n_i)) + V_hat
     phi_n_bc = phi_p_bc = V_hat                         [Shockley boundary]
+
+Time-varying contact voltage (M16.7)
+------------------------------------
+A contact may carry an optional `voltage_t` block instead of a fixed
+`voltage` value. Two variants are supported:
+
+  - `{"type": "table", "times": [...], "values": [...]}`: linear
+    interpolation between `(times[i], values[i])` pairs; `t < times[0]`
+    clamps to `values[0]` and `t > times[-1]` clamps to `values[-1]`.
+  - `{"type": "step", "t0": ..., "v0": ..., "v1": ...}`: piecewise
+    constant; returns `v0` for `t < t0` and `v1` for `t >= t0`.
+
+The BC-ramp continuation (`bc_ramp_steps`) does not consume
+`voltage_t`. It ramps to `voltage_t.values[0]` (table) or
+`voltage_t.v0` (step). After the ramp, the time loop builds BCs from
+`voltages_at_t(t_next)` at every step. Configs without `voltage_t`
+on any contact are bit-identical to v0.22.0; the evaluator returns
+the same dict at every t and the BC stack is built from the fixed
+`voltage` values just as before.
 """
 from __future__ import annotations
 
@@ -295,8 +314,13 @@ def run_transient(
         contact_facet_infos[c["name"]] = info
 
     # ------------------------------------------------------------------
-    # Static voltages from contacts (no sweep in transient)
+    # Static voltages from contacts (no sweep in transient).
+    # `static_voltages` records the time-loop-target value for each ohmic
+    # contact; for contacts with `voltage_t`, that target is the waveform
+    # evaluated at t=0 and is only used for IV-row labeling. The actual
+    # BC value at each step comes from `voltages_at_t(t_next)`.
     # ------------------------------------------------------------------
+    voltages_at_t = _build_voltage_t_evaluator(cfg)
     static_voltages: dict[str, float] = {}
     for c in cfg["contacts"]:
         if c["type"] != "ohmic":
@@ -380,11 +404,12 @@ def run_transient(
     # carrier-density conversion needed (unlike the (n, p) form runner).
     # ------------------------------------------------------------------
     def _record_all_iv(t_val: float, iv_rows: list):
+        v_now = voltages_at_t(t_val)
         for c in cfg["contacts"]:
             if c["type"] != "ohmic":
                 continue
             cname = c["name"]
-            V_applied = static_voltages.get(cname, 0.0)
+            V_applied = float(v_now.get(cname, static_voltages.get(cname, 0.0)))
             finfo = contact_facet_infos.get(cname)
             if finfo is None:
                 continue
@@ -453,8 +478,10 @@ def run_transient(
 
         # Build BCs (Slotboom Shockley boundary) and seed unknowns
         # with the BC values at the contacts (so SNES starts close to
-        # the solution at each step).
-        bcs = _build_transient_bcs(static_voltages)
+        # the solution at each step). For contacts without
+        # `voltage_t`, `voltages_at_t(t_next)` returns the fixed
+        # `voltage` value at every step (bit-identical to v0.22.0).
+        bcs = _build_transient_bcs(voltages_at_t(t_next))
         _apply_bc_values(bcs)
 
         tag = fmt_tag(t_next)
@@ -768,8 +795,13 @@ def _run_bc_continuation(cfg: dict, n_steps: int, voltage_factor: float = 1.0):
     if n_steps <= 0:
         return None
 
+    # For contacts with `voltage_t` (M16.7), the ramp endpoint is the
+    # waveform value at t=0: `values[0]` for tables, `v0` for steps.
+    # The time loop then takes over with `voltages_at_t(t_next)`. The
+    # plain `voltage` field is the fallback for contacts without
+    # `voltage_t`.
     targets = {
-        c["name"]: float(c.get("voltage", 0.0)) * voltage_factor
+        c["name"]: _ramp_target_voltage(c) * voltage_factor
         for c in cfg["contacts"]
         if c["type"] == "ohmic"
     }
@@ -786,10 +818,14 @@ def _run_bc_continuation(cfg: dict, n_steps: int, voltage_factor: float = 1.0):
     cont_cfg = copy.deepcopy(cfg)
     for c in cont_cfg["contacts"]:
         c.pop("voltage_sweep", None)
+        # M16.7: drop voltage_t before handing the cfg to bias_sweep;
+        # the schema rejects voltage_t on non-transient solves. The
+        # ramp endpoint is the waveform value at t=0, scaled by
+        # voltage_factor and written into the contact's `voltage`.
+        target_v = _ramp_target_voltage(c) * voltage_factor
+        c.pop("voltage_t", None)
         if c["type"] == "ohmic":
-            # Apply the voltage_factor to every contact uniformly so
-            # the ramp endpoint reflects all biases scaled together.
-            c["voltage"] = float(c.get("voltage", 0.0)) * voltage_factor
+            c["voltage"] = float(target_v)
     for c in cont_cfg["contacts"]:
         if c["name"] == ramp_contact:
             c["voltage"] = V_max
@@ -830,3 +866,71 @@ def _run_bc_continuation(cfg: dict, n_steps: int, voltage_factor: float = 1.0):
         bs_result.phi_n.x.array.copy(),
         bs_result.phi_p.x.array.copy(),
     )
+
+
+def _ramp_target_voltage(contact: dict[str, Any]) -> float:
+    """Return the BC-ramp endpoint voltage for a contact (M16.7).
+
+    For a contact with a `voltage_t` block, the ramp lands at the
+    waveform value at t=0: `values[0]` (table) or `v0` (step). For
+    contacts without `voltage_t` the target is the plain `voltage`
+    field (the v0.22.0 behavior).
+    """
+    vt = contact.get("voltage_t")
+    if vt is None:
+        return float(contact.get("voltage", 0.0))
+    kind = vt.get("type")
+    if kind == "table":
+        return float(vt["values"][0])
+    if kind == "step":
+        t0 = float(vt["t0"])
+        return float(vt["v1"]) if t0 <= 0.0 else float(vt["v0"])
+    raise ValueError(
+        f"voltage_t.type={kind!r} not recognized; expected 'table' or 'step' "
+        f"(M16.7)"
+    )
+
+
+def _build_voltage_t_evaluator(cfg: dict[str, Any]):
+    """Return a callable `voltages_at_t(t) -> dict[str, float]`.
+
+    The dict maps each ohmic contact name to its applied voltage at
+    time `t` (seconds, absolute simulation time). Contacts without a
+    `voltage_t` block return their fixed `voltage` value at every t,
+    bit-identical to the v0.22.0 behavior. (M16.7)
+    """
+    fixed: dict[str, float] = {}
+    table_specs: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    step_specs: dict[str, tuple[float, float, float]] = {}
+    for c in cfg.get("contacts", []):
+        if c.get("type") != "ohmic":
+            continue
+        name = c["name"]
+        vt = c.get("voltage_t")
+        if vt is None:
+            fixed[name] = float(c.get("voltage", 0.0))
+            continue
+        kind = vt.get("type")
+        if kind == "table":
+            times = np.asarray(vt["times"], dtype=float)
+            values = np.asarray(vt["values"], dtype=float)
+            table_specs[name] = (times, values)
+        elif kind == "step":
+            step_specs[name] = (
+                float(vt["t0"]), float(vt["v0"]), float(vt["v1"]),
+            )
+        else:
+            raise ValueError(
+                f"contact {name!r}: voltage_t.type={kind!r} not "
+                f"recognized; expected 'table' or 'step' (M16.7)"
+            )
+
+    def voltages_at_t(t: float) -> dict[str, float]:
+        out: dict[str, float] = dict(fixed)
+        for name, (times, values) in table_specs.items():
+            out[name] = float(np.interp(t, times, values))
+        for name, (t0, v0, v1) in step_specs.items():
+            out[name] = v1 if t >= t0 else v0
+        return out
+
+    return voltages_at_t

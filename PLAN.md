@@ -36,10 +36,31 @@ recombination for 1D/2D/3D devices.
 ## Current state
 
 M1 through M15 plus M14.3, M14.4, M16.1, M16.2, M16.3, M16.4,
-M16.5, and M16.6 are merged into `main`. Current package version
-is `0.22.0`; M16.6 (BBT and TAT tunneling, branch
-`dev/m16.6-tunneling`) ships the sixth and largest physics-
-completeness slice of M16: closed-form additive Kane band-to-band
+M16.5, M16.6, and M16.7 are merged into `main`. Current package
+version is `0.23.0`; M16.7 (transient time-varying contact
+voltage, branch `dev/m16.7-transient-ac`) closes the M16
+umbrella by extending `semi/runners/transient.py` with a
+`contacts[].voltage_t` field (variants `table` and `step`) and
+reactivating audit case 06 (transient FFT of I(t) under
+sinusoidal V(t) compared to the M14 small-signal AC sweep
+admittance Y(omega)) within 5 %. Schema additive minor bump
+v2.6.0 -> v2.7.0; the bias_sweep, ac_sweep, equilibrium,
+mos_cv, mos_cap_ac, and resistor_3d runners reject `voltage_t`
+at validate time so the field is transient-only. v2.0.0 through
+v2.6.0 inputs continue to validate; configs without `voltage_t`
+are bit-identical to v0.22.0 on every existing benchmark
+(pn_1d_bias anchor: J(V=0.6 V) = 1.635e+03 A/m^2; the
+diode_velsat_1d, diode_auger_1d, diode_fermi_dirac_1d,
+schottky_1d, and zener_1d anchors continue to hold). Two
+demonstration benchmarks ship the new schema variant:
+`pn_1d_pulse` (voltage_t.step from 0.0 V to 0.6 V at t = 5 ns)
+and `diode_sine_1d` (voltage_t.table sampling V_DC = 0.4 V +
+50 mV * sin(2 pi * 1 MHz * t) over 4 cycles); both have
+lightweight finiteness / FFT-peak verifiers because the formal
+V&V gate lives in audit case 06. M16.6 (BBT and TAT tunneling,
+branch `dev/m16.6-tunneling`) shipped in v0.22.0 the sixth and
+largest physics-completeness slice of M16: closed-form additive
+Kane band-to-band
 generation and Hurkx trap-assisted recombination kernels inlined
 alongside the existing SRH and Auger expressions in the DD block
 residual builder. No new unknowns; no change to Slotboom primary
@@ -273,10 +294,10 @@ M15 through M18. Summary:
 - **Linear solver: GPU path now optional.** Default is still CPU-MUMPS
   (bit-identical to pre-M15); set `solver.backend` to `gpu-amgx`,
   `gpu-hypre`, or `auto` to opt in to PETSc-CUDA / PETSc-HIP. M16+.
-- **Physics gaps:** no transient FFT vs AC sweep validation. M16.7.
-  (Field-dependent mobility shipped in M16.1; Lombardi surface
-  mobility in M16.2; Auger in M16.3; Fermi-Dirac in M16.4; Schottky
-  in M16.5; BBT and TAT tunneling in M16.6.)
+- **Physics gaps:** none in the M16 umbrella (all of M16.1
+  through M16.7 shipped). Next-tier gaps in M17
+  (heterojunctions, position-dependent chi and Eg) and M19
+  (3D MOSFET capstone).
 - **Heterojunctions:** position-dependent χ and Eg not yet supported.
   M17.
 - **Cartesian-2D MOSCAP variant** and a rigorous AC small-signal HF
@@ -285,18 +306,27 @@ M15 through M18. Summary:
 
 ## Next task
 
-**M16.7: transient FFT vs AC sweep validation** on a fresh branch
-`dev/m16.7-transient-ac`. Acceptance tests in
-[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) § M16.7.
-M16.7 is the final M16 slice and ships no new physics: it adds a
-V&V cross-check between the M13.1 transient runner and the M14
-small-signal AC sweep runner. The FFT of a transient response at
-a DC operating point must match the AC sweep at that operating
-point within an agreed tolerance. After M16.7 the M16 umbrella
-closes and the gap list in PLAN / IMPROVEMENT_GUIDE reads "no
-remaining M16 gaps"; the next milestone in the roadmap is M17
-(heterojunctions) or M19 (3D MOSFET capstone), whichever the
-maintainer prioritizes.
+**M17 (heterojunctions) or M19 (3D MOSFET capstone)** on a
+fresh branch. The M16 umbrella is complete after M16.7. The
+maintainer chooses between the two next-tier candidates:
+
+- **M17: heterojunctions.** Position-dependent electron
+  affinity chi(x) and band gap E_g(x) on multi-region meshes.
+  Touches `semi/physics/poisson.py` and
+  `semi/physics/slotboom.py` (the band-edge offsets are no
+  longer constants). Depends on M16.4 (Fermi-Dirac, needed at
+  heterojunction barriers); unblocked.
+- **M19: 3D MOSFET capstone.** A 3D MOSFET on a gmsh-sourced
+  unstructured mesh, exercising the M15 GPU linear-solver path
+  and the M16.1 Caughey-Thomas mobility under non-trivial
+  geometry. Depends on M16.1; unblocked. Expected to need MPI
+  parallel orchestration (M19.1) for runtime to be tolerable.
+
+Acceptance tests for both are documented in
+[`docs/IMPROVEMENT_GUIDE.md`](docs/IMPROVEMENT_GUIDE.md) § 4 and
+[`docs/ROADMAP.md`](docs/ROADMAP.md). The next reviewer authors a
+starter prompt against the chosen milestone in the same shape as
+`docs/M16_7_STARTER_PROMPT.md`.
 
 ## Backlog
 
@@ -433,6 +463,115 @@ None as of v0.17.0.
 ## Completed work log
 
 Append-only. Newest entries on top.
+
+- **M16.7 transient time-varying contact voltage (2026-05-06):**
+  Branch `dev/m16.7-transient-ac`, PR #84, six phase-letter
+  commits per `docs/M16_7_STARTER_PROMPT.md`. Schema additive
+  minor bump v2.6.0 -> v2.7.0; package version 0.22.0 -> 0.23.0.
+  M16.7 is the seventh and final physics-completeness slice of
+  M16 and closes the umbrella. Ships no new physics kernel;
+  extends `semi/runners/transient.py` to consume a
+  `contacts[].voltage_t` block (variants `table` and `step`)
+  through a new `_build_voltage_t_evaluator(cfg)` callable
+  that replaces the fixed `static_voltages` dict in the time-
+  loop BC build, and reactivates audit case 06 (transient FFT
+  of I(t) under sinusoidal V(t) compared to the M14 AC sweep
+  Y(omega)) within the 5 % gate. Acceptance test 2 verified:
+  no benchmark uses `voltage_t`, so every existing benchmark is
+  bit-identical to v0.22.0 by construction (anchors:
+  `pn_1d_bias` J(V=0.6 V) = 1.635e+03 A/m^2; `diode_velsat_1d`
+  56.27 % @ 0.9 V, 0.19 % @ 0.3 V; `diode_auger_1d` >20 %
+  divergence at 0.9 V; `diode_fermi_dirac_1d` 7.37 %
+  FD-vs-Boltzmann V_bi at N_D = 1e20 cm^-3; `schottky_1d`
+  worst-case <10 %; `zener_1d` worst-case <20 % Kane match).
+  - **Phase 0 (starter prompt).** `docs/M16_7_STARTER_PROMPT.md`
+    shipped verbatim on this branch via PR #84.
+  - **Phase A (schema 2.7.0).** `schemas/input.v2.json` adds the
+    `contacts[].voltage_t` sub-object with two variants
+    (`table` with monotonic `times` and equal-length `values`;
+    `step` with `t0`, `v0`, `v1`). `semi/schema.py`
+    `_validate_voltage_t` enforces mutual exclusion with
+    `voltage_sweep`, schema-side per-variant required-field
+    checks, monotonicity / length-equality, and rejection on
+    non-transient solver types so users see the failure at
+    validate time rather than deep in the FEM path.
+    `SCHEMA_SUPPORTED_MINOR` 6 -> 7.
+    `tests/test_voltage_t_schema.py` adds 17 schema-side
+    assertions covering both variants, mutual exclusion,
+    cross-runner rejection, default-fill (no `voltage_t` is
+    bit-identical to v0.22.0), and existing-benchmark v2.7.0
+    cross-validation.
+  - **Phase B (transient runner extension).**
+    `semi/runners/transient.py` adds a private
+    `_build_voltage_t_evaluator(cfg)` that returns a callable
+    `voltages_at_t(t) -> dict[str, float]`. Contacts without
+    `voltage_t` return their fixed `voltage` value at every t,
+    bit-identical to v0.22.0; `table` contacts use
+    `np.interp(t, times, values)` with endpoint clamping;
+    `step` contacts return `v0` for `t < t0` else `v1`. The
+    time loop body replaces `_build_transient_bcs(static_voltages)`
+    with `_build_transient_bcs(voltages_at_t(t_next))`. The IV
+    recorder also reads `voltages_at_t(t_val)` so the recorded
+    `V` per row reflects the actual per-step BC value. The
+    BC-ramp continuation (`_run_bc_continuation`) ramps to the
+    waveform value at t = 0 (`values[0]` for tables, `v0` for
+    steps) via a new `_ramp_target_voltage(contact)` helper;
+    `voltage_t` is dropped from the bias_sweep cfg passed to
+    the ramp (the schema rejects it on non-transient solves).
+    `tests/fem/test_transient_voltage_t.py` adds 15 tests
+    (13 pure-Python evaluator / ramp-target unit tests plus 2
+    end-to-end `run_transient` integration tests on a 4-cell
+    1D pn diode). The pure-Python evaluator tests run in the
+    gated `docker-fem-tests` job (the `tests/fem/` conftest
+    skips collection when dolfinx is missing) so the new
+    branches are covered before the audit job lands the
+    quantitative gate.
+  - **Phase C (audit case 06 reactivation).**
+    `tests/audit/test_06_transient_fft_vs_ac_sweep.py` is now
+    active (no `pytest.skip`). The placeholder Y_ac(f=1 MHz,
+    V_DC=0.4 V) computation stays at the top; the test then
+    builds a transient cfg from the same `rc_ac_sweep`
+    benchmark with `voltage_t.table` sampling
+    V(t) = V_DC + dV * sin(2 pi F t) at dV = 1 mV (small-
+    signal), 4 cycles, 200 samples per cycle (800 BDF1
+    timesteps at dt = 5 ns), `bc_ramp_steps = 20` ramping to
+    V_DC. A Hann window applied to both V(t) and I(t) before
+    the FFT cancels in the admittance ratio
+    `Y_transient_fft = J_FFT[bin_F] / V_FFT[bin_F]`. Gate:
+    `|Y_transient_fft - Y_ac| / |Y_ac| < 0.05`. Markdown /
+    CSV writers updated to record both Y values, the relative
+    error, and a passed / failed status. `docs/PHYSICS_AUDIT.md`
+    case 06 section rewritten to reflect the active state.
+  - **Phase D (demonstration benchmarks).**
+    `benchmarks/pn_1d_pulse/` exercises the `voltage_t.step`
+    variant on a 1D pn diode (anode steps from 0.0 V to 0.6 V
+    at t = 5 ns; same 800-cell, 20 um, N_A = N_D = 1e17 cm^-3
+    geometry as `pn_1d_turnon`; 250 BDF2 timesteps at
+    dt = 200 ps). Verifier asserts I(t) finite, post-step
+    current >> pre-step current (>10x), and post-step current
+    within 20 % of the long-diode Shockley diffusion-saturation
+    reference at V_F = 0.6 V. `benchmarks/diode_sine_1d/`
+    exercises the `voltage_t.table` variant with sinusoidal
+    large-signal forward-bias drive (V_DC = 0.4 V, dV = 50 mV,
+    F = 1 MHz, 800 timesteps at dt = 5 ns; same geometry).
+    Verifier asserts I(t) finite, FFT peak at the F = 1 MHz
+    fundamental, and second-harmonic ratio <= 50 %. Both
+    benchmarks ship with twin-axis time-domain plotters; the
+    diode_sine_1d plotter also writes a |I(omega)| log-y plot
+    showing the fundamental and the first few harmonics. CI
+    matrix entries added near `pn_1d_turnon` (no
+    `allow-failure: true`).
+  - **Phase E (closeout).** This entry. PLAN.md L276 gap line
+    rewritten to "no remaining M16 gaps"; IMPROVEMENT_GUIDE.md
+    § 1 rewritten to "M16 umbrella complete". `Next task` set
+    to M17 (heterojunctions) or M19 (3D MOSFET capstone),
+    maintainer's choice. PHYSICS_INTRO.md § 6 gains a
+    time-varying transient bullet; § 7 drops the "no transient
+    FFT vs AC" bullet. ROADMAP.md M16.7 row promoted to
+    shipped. CHANGELOG.md `[0.23.0]` entry added.
+    `pyproject.toml` and `semi/__init__.py` bumped 0.22.0 ->
+    0.23.0. The mosfet_2d CI matrix entry retains
+    `allow-failure: "true"` from M16.1 through M16.6.
 
 - **M16.6 BBT and TAT tunneling (2026-05-06):** Branch
   `dev/m16.6-tunneling`, six phase-letter commits per

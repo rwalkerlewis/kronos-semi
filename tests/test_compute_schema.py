@@ -55,9 +55,10 @@ def test_supported_minor_resets_for_v2():
     bumped it to 3 (v2.3.0 Auger recombination); M16.4 bumped it to
     4 (v2.4.0 Fermi-Dirac statistics dispatch); M16.5 bumped it to
     5 (v2.5.0 Schottky contact type); M16.6 bumped it to 6 (v2.6.0
-    BBT and TAT tunneling dispatch); the M14.3 reset semantics
-    survive (no major bump means no minor reset)."""
-    assert schema.SCHEMA_SUPPORTED_MINOR == 6
+    BBT and TAT tunneling dispatch); M16.7 bumped it to 7 (v2.7.0
+    transient time-varying contact voltage); the M14.3 reset
+    semantics survive (no major bump means no minor reset)."""
+    assert schema.SCHEMA_SUPPORTED_MINOR == 7
 
 
 def test_schema_version_140_accepted_with_deprecation(minimal_cfg):

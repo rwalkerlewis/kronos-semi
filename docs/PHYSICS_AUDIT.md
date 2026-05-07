@@ -59,7 +59,7 @@ At V_DC = 0.4 V (forward bias, ~75 S device), Re(Y(omega->0)) matches the sign o
 
 ## Case 06 - transient (FFT) vs ac_sweep
 
-Skipping FFT comparison: `run_transient` does not currently support a time-varying contact voltage V(t). Comparing the FFT of I(t) under V(t) = V_DC + dV*sin(omega t) to ac_sweep Y(omega) requires either a `bc_voltage_callback` hook or a transient runner extension. Reference value: Y_ac(f=1000000.0 Hz, V_DC=0.4 V) = 7.520e+01 + j*6.457e+03 S. Tracking issue: open as part of PR follow-up.
+At V_DC = 0.4 V, f = 1 MHz, dV = 1 mV on the `rc_ac_sweep` benchmark, the FFT of I(t) under V(t) = V_DC + dV*sin(omega t) (sampled into a `voltage_t` table; M16.7) recovers the AC small-signal admittance Y(omega) within the 5% audit gate. Per-run values (Y_ac, Y_transient_fft, rel_err) are written to `/tmp/audit/06_transient_fft_vs_ac_sweep.csv`. The transient runner uses BDF1 over 4 cycles at 200 samples per cycle (800 timesteps, dt = 5 ns) with `bc_ramp_steps = 20` ramping to V_DC before the time loop. A Hann window applied to both V(t) and I(t) before the rfft cancels in the admittance ratio Y(omega) = J_fft[bin] / V_fft[bin].
 
 CSV: `/tmp/audit/06_transient_fft_vs_ac_sweep.csv`
 

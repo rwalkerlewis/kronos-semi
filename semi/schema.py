@@ -131,7 +131,19 @@ ENGINE_SUPPORTED_SCHEMA_MAJOR = max(ENGINE_SUPPORTED_SCHEMA_MAJORS)
 #                  most accurate under Fermi-Dirac at heavy doping).
 #                  Additive bump: v2.0.0 through v2.5.0 inputs
 #                  continue to validate.
-SCHEMA_SUPPORTED_MINOR = 6
+#   M16.7 (2.7.0): added contacts[].voltage_t for time-varying
+#                  contact voltage in the transient runner. Two
+#                  variants: {type: "table", times, values} (linear
+#                  interpolation between sample points with endpoint
+#                  clamping) and {type: "step", t0, v0, v1} (one
+#                  transition at t0). Mutually exclusive with
+#                  voltage_sweep. The bias_sweep, ac_sweep, equilibrium,
+#                  mos_cv, mos_cap_ac, and resistor_3d runners reject
+#                  voltage_t at validate time so users see the failure
+#                  before the FEM path. v2.0.0 through v2.6.0 inputs
+#                  continue to validate; configs without voltage_t are
+#                  bit-identical to v0.22.0.
+SCHEMA_SUPPORTED_MINOR = 7
 
 
 @lru_cache(maxsize=8)
@@ -381,6 +393,84 @@ def _validate_schottky_contacts(cfg: dict[str, Any]) -> None:
             )
 
 
+def _validate_voltage_t(cfg: dict[str, Any]) -> None:
+    """
+    Cross-field validation for `contacts[].voltage_t` (M16.7).
+
+    The JSON schema declares the variant shape and the enum on
+    `voltage_t.type`. Constraints that the schema cannot express:
+
+      - `voltage_t` and `voltage_sweep` on the same contact are
+        mutually exclusive.
+      - For `type='table'`: `times` and `values` must have equal
+        length and `times` must be strictly monotonically increasing.
+      - For `type='step'`: `t0`, `v0`, `v1` are all required.
+      - `voltage_t` is consumed only by the transient runner; setting
+        it on a contact when `solver.type` is anything other than
+        `"transient"` raises so users see the failure at validate
+        time rather than as a silent no-op.
+    """
+    solver_type = cfg.get("solver", {}).get("type", "equilibrium")
+    for contact in cfg.get("contacts", []):
+        vt = contact.get("voltage_t")
+        if vt is None:
+            continue
+        name = contact.get("name", "<unnamed>")
+        if "voltage_sweep" in contact:
+            raise SchemaError(
+                f"contact {name!r}: voltage_t and voltage_sweep are "
+                f"mutually exclusive; pick one"
+            )
+        if solver_type != "transient":
+            raise SchemaError(
+                f"contact {name!r}: voltage_t is only consumed by the "
+                f"transient runner (solver.type='transient'); got "
+                f"solver.type={solver_type!r}. Use `voltage` for a "
+                f"fixed bias or `voltage_sweep` for a continuation ramp "
+                f"(M16.7)."
+            )
+        kind = vt.get("type")
+        if kind == "table":
+            times = vt.get("times")
+            values = vt.get("values")
+            if times is None or values is None:
+                raise SchemaError(
+                    f"contact {name!r}: voltage_t type='table' requires "
+                    f"both `times` and `values`"
+                )
+            if len(times) != len(values):
+                raise SchemaError(
+                    f"contact {name!r}: voltage_t.times (len {len(times)}) "
+                    f"and voltage_t.values (len {len(values)}) must have "
+                    f"equal length"
+                )
+            if len(times) < 2:
+                raise SchemaError(
+                    f"contact {name!r}: voltage_t.times must have at "
+                    f"least 2 entries; got {len(times)}"
+                )
+            for i in range(1, len(times)):
+                if not (float(times[i]) > float(times[i - 1])):
+                    raise SchemaError(
+                        f"contact {name!r}: voltage_t.times must be "
+                        f"strictly monotonically increasing; "
+                        f"times[{i - 1}]={times[i - 1]} >= "
+                        f"times[{i}]={times[i]}"
+                    )
+        elif kind == "step":
+            for key in ("t0", "v0", "v1"):
+                if key not in vt:
+                    raise SchemaError(
+                        f"contact {name!r}: voltage_t type='step' "
+                        f"requires `{key}`"
+                    )
+        else:
+            raise SchemaError(
+                f"contact {name!r}: voltage_t.type must be 'table' or "
+                f"'step'; got {kind!r}"
+            )
+
+
 _TUNNELING_DEFAULTS: dict[str, Any] = {
     "bbt": False,
     "tat": False,
@@ -495,6 +585,7 @@ def _fill_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     cont.setdefault("grow_factor", 1.5)
 
     _validate_compute(cfg)
+    _validate_voltage_t(cfg)
 
     out = cfg.setdefault("output", {})
     out.setdefault("directory", "./results")
