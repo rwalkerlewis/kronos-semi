@@ -231,7 +231,9 @@ def test_cell_tags_none_collapses_to_first_region_material():
     """A single-region builtin mesh passes `cell_tags=None`; the helper
     must collapse every field to the first region's material values
     so the runner's pre-M17 single-material path stays byte-identical
-    when no MeshTags object is built."""
+    when no MeshTags object is built. `chi_ref_hat` is resolved from
+    the first semiconductor region's chi (GaAs here), not from the
+    Scaling reference."""
     import pytest
 
     from semi.materials import MATERIALS
@@ -258,20 +260,26 @@ def test_cell_tags_none_collapses_to_first_region_material():
     n_i_arr = fields["n_i_hat"].x.array
     assert np.allclose(n_i_arr, float(sc.n_i) / sc.C0, rtol=0.0, atol=1.0e-12)
 
-    assert fields["chi_ref_hat"] == pytest.approx(MATERIALS["Si"].chi / sc.V0, rel=1e-12)
+    # GaAs is the first (and only) semiconductor in the cfg, so it
+    # supplies the chi_ref used by the BC layer's Anderson shift.
+    assert fields["chi_ref_hat"] == pytest.approx(
+        MATERIALS["GaAs"].chi / sc.V0, rel=1e-12
+    )
 
 
 def test_cell_tags_none_falls_back_to_silicon_when_regions_empty():
     """If the regions map carries no material entry (degenerate hand-
-    built cfg), the cell_tags=None branch falls back to silicon. The
-    chi field must equal Si.chi / sc.V0 across the entire mesh."""
+    built cfg with only a non-dict noise value), the cell_tags=None
+    branch falls back to silicon. The chi field must equal Si.chi /
+    sc.V0 across the entire mesh; this exercises the
+    `if ref_mat is None: ref_mat = MATERIALS["Si"]` Si fallback."""
     from semi.materials import MATERIALS
     from semi.physics.heterojunction import build_dg0_material_fields
 
     L = 1.0e-6
     msh, _ = _build_single_region_1d_mesh(L=L, N=8)
     sc = _scaling_for_si(L=L)
-    regions_cfg: dict = {"placeholder": {"role": "semiconductor", "tag": 1}}
+    regions_cfg: dict = {"noise": "ignored"}
     fields = build_dg0_material_fields(msh, None, regions_cfg, sc, T=300.0)
 
     chi_arr = fields["chi_hat"].x.array
