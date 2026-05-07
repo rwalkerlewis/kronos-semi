@@ -221,6 +221,8 @@ jobs:
           # broken and the PR should not merge.
           - name: nmos_idvgs
             args: nmos_idvgs
+          - name: schottky_iv_temperature
+            args: schottky_iv_temperature
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

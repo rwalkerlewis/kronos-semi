@@ -3311,6 +3311,171 @@ def plot_nmos_idvgs(result, out_dir: Path) -> list[Path]:
 _PLOTTERS["nmos_idvgs"] = plot_nmos_idvgs
 
 
+def _temperature_overrides(cfg, temperatures):
+    """Yield (T, cfg_copy) pairs with physics.temperature overridden."""
+    import copy
+
+    base_out_dir = (
+        cfg.get("output", {}).get("directory") or "./results/_companion"
+    )
+    for t_kelvin in temperatures:
+        cfg_t = copy.deepcopy(cfg)
+        cfg_t["physics"]["temperature"] = float(t_kelvin)
+        cfg_t.setdefault("output", {})
+        cfg_t["output"] = dict(cfg_t["output"])
+        cfg_t["output"]["directory"] = (
+            f"{base_out_dir.rstrip('/')}/_T_{int(round(t_kelvin))}K"
+        )
+        yield float(t_kelvin), cfg_t
+
+
+@register("schottky_iv_temperature")
+def verify_schottky_iv_temperature(result) -> list[tuple[str, bool, str]]:
+    """
+    Smoke verifier for the schottky_iv_temperature example.
+
+    Anchor run: T = 300 K. Companion runs: T = 250 K and T = 350 K,
+    invoked here via in-process semi.run.run() with
+    physics.temperature overridden.
+
+    Checks (smoke only; tight tolerances live under benchmarks/):
+      - All three runs complete without raising and record an iv table.
+      - For each T, the I(V_F) curve is finite at every V_F and is
+        monotonically non-decreasing in V_F (1 % local-max tolerance).
+      - At V_F = 0.3 V (mid-sweep), I(350 K) > I(300 K) > I(250 K)
+        strictly (the temperature-dependent thermionic-emission ordering
+        must be physically correct).
+    """
+    from semi import run as semi_run
+
+    cfg_anchor = result.cfg
+    iv_anchor = list(result.iv or [])
+    if not iv_anchor:
+        return [(
+            "schottky_iv_temperature: anchor run recorded iv rows",
+            False, "no iv rows in result",
+        )]
+
+    iv_by_T: dict[float, list[dict]] = {}
+    iv_by_T[float(cfg_anchor["physics"]["temperature"])] = iv_anchor
+
+    for t_kelvin, cfg_t in _temperature_overrides(cfg_anchor, [250.0, 350.0]):
+        print(
+            f"[schottky_iv_temperature] running companion sweep at "
+            f"T = {t_kelvin:.0f} K...",
+            flush=True,
+        )
+        res = semi_run.run(cfg_t)
+        iv_by_T[t_kelvin] = list(res.iv or [])
+
+    checks: list[tuple[str, bool, str]] = []
+
+    j_at_vf03: dict[float, float] = {}
+    for t_kelvin in sorted(iv_by_T):
+        iv = iv_by_T[t_kelvin]
+        if not iv:
+            checks.append((
+                f"schottky_iv_temperature: T = {t_kelvin:.0f} K run "
+                f"recorded iv rows",
+                False, "iv table empty",
+            ))
+            continue
+
+        anode_iv = sorted(
+            (r for r in iv if r.get("contact") == "anode"),
+            key=lambda r: r["V"],
+        )
+        v_f = np.array([r["V"] for r in anode_iv], dtype=float)
+        j_arr = np.array([r["J"] for r in anode_iv], dtype=float)
+
+        finite = bool(np.all(np.isfinite(j_arr)))
+        checks.append((
+            f"schottky_iv_temperature: T = {t_kelvin:.0f} K I(V_F) finite",
+            finite,
+            f"non-finite samples: {int((~np.isfinite(j_arr)).sum())} "
+            f"/ {len(j_arr)}",
+        ))
+        if not finite:
+            continue
+
+        running_max = np.maximum.accumulate(np.abs(j_arr))
+        violations = int(np.sum(np.abs(j_arr) < running_max * 0.99))
+        checks.append((
+            f"schottky_iv_temperature: T = {t_kelvin:.0f} K I(V_F) monotone "
+            f"in V_F (<= 1 % dips tolerated)",
+            violations == 0,
+            f"{violations} / {len(j_arr)} samples below the running max",
+        ))
+
+        j_at_vf03[t_kelvin] = float(np.interp(0.3, v_f, j_arr))
+
+    if all(t in j_at_vf03 for t in (250.0, 300.0, 350.0)):
+        ordering_ok = (
+            j_at_vf03[350.0] > j_at_vf03[300.0] > j_at_vf03[250.0]
+        )
+        checks.append((
+            "schottky_iv_temperature: I(350 K) > I(300 K) > I(250 K) "
+            "at V_F = 0.3 V",
+            ordering_ok,
+            f"J(250 K) = {j_at_vf03[250.0]:.3e}, "
+            f"J(300 K) = {j_at_vf03[300.0]:.3e}, "
+            f"J(350 K) = {j_at_vf03[350.0]:.3e} A/m^2",
+        ))
+    else:
+        checks.append((
+            "schottky_iv_temperature: I(V_F = 0.3 V) interpolated for all T",
+            False,
+            f"iv tables present for T = {sorted(j_at_vf03)} K",
+        ))
+
+    result._schottky_iv_by_T = {
+        t_kelvin: (
+            np.array([r["V"] for r in sorted(
+                (q for q in iv if q.get("contact") == "anode"),
+                key=lambda q: q["V"],
+            )], dtype=float),
+            np.array([r["J"] for r in sorted(
+                (q for q in iv if q.get("contact") == "anode"),
+                key=lambda q: q["V"],
+            )], dtype=float),
+        )
+        for t_kelvin, iv in iv_by_T.items()
+    }
+    return checks
+
+
+def plot_schottky_iv_temperature(result, out_dir: Path) -> list[Path]:
+    """Three semilog-y I-V curves overlaid, color-coded by temperature."""
+    iv_by_T = getattr(result, "_schottky_iv_by_T", None)
+    if not iv_by_T:
+        return []
+
+    fig, ax = plt.subplots(1, 1, figsize=(7.5, 5))
+    cmap = plt.get_cmap("coolwarm")
+    temps_sorted = sorted(iv_by_T)
+    for i, t_kelvin in enumerate(temps_sorted):
+        v_f, j_arr = iv_by_T[t_kelvin]
+        color = cmap(i / max(len(temps_sorted) - 1, 1))
+        ax.semilogy(v_f, np.maximum(np.abs(j_arr), 1.0e-30),
+                    "o-", markersize=3, color=color,
+                    label=f"T = {t_kelvin:.0f} K")
+    ax.set_xlabel("V_F (V)")
+    ax.set_ylabel("|J_anode| (A/m^2)")
+    ax.grid(True, which="both", alpha=0.3)
+    ax.legend(loc="best")
+    ax.set_title(
+        "schottky_iv_temperature: Pt-on-n-Si I-V at 250 / 300 / 350 K"
+    )
+    fig.tight_layout()
+    p = out_dir / "schottky_iv_temperature.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["schottky_iv_temperature"] = plot_schottky_iv_temperature
+
+
 # --------------------------------------------------------------------------- #
 # Driver                                                                      #
 # --------------------------------------------------------------------------- #
