@@ -15,6 +15,9 @@ analytical references is benchmark territory.
 | [`nmos_idvgs`](nmos_idvgs/) | n-channel MOSFET | `bias_sweep` | M16.1 Caughey-Thomas, M16.2 Lombardi, M16.4 Fermi-Dirac |
 | [`schottky_iv_temperature`](schottky_iv_temperature/) | Pt-on-n-Si Schottky diode | `bias_sweep` | M16.5 Schottky thermionic emission (under three temperatures) |
 | [`power_diode_reverse_recovery`](power_diode_reverse_recovery/) | long-base pn rectifier | `transient` | M16.7 voltage_t (piecewise-linear), M16.3 Auger |
+| [`pmos_idvgs`](pmos_idvgs/) | p-channel MOSFET | `bias_sweep` | M16.1 Caughey-Thomas, M16.2 Lombardi, M16.4 Fermi-Dirac (PMOS complement to `nmos_idvgs`) |
+| [`moscap_cv_oxide_thickness`](moscap_cv_oxide_thickness/) | MOS capacitor (1D) | `mos_cv` | C-V at three gate-oxide thicknesses (2 / 5 / 10 nm); demonstrates the C-V output mode |
+| [`diode_reverse_leakage_temperature`](diode_reverse_leakage_temperature/) | pn diode (reverse-bias) | `bias_sweep` | SRH generation T-dependence (250 / 300 / 350 K); educational complement to `schottky_iv_temperature` |
 
 ## How to run an example
 

@@ -1024,6 +1024,14 @@ The engine is ready for a UI when all of these are green:
 
 ### [Unreleased]
 
+- **2026-05-06**, author examples extension starter prompt
+  ([EXAMPLES_EXTENSION_STARTER_PROMPT.md](EXAMPLES_EXTENSION_STARTER_PROMPT.md))
+  on branch `dev/examples-extension`; phases ship per the PR
+  template at the bottom of the prompt. Three additions on
+  top of PR #85: `pmos_idvgs`, `moscap_cv_oxide_thickness`,
+  `diode_reverse_leakage_temperature`. Non-milestone
+  documentation / demonstration work; runs parallel to the
+  M17 / M19 next-task path.
 - **2026-05-06**, examples catalogue shipped: three self-contained
   practical-device configs land under a new top-level `examples/`
   directory (`nmos_idvgs`, `schottky_iv_temperature`,
