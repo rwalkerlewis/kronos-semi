@@ -4,11 +4,11 @@ kronos-semi is a FEniCSx-based finite-element semiconductor device simulator tha
 
 ## Capability matrix
 
-All milestones M1 through M15 plus M14.3, M14.4, M16.1, M16.2,
-M16.3, M16.4, M16.5, and M16.6 have shipped as of v0.22.0. The
-table below is the current state; see the Delivery history section
-for per-milestone details. Planned milestones (M16.7, M19, M20)
-have explicit acceptance tests in
+All milestones M1 through M15 plus M14.3, M14.4, M16.1 through
+M16.7 have shipped as of v0.23.0. The M16 umbrella is complete.
+The table below is the current state; see the Delivery history
+section for per-milestone details. Planned milestones (M17, M19,
+M19.1, M20) have explicit acceptance tests in
 [`docs/IMPROVEMENT_GUIDE.md`](IMPROVEMENT_GUIDE.md).
 
 | Capability | Dimensions | Status | Verifier |
@@ -41,7 +41,7 @@ have explicit acceptance tests in
 | Fermi-Dirac statistics (M16.4) | 1D / 2D | shipped | MMS-DD Variant G L2 >= 1.99 / H1 >= 0.99 on every block (1D measured 2.000/2.000/2.000, 2D measured 1.997/1.999/1.999); diode_fermi_dirac_1d FEM-vs-Blakemore-analytical V_bi 0.0000% and FD-vs-Boltzmann V_bi divergence 7.37% at N_D=1e20 cm^-3 (basic Blakemore production form; see CHANGELOG `[0.20.0]` for the deviation rationale from the >15% / 1e-3-vs-full-integral nominal targets) |
 | Schottky contacts (M16.5) | 1D | shipped | schottky_1d slope `ln(J_FEM)` vs V matches 1/V_t within 5% (observed 2.46%) and `|J_FEM - J_thermionic|/J_thermionic < 5x` envelope absolute match (observed worst 278%) over V in [0.1, 0.5] V; ADR 0015 documents the V&V scope |
 | BBT and TAT tunneling (M16.6) | 1D | shipped | MMS-DD Variant H psi block L2 = 2.000 / H1 = 1.000 (1D); zener_1d ln-J slope sign indicating BBT firing (observed -0.279 per V) and 5x envelope `\|J_FEM - J_Kane\|/J_Kane` over V_R in [-8, -4] V (observed worst 99.88%); doping relaxed to N = 1e18 cm^-3 from the prompt's nominal 1e19 cm^-3 (deep-bias SNES convergence; tighter follow-up tracked in M16.7 backlog) |
-| Time-varying transient contact voltage (M16.7) | 1D / 2D | Planned | audit case 06 transient FFT vs AC sweep agreement within 5% |
+| Time-varying transient contact voltage (M16.7) | 1D | shipped | audit case 06 transient FFT vs AC sweep agreement within 5% (Hann-windowed FFT admittance ratio at V_DC = 0.4 V, F = 1 MHz, dV = 1 mV); pn_1d_pulse and diode_sine_1d demonstration benchmarks ship the schema variants |
 | Heterojunctions (M17) | 2D | Planned | hemt_2d 2DEG sheet density within 15% of self-consistent reference |
 | 3D MOSFET benchmark (M19) | 3D | Planned | Pao-Sah within 25% (linear); velsat within 30% (saturation); >=5x GPU speedup at 500k DOFs |
 | MPI parallel benchmark (M19.1) | 3D | Planned | mosfet_3d under mpiexec -n {1,2,4} same I_D within 1e-8; n=4 vs n=1 speedup >=2.5x |
@@ -49,7 +49,7 @@ have explicit acceptance tests in
 
 ## Honest gap
 
-Three things the engine still does not do well, called out at the top
+Two things the engine still does not do well, called out at the top
 of this document so a reviewer hits them first instead of digging
 through the milestone history.
 
@@ -61,13 +61,13 @@ unstructured mesh, run on both CPU-MUMPS and GPU-AMGX backends; M19
 depends on M16.1 (Caughey-Thomas mobility) so saturation has any
 meaning.
 
-The physics catalogue has one remaining gap that matters for a
-quantitative TCAD comparison: the cross-check that an FFT of the
-transient response matches the AC sweep at the same operating
-point is deferred. M16.7 closes this gap. Field-dependent mobility
-(M16.1 / M16.2), Auger recombination (M16.3), Fermi-Dirac
-statistics (M16.4), Schottky contacts (M16.5), and BBT / TAT
-tunneling (M16.6) have all shipped.
+The physics catalogue is complete in the M16 umbrella. Field-
+dependent mobility (M16.1 / M16.2), Auger recombination (M16.3),
+Fermi-Dirac statistics (M16.4), Schottky contacts (M16.5), BBT /
+TAT tunneling (M16.6), and transient time-varying contact voltage
+with FFT-vs-AC audit (M16.7) have all shipped. Heterojunctions
+(position-dependent chi and Eg) are the next-tier physics gap and
+are tracked as M17.
 
 ## Scope vs. COMSOL Semiconductor Module
 
@@ -99,14 +99,14 @@ analysis and axisymmetric (cylindrical) 2D devices:
   (M16.4); Boltzmann remains the default
 - Schottky contacts via thermionic-emission Robin BC plus metal-
   Fermi-level psi Dirichlet (M16.5; v0.21.0)
+- Band-to-band / trap-assisted tunneling via Kane and Hurkx
+  kernels (M16.6; v0.22.0)
+- Time-varying transient contact voltage with FFT-vs-AC audit
+  (M16.7; v0.23.0)
 
-**Explicitly out of scope today (M16 physics completeness, M17
-heterojunctions, M19 3D MOSFET, M19.1 MPI, M20 server hardening
-planned):**
+**Explicitly out of scope today (M17 heterojunctions, M19 3D
+MOSFET, M19.1 MPI, M20 server hardening planned):**
 
-- Band-to-band / trap-assisted tunneling (M16.6)
-- Time-varying transient contact voltage (M16.7; closes audit
-  case 06)
 - Heterojunctions, position-dependent chi(x) and Eg(x) (M17;
   depends on M16.4)
 - 3D MOSFET on a gmsh-sourced unstructured mesh (M19; depends on

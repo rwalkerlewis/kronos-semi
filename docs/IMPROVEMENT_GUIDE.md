@@ -78,11 +78,13 @@ What exists and works:
 
 What does *not* exist:
 
-- **No transient FFT vs AC sweep validation.** M16.7. (M16.1
-  Caughey-Thomas mobility, M16.2 Lombardi surface mobility, M16.3
-  Auger, M16.4 Fermi-Dirac, M16.5 Schottky contacts, and M16.6 BBT
-  and TAT tunneling have all shipped; see § 4 for the per-milestone
-  Done entries.)
+- **M16 umbrella complete.** All seven physics-completeness
+  slices (M16.1 Caughey-Thomas mobility, M16.2 Lombardi surface
+  mobility, M16.3 Auger, M16.4 Fermi-Dirac, M16.5 Schottky
+  contacts, M16.6 BBT and TAT tunneling, M16.7 time-varying
+  transient contact voltage with FFT-vs-AC audit) shipped; see
+  § 4 for per-milestone Done entries. Next-tier gaps in M17
+  (heterojunctions) and M19 (3D MOSFET capstone).
 - **No real 3D semiconductor device.** The 3D coverage today is the
   doped resistor (M7) and a pure-Poisson box (M15 acceptance test).
   No 3D MOSFET / FinFET / planar transistor. M19 closes this with a
@@ -103,13 +105,12 @@ What does *not* exist:
 - **No HTTP server hardening.** `kronos_server/app.py` carries a
   `# TODO(M10+): add auth, rate limiting, API keys before any public
   deployment`. M20.
-- **One small production-hardening gap remaining**: the transient
-  runner accepts no `V(t)` (audit case 06 is `pytest.skip`). M16.7
-  closes it with a per-step contact-voltage callable / table; see
-  the M16.7 entry in §4. The four gaps closed in M14.3 (strict
-  schema, XDMF mesh ingest, Pao-Sah `mosfet_2d` verifier, and the
-  ~792 LOC of dead-on-active-path Scharfetter-Gummel primitives in
-  `semi/fem/sg_assembly.py`) shipped in v0.16.0.
+- **The four gaps closed in M14.3** (strict schema, XDMF mesh ingest,
+  Pao-Sah `mosfet_2d` verifier, and the ~792 LOC of dead-on-active-
+  path Scharfetter-Gummel primitives in `semi/fem/sg_assembly.py`)
+  shipped in v0.16.0. The transient runner gained a per-contact
+  `voltage_t` block in M16.7 (v0.23.0); audit case 06 is now active
+  and matches the M14 AC sweep within 5 %.
 
 Bottom line: the numerics are sound, the engine is addressable from
 outside Python, results are consumable without a dolfinx install, the
@@ -773,28 +774,43 @@ any meaning), M14.3 (need XDMF or gmsh ingest stable).
 
 ---
 
-### M16.7: Time-varying transient contact voltage
+### M16.7: Time-varying transient contact voltage (Done; v0.23.0)
 
-**Why.** Closes audit case 06 (transient FFT vs AC sweep) which is
-currently `pytest.skip`. Enables switching-transient and ringing
-simulation, which is the second-most-asked-for transient feature
-after turn-on.
+**Why.** Closes audit case 06 (transient FFT vs AC sweep) which had
+been a `pytest.skip` since the M14 audit suite landed. Enables
+switching-transient and ringing simulation, which is the
+second-most-asked-for transient feature after turn-on.
 
-**Deliverable.** Extend
-[`semi/runners/transient.py`](../semi/runners/transient.py) to accept
-a per-step contact voltage from a callable or a JSON-supplied table.
-Schema:
-`contacts[].voltage_t: {type: "table", times, values}` or
-`{type: "step", t0, v0, v1}`. Update audit case 06 to active.
+**Deliverable.** Extended
+[`semi/runners/transient.py`](../semi/runners/transient.py) to
+consume a per-contact `voltage_t` block via a private
+`_build_voltage_t_evaluator(cfg)` callable that replaces the fixed
+`static_voltages` dict in the time-loop BC build. Schema:
+`contacts[].voltage_t: {type: "table", times, values}` (linear
+interpolation between sample points with endpoint clamping) or
+`{type: "step", t0, v0, v1}` (one transition at `t0`). Mutually
+exclusive with `voltage_sweep`. The bias_sweep, ac_sweep,
+equilibrium, mos_cv, mos_cap_ac, and resistor_3d runners reject
+`voltage_t` at validate time so users see the failure before the
+FEM path. Audit case 06 reactivated with a Hann-windowed FFT
+admittance comparison; case 06's CSV / markdown writers now record
+`Y_ac`, `Y_transient_fft`, the relative error, and a
+passed / failed status.
 
-**Acceptance tests.**
+**Acceptance tests (status as shipped).**
 
-1. Audit case 06 passes: transient FFT of I(t) at a small-signal
-   V(t) sinusoid agrees with `run_ac_sweep` Y(omega) at the same
-   frequency within 5%.
-2. Existing transient benchmarks bit-identical.
+1. Audit case 06 passes within 5 %: transient FFT of I(t) under
+   `V(t) = V_DC + dV * sin(2 pi F t)` (sampled into a `voltage_t`
+   table) at V_DC = 0.4 V, F = 1 MHz, dV = 1 mV agrees with
+   `run_ac_sweep` Y(omega) at the same operating point.
+2. Existing transient benchmarks bit-identical (`pn_1d_turnon` is
+   the regression anchor; no benchmark uses `voltage_t`, so every
+   prior config is bit-identical to v0.22.0 by construction). Done.
 
 **Dependencies.** M14.3.
+
+**See:** [CHANGELOG `[0.23.0]`](../CHANGELOG.md) for the per-phase
+deliverable summary.
 
 ---
 
@@ -1008,6 +1024,39 @@ The engine is ready for a UI when all of these are green:
 
 ### [Unreleased]
 
+### [0.23.0]
+
+- **2026-05-06**, M16.7 transient time-varying contact voltage
+  shipped (v0.23.0): § 4 M16.7 marked Done with `[0.23.0]`
+  CHANGELOG anchor; closes the M16 umbrella (M16.1 through M16.7
+  all shipped). Schema additive minor bump v2.6.0 -> v2.7.0
+  (`contacts[].voltage_t` sub-object with `table` and `step`
+  variants; mutually exclusive with `voltage_sweep`; rejected at
+  validate time on non-transient solver types). `semi/schema.py`
+  `_validate_voltage_t` enforces the cross-field constraints;
+  `semi/runners/transient.py` adds `_build_voltage_t_evaluator(cfg)`
+  returning a callable `voltages_at_t(t) -> dict[str, float]`,
+  which replaces the fixed `static_voltages` dict in the time-loop
+  BC build (no FEM behavior change for configs without
+  `voltage_t`). Audit case 06
+  (`tests/audit/test_06_transient_fft_vs_ac_sweep.py`) reactivated
+  with a Hann-windowed admittance ratio
+  `Y_transient_fft = J_FFT[bin_F] / V_FFT[bin_F]` compared to
+  `run_ac_sweep` Y(omega) within the 5 % gate at V_DC = 0.4 V,
+  F = 1 MHz, dV = 1 mV. Two demonstration benchmarks ship the
+  schema variants: `benchmarks/pn_1d_pulse/` (voltage_t.step
+  switching transient at t = 5 ns) with finiteness / Shockley-
+  reference verifier, and `benchmarks/diode_sine_1d/`
+  (voltage_t.table sinusoidal large-signal drive at V_DC = 0.4 V,
+  dV = 50 mV, F = 1 MHz over 4 cycles) with FFT-peak / second-
+  harmonic verifier. Both have lightweight verifiers; the formal
+  V&V gate lives in audit case 06. `tests/fem/test_transient_voltage_t.py`
+  adds 15 coverage tests (13 pure-Python evaluator / ramp-target
+  unit tests plus 2 end-to-end `run_transient` integration tests
+  on a tiny 4-cell pn diode) so the new branches land covered in
+  the gated `docker-fem-tests` job, avoiding the follow-up-commit
+  pattern from M16.5 / M16.6. The configs without `voltage_t`
+  branch is bit-identical to v0.22.0 on every existing benchmark.
 - **2026-05-06**, author M16.7 starter prompt
   ([M16_7_STARTER_PROMPT.md](M16_7_STARTER_PROMPT.md)) on branch
   `dev/m16.7-transient-ac`; phases ship per

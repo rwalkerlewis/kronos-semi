@@ -21,9 +21,102 @@ with `[0.18.0]` below), **2.3.0** (additive minor; M16.3 Auger
 recombination kernel; shipped with `[0.19.0]` below), **2.4.0**
 (additive minor; M16.4 Fermi-Dirac statistics dispatch; shipped
 with `[0.20.0]` below), **2.5.0** (additive minor; M16.5 Schottky
-contact type; shipped with `[0.21.0]` below), and **2.6.0**
+contact type; shipped with `[0.21.0]` below), **2.6.0**
 (additive minor; M16.6 BBT and TAT tunneling dispatch; shipped
-with `[0.22.0]` below).
+with `[0.22.0]` below), and **2.7.0** (additive minor; M16.7
+transient time-varying contact voltage `voltage_t`; shipped with
+`[0.23.0]` below).
+
+## [0.23.0] - 2026-05-06
+
+**M16 umbrella complete.** All seven physics-completeness slices
+(M16.1 Caughey-Thomas mobility, M16.2 Lombardi surface mobility,
+M16.3 Auger, M16.4 Fermi-Dirac, M16.5 Schottky contacts, M16.6 BBT
+and TAT tunneling, M16.7 time-varying transient contact voltage)
+have shipped. Next-tier work is M17 (heterojunctions) or M19 (3D
+MOSFET capstone).
+
+### Added
+- **M16.7 transient time-varying contact voltage.** Extended
+  `semi/runners/transient.py` to accept a per-contact `voltage_t`
+  block via a new `_build_voltage_t_evaluator(cfg)` callable that
+  returns `voltages_at_t(t) -> dict[str, float]`. The time-loop
+  BC build now reads `_build_transient_bcs(voltages_at_t(t_next))`
+  on every step. Two waveform variants ship: `table` (linear
+  interpolation between `(times, values)` pairs with endpoint
+  clamping) and `step` (one transition at `t0`). Configs without
+  `voltage_t` on any contact are bit-identical to v0.22.0; the
+  evaluator returns the same dict at every t and the BC stack is
+  built from the fixed `voltage` values just as before. The
+  BC-ramp continuation lands at the waveform value at t = 0
+  (`values[0]` for tables, `v0` for steps) before the time loop
+  takes over.
+- Schema 2.7.0 (additive minor): new `contacts[].voltage_t`
+  sub-object. Mutually exclusive with `voltage_sweep`. Required
+  variant fields are enforced by `semi/schema.py::_validate_voltage_t`
+  (table requires equal-length, strictly monotonic `times` and
+  `values` arrays; step requires `t0`, `v0`, `v1`). The bias_sweep,
+  ac_sweep, equilibrium, mos_cv, mos_cap_ac, and resistor_3d
+  runners reject `voltage_t` at validate time so users see the
+  failure before the FEM path. v2.0.0 through v2.6.0 inputs continue
+  to validate.
+- Audit case 06 reactivated. `tests/audit/test_06_transient_fft_vs_ac_sweep.py`
+  is no longer a `pytest.skip`; it builds a transient cfg with
+  `voltage_t.table` sampling V(t) = V_DC + dV*sin(2 pi F t) at
+  V_DC = 0.4 V, F = 1 MHz, dV = 1 mV (small-signal) over 4 cycles
+  at 200 samples per cycle (800 BDF1 timesteps), takes the
+  Hann-windowed FFT of I(t) and V(t), and computes
+  `Y_transient_fft = J_FFT[bin_F] / V_FFT[bin_F]`. Acceptance gate:
+  `|Y_transient_fft - Y_ac| / |Y_ac| < 0.05`. The CSV / markdown
+  writers record both Y values, the relative error, and a
+  `passed` / `failed` status.
+- `benchmarks/pn_1d_pulse/` (M16.7 demonstrator). 1D pn diode
+  switching transient via `voltage_t.step` (anode steps from 0.0 V
+  to 0.6 V at t = 5 ns). Same 800-cell, 20 um, N_A = N_D = 1e17 cm^-3
+  geometry as `pn_1d_turnon`; 250 BDF2 timesteps at dt = 200 ps.
+  Lightweight verifier: I(t) finite, post-step current >> pre-step
+  current (>10x), post-step current within 20 % of the long-diode
+  Shockley diffusion-saturation reference at V_F = 0.6 V.
+- `benchmarks/diode_sine_1d/` (M16.7 demonstrator). 1D pn diode
+  under sinusoidal large-signal forward-bias drive via
+  `voltage_t.table` (V_DC = 0.4 V, dV = 50 mV, F = 1 MHz, 4 cycles
+  at 200 samples per cycle, 800 timesteps). Same geometry as
+  `pn_1d_turnon`. Lightweight verifier: I(t) finite, FFT peak at
+  the F = 1 MHz fundamental, second-harmonic ratio <= 50 %. The
+  small-signal AC-vs-FFT V&V gate lives in audit case 06.
+- `tests/fem/test_transient_voltage_t.py` adds 15 coverage tests
+  (13 pure-Python evaluator / ramp-target unit tests plus 2
+  end-to-end `run_transient` integration tests on a 4-cell pn
+  diode) so the new `voltage_t` evaluator branches are covered in
+  the gated `docker-fem-tests` job, avoiding the follow-up-commit
+  pattern from M16.5 / M16.6.
+- `tests/test_voltage_t_schema.py` adds 17 schema-side assertions
+  covering both variants, mutual exclusion with `voltage_sweep`,
+  cross-runner rejection, default-fill (no `voltage_t` is
+  bit-identical to v0.22.0), and existing-benchmark v2.7.0
+  cross-validation.
+
+### Changed
+- `semi/runners/transient.py` time-loop BC build replaced
+  `_build_transient_bcs(static_voltages)` with
+  `_build_transient_bcs(voltages_at_t(t_next))`. The IV recorder
+  also reads `voltages_at_t(t_val)` so the recorded `V` per row
+  reflects the actual per-step BC value.
+- `_run_bc_continuation` now ramps to the waveform value at t = 0
+  for contacts with `voltage_t` (was: ramp to the fixed `voltage`
+  field unconditionally). The new `_ramp_target_voltage(contact)`
+  helper centralizes the lookup.
+- `docs/PHYSICS_AUDIT.md` case 06 section rewritten to reflect
+  the active state.
+- PLAN.md gap line and IMPROVEMENT_GUIDE.md § 1 gap line rewritten
+  to "M16 umbrella complete". `Next task` set to M17 or M19,
+  maintainer's choice.
+
+### Bumped
+- Package version 0.22.0 -> 0.23.0.
+- Schema version 2.6.0 -> 2.7.0 (additive; v2.0.0 through v2.6.0
+  inputs continue to validate).
+- `SCHEMA_SUPPORTED_MINOR` 6 -> 7.
 
 ## [0.22.0] - 2026-05-06
 
