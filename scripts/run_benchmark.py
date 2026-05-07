@@ -36,6 +36,7 @@ import numpy as np  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BENCHMARKS_DIR = REPO_ROOT / "benchmarks"
+EXAMPLES_DIR = REPO_ROOT / "examples"
 RESULTS_DIR = REPO_ROOT / "results"
 
 
@@ -3147,8 +3148,16 @@ def main(argv: list[str] | None = None) -> int:
     name = args.name
     bench_dir = BENCHMARKS_DIR / name
     if not bench_dir.is_dir():
-        print(f"ERROR: benchmark directory not found: {bench_dir}", file=sys.stderr)
-        return 2
+        example_dir = EXAMPLES_DIR / name
+        if example_dir.is_dir():
+            bench_dir = example_dir
+        else:
+            print(
+                f"ERROR: benchmark directory not found: {bench_dir} "
+                f"(also checked {example_dir})",
+                file=sys.stderr,
+            )
+            return 2
 
     try:
         json_path = Path(args.input) if args.input else find_json(bench_dir, name)

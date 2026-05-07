@@ -1024,6 +1024,13 @@ The engine is ready for a UI when all of these are green:
 
 ### [Unreleased]
 
+- **2026-05-06**, author examples catalogue starter prompt
+  ([EXAMPLES_CATALOGUE_STARTER_PROMPT.md](EXAMPLES_CATALOGUE_STARTER_PROMPT.md))
+  on branch `dev/examples-catalogue`; phases ship per the PR
+  template at the bottom of the prompt. Non-milestone
+  documentation / demonstration work; runs parallel to the M17
+  / M19 next-task path.
+
 ### [0.23.0]
 
 - **2026-05-06**, M16.7 transient time-varying contact voltage
