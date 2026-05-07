@@ -44,6 +44,10 @@ def run_bias_sweep(
     from ..doping import build_profile
     from ..mesh import build_mesh
     from ..physics.drift_diffusion import build_dd_block_residual, make_dd_block_spaces
+    from ..physics.heterojunction import (
+        build_dg0_material_fields,
+        cfg_uses_heterojunction,
+    )
     from ..postprocess import (
         fmt_tag,
         record_iv,
@@ -57,7 +61,7 @@ def run_bias_sweep(
     ref_mat = reference_material(cfg)
     sc = make_scaling_from_config(cfg, ref_mat)
 
-    msh, _cell_tags, facet_tags = build_mesh(cfg)
+    msh, cell_tags, facet_tags = build_mesh(cfg)
 
     N_raw_fn = build_profile(cfg["doping"])
 
@@ -102,9 +106,18 @@ def run_bias_sweep(
         for bc in bcs_psi_only:
             bc.set(spaces.psi.x.array)
         spaces.psi.x.scatter_forward()
+        # The Schottky psi-only seed runs before the het_fields branch
+        # below resolves; build the fields here too if the cfg opts in.
+        het_fields_seed = None
+        if cfg_uses_heterojunction(cfg.get("regions", {})):
+            het_fields_seed = build_dg0_material_fields(
+                msh, cell_tags, cfg["regions"], sc,
+                T=phys.get("temperature", 300.0),
+            )
         F_psi_eq = build_equilibrium_poisson_form(
             spaces.V_psi, spaces.psi, N_hat_fn, sc, ref_mat.epsilon_r,
             statistics_cfg={"statistics": phys.get("statistics", "boltzmann")},
+            heterojunction_fields=het_fields_seed,
         )
         solve_nonlinear(
             F_psi_eq, spaces.psi, bcs_psi_only,
@@ -157,6 +170,16 @@ def run_bias_sweep(
 
     stat_cfg = {"statistics": phys.get("statistics", "boltzmann")}
 
+    # M17: build the per-cell DG0 chi/Eg/Nc/Nv/n_i/eps_r fields when the
+    # cfg opts into the heterojunction path; otherwise pass None and the
+    # form builder runs the v0.23.0 scalar `ni_hat` Constant path.
+    het_fields = None
+    if cfg_uses_heterojunction(cfg.get("regions", {})):
+        het_fields = build_dg0_material_fields(
+            msh, cell_tags, cfg["regions"], sc,
+            T=phys.get("temperature", 300.0),
+        )
+
     # M16.5: the Schottky thermionic-emission Robin form depends on
     # the per-contact applied voltage, so the residual is rebuilt per
     # bias step inside `solve_at`. Devices with no Schottky contacts
@@ -188,6 +211,7 @@ def run_bias_sweep(
             statistics_cfg=stat_cfg,
             schottky_facets=schottky_facets_step,
             ref_mat=ref_mat,
+            heterojunction_fields=het_fields,
         )
 
     F_list = _build_F_list({})

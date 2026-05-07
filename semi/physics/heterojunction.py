@@ -45,6 +45,28 @@ _OVERRIDE_TO_FIELD: dict[str, str] = {
 }
 
 
+def cfg_uses_heterojunction(regions_cfg: dict[str, Any]) -> bool:
+    """Return True iff any region opts into the M17 heterojunction path.
+
+    A region opts in by setting `material_overrides` to a non-empty
+    dict or `heterojunction: true`. Configurations that do neither are
+    bit-identical to v0.23.0 because the runner skips
+    `build_dg0_material_fields` and the form builders run the existing
+    scalar `ni_hat` Constant path. M17 schema 2.8.0.
+    """
+    if not isinstance(regions_cfg, dict):
+        return False
+    for region_cfg in regions_cfg.values():
+        if not isinstance(region_cfg, dict):
+            continue
+        overrides = region_cfg.get("material_overrides")
+        if overrides:
+            return True
+        if region_cfg.get("heterojunction", False):
+            return True
+    return False
+
+
 def _resolve_region_material(region_cfg: dict[str, Any]) -> Material:
     """Apply `material_overrides` to the database material for a region.
 
