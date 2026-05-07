@@ -1,0 +1,122 @@
+{
+  "schema_version": "2.7.0",
+  "name": "pn_1d_pulse",
+  "description": "1D pn diode switching transient: anode bias steps from 0.0 V to 0.6 V at t = 5 ns via the M16.7 voltage_t.step variant. Geometry mirrors pn_1d_turnon (20 um symmetric step junction, N_A = N_D = 1e17 cm^-3, tau = 1e-7 s, 800 cells). The pre-step current is order-of-magnitude smaller than the post-step current. The verifier (scripts/run_benchmark.py verify_pn_1d_pulse) asserts I(t) is finite everywhere, the pre-step current is order-of-magnitude smaller than the post-step current, and the post-step current at t = 50 ns matches the pn_1d_turnon final-time current within 20 %. Demonstration benchmark; the formal V&V gate for voltage_t lives in tests/audit/test_06_transient_fft_vs_ac_sweep.py.",
+  "dimension": 1,
+  "mesh": {
+    "source": "builtin",
+    "extents": [
+      [
+        0.0,
+        2e-05
+      ]
+    ],
+    "resolution": [
+      800
+    ],
+    "regions_by_box": [
+      {
+        "name": "silicon",
+        "tag": 1,
+        "bounds": [
+          [
+            0.0,
+            2e-05
+          ]
+        ]
+      }
+    ],
+    "facets_by_plane": [
+      {
+        "name": "anode",
+        "tag": 1,
+        "axis": 0,
+        "value": 0.0
+      },
+      {
+        "name": "cathode",
+        "tag": 2,
+        "axis": 0,
+        "value": 2e-05
+      }
+    ]
+  },
+  "regions": {
+    "silicon": {
+      "material": "Si",
+      "tag": 1,
+      "role": "semiconductor"
+    }
+  },
+  "doping": [
+    {
+      "region": "silicon",
+      "profile": {
+        "type": "step",
+        "axis": 0,
+        "location": 1e-05,
+        "N_D_left": 0.0,
+        "N_A_left": 1e+17,
+        "N_D_right": 1e+17,
+        "N_A_right": 0.0
+      }
+    }
+  ],
+  "contacts": [
+    {
+      "name": "anode",
+      "facet": "anode",
+      "type": "ohmic",
+      "voltage": 0.0,
+      "voltage_t": {
+        "type": "step",
+        "t0": 5e-09,
+        "v0": 0.0,
+        "v1": 0.6
+      }
+    },
+    {
+      "name": "cathode",
+      "facet": "cathode",
+      "type": "ohmic",
+      "voltage": 0.0
+    }
+  ],
+  "physics": {
+    "temperature": 300.0,
+    "statistics": "boltzmann",
+    "mobility": {
+      "mu_n": 1400.0,
+      "mu_p": 450.0
+    },
+    "recombination": {
+      "srh": true,
+      "tau_n": 1e-07,
+      "tau_p": 1e-07,
+      "E_t": 0.0
+    }
+  },
+  "solver": {
+    "type": "transient",
+    "t_end": 5e-08,
+    "dt": 2e-10,
+    "order": 2,
+    "max_steps": 400,
+    "output_every": 50,
+    "bc_ramp_steps": 0,
+    "snes": {
+      "rtol": 1e-06,
+      "atol": 1e-07,
+      "stol": 1e-14,
+      "max_it": 100
+    }
+  },
+  "output": {
+    "directory": "./results/pn_1d_pulse",
+    "fields": [
+      "potential",
+      "n",
+      "p"
+    ]
+  }
+}

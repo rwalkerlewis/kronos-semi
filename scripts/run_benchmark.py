@@ -2801,6 +2801,331 @@ _PLOTTERS["zener_1d"] = plot_zener_1d
 
 
 # --------------------------------------------------------------------------- #
+# pn_1d_pulse verifier and plotter (M16.7 voltage_t.step demonstrator)        #
+# --------------------------------------------------------------------------- #
+
+@register("pn_1d_pulse")
+def verify_pn_1d_pulse(result) -> list[tuple[str, bool, str]]:
+    """
+    M16.7 demonstration verifier: 1D pn diode under a switching
+    transient applied via voltage_t.step. The pre-step regime is
+    zero bias; the post-step regime is forward bias V = 0.6 V.
+
+    Lightweight checks:
+      - I(t) is finite at every recorded timestep.
+      - Pre-step current at t = 4.8 ns is at least 10x smaller than
+        the post-step current at t = 50 ns.
+      - Post-step current at t = 50 ns is within 20 % of the long-
+        diode Shockley diffusion-saturation reference at V = 0.6 V.
+    """
+    from semi.constants import cm3_to_m3, thermal_voltage
+    from semi.diode_analytical import shockley_long_diode_saturation
+    from semi.materials import get_material
+
+    cfg = result.cfg
+    iv = list(result.iv or [])
+    if not iv:
+        return [(
+            "pn_1d_pulse: transient recorded IV rows",
+            False, "no iv rows in result",
+        )]
+
+    iv_anode = sorted(
+        (r for r in iv if r.get("contact") == "anode"),
+        key=lambda r: r["t"],
+    )
+    if len(iv_anode) < 5:
+        return [(
+            "pn_1d_pulse: at least 5 IV samples on anode",
+            False, f"got {len(iv_anode)}",
+        )]
+
+    t_arr = np.array([r["t"] for r in iv_anode])
+    j_arr = np.array([r["J"] for r in iv_anode])
+
+    checks: list[tuple[str, bool, str]] = []
+
+    # 1. Finiteness gate.
+    finite = bool(np.all(np.isfinite(j_arr)))
+    checks.append((
+        "I(t) finite everywhere",
+        finite,
+        f"non-finite samples: {int((~np.isfinite(j_arr)).sum())} / {len(j_arr)}",
+    ))
+    if not finite:
+        return checks
+
+    # Pre-step / post-step samples. The voltage_t step transition is at
+    # t0 = 5 ns; we sample the recorded IV row closest to those targets.
+    def _nearest(t_target: float) -> tuple[float, float]:
+        idx = int(np.argmin(np.abs(t_arr - t_target)))
+        return float(t_arr[idx]), float(j_arr[idx])
+
+    t_pre, j_pre = _nearest(4.8e-9)
+    t_post, j_post = _nearest(50.0e-9)
+    j_pre_abs = abs(j_pre)
+    j_post_abs = abs(j_post)
+
+    # 2. Order-of-magnitude separation between pre-step and post-step.
+    sep_ok = j_post_abs > 10.0 * j_pre_abs
+    checks.append((
+        "post-step current >> pre-step current (>10x)",
+        sep_ok,
+        f"|J(t={t_pre*1e9:.2f} ns)| = {j_pre_abs:.3e} A/m^2; "
+        f"|J(t={t_post*1e9:.2f} ns)| = {j_post_abs:.3e} A/m^2",
+    ))
+
+    # 3. Post-step current vs Shockley long-diode reference at 0.6 V.
+    prof = cfg["doping"][0]["profile"]
+    if prof.get("type") != "step":
+        return [(
+            "pn_1d_pulse: doping profile is a step junction",
+            False, f"profile type = {prof.get('type')!r}",
+        )]
+    N_A = cm3_to_m3(prof["N_A_left"])
+    N_D = cm3_to_m3(prof["N_D_right"])
+    mat_name = cfg["regions"]["silicon"]["material"]
+    mat = get_material(mat_name)
+    n_i = mat.n_i
+    T = float(cfg.get("physics", {}).get("temperature", 300.0))
+    V_t = thermal_voltage(T)
+    mob = cfg.get("physics", {}).get("mobility", {}) or {}
+    rec = cfg.get("physics", {}).get("recombination", {}) or {}
+    mu_n_SI = float(mob.get("mu_n", 1400.0)) * 1.0e-4
+    mu_p_SI = float(mob.get("mu_p", 450.0)) * 1.0e-4
+    tau_n = float(rec.get("tau_n", 1.0e-7))
+    tau_p = float(rec.get("tau_p", 1.0e-7))
+
+    J_s, _L_n, _L_p = shockley_long_diode_saturation(
+        N_A, N_D, n_i, mu_n_SI, mu_p_SI, tau_n, tau_p, V_t,
+    )
+    V_F = 0.6
+    J_ref = J_s * (np.exp(V_F / V_t) - 1.0)
+    rel = abs(j_post_abs - J_ref) / max(J_ref, 1.0e-30)
+    checks.append((
+        "post-step current within 20 % of Shockley diffusion ref",
+        rel < 0.20,
+        f"|J_FEM(50 ns)| = {j_post_abs:.3e}, "
+        f"J_Shockley(0.6 V) = {J_ref:.3e}, rel_err = {rel:.2%}",
+    ))
+
+    return checks
+
+
+def plot_pn_1d_pulse(result, out_dir: Path) -> list[Path]:
+    import matplotlib.pyplot as plt
+
+    iv_anode = sorted(
+        (r for r in result.iv if r.get("contact") == "anode"),
+        key=lambda r: r["t"],
+    )
+    t_ns = np.array([r["t"] for r in iv_anode]) * 1.0e9
+    j_arr = np.array([r["J"] for r in iv_anode])
+    v_arr = np.array([r["V"] for r in iv_anode])
+
+    fig, ax_left = plt.subplots(1, 1, figsize=(7.5, 4.5))
+    ax_right = ax_left.twinx()
+
+    line_j, = ax_left.plot(t_ns, j_arr, color="tab:blue", lw=1.4,
+                           label="J_anode")
+    line_v, = ax_right.plot(t_ns, v_arr, color="tab:red", lw=1.0,
+                            ls="--", label="V_anode")
+
+    ax_left.set_xlabel("t (ns)")
+    ax_left.set_ylabel("J_anode (A/m^2)", color="tab:blue")
+    ax_left.tick_params(axis="y", labelcolor="tab:blue")
+    ax_right.set_ylabel("V_anode (V)", color="tab:red")
+    ax_right.tick_params(axis="y", labelcolor="tab:red")
+    ax_left.grid(True, alpha=0.3)
+    ax_left.axvline(5.0, color="gray", ls=":", alpha=0.7,
+                    label="step at t0 = 5 ns")
+    ax_left.legend(handles=[line_j, line_v], loc="best")
+    ax_left.set_title("pn_1d_pulse: switching transient via voltage_t.step")
+    fig.tight_layout()
+    p = out_dir / "iv_pulse.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["pn_1d_pulse"] = plot_pn_1d_pulse
+
+
+# --------------------------------------------------------------------------- #
+# diode_sine_1d verifier and plotter (M16.7 voltage_t.table demonstrator)     #
+# --------------------------------------------------------------------------- #
+
+@register("diode_sine_1d")
+def verify_diode_sine_1d(result) -> list[tuple[str, bool, str]]:
+    """
+    M16.7 demonstration verifier: 1D pn diode under sinusoidal large-
+    signal forward-bias drive applied via voltage_t.table at V_DC = 0.4 V,
+    dV = 50 mV, F = 1 MHz.
+
+    Lightweight checks:
+      - I(t) is finite at every recorded timestep.
+      - The FFT of I(t) (after demeaning) has its dominant peak at
+        the F = 1 MHz fundamental.
+      - The second-harmonic amplitude |I_FFT[2F]| is at most 50 % of
+        the fundamental amplitude |I_FFT[F]|.
+
+    The small-signal AC-vs-FFT V&V gate lives in audit case 06.
+    """
+    iv = list(result.iv or [])
+    if not iv:
+        return [(
+            "diode_sine_1d: transient recorded IV rows",
+            False, "no iv rows in result",
+        )]
+
+    iv_anode = sorted(
+        (r for r in iv if r.get("contact") == "anode"),
+        key=lambda r: r["t"],
+    )
+    if len(iv_anode) < 100:
+        return [(
+            "diode_sine_1d: at least 100 IV samples on anode",
+            False, f"got {len(iv_anode)}",
+        )]
+    t_arr = np.array([r["t"] for r in iv_anode])
+    j_arr = np.array([r["J"] for r in iv_anode])
+
+    checks: list[tuple[str, bool, str]] = []
+
+    finite = bool(np.all(np.isfinite(j_arr)))
+    checks.append((
+        "I(t) finite everywhere",
+        finite,
+        f"non-finite samples: {int((~np.isfinite(j_arr)).sum())} / {len(j_arr)}",
+    ))
+    if not finite:
+        return checks
+
+    # Drop the t = 0 entry so the sample count matches the table grid
+    # (the runner records an initial entry before the first BDF step).
+    if t_arr[0] == 0.0 and len(t_arr) > 1:
+        t_arr = t_arr[1:]
+        j_arr = j_arr[1:]
+
+    f_hz = 1.0e6
+    n = len(t_arr)
+    dt_meas = float(t_arr[1] - t_arr[0])
+    samples_per_period = int(round(1.0 / (f_hz * dt_meas)))
+    n_periods = int(round(n / samples_per_period))
+
+    # FFT: demean and apply Hann window. The fundamental sits at
+    # bin = n_periods (integer cycles in the window).
+    window = np.hanning(n)
+    j_ac = (j_arr - np.mean(j_arr)) * window
+    spectrum = np.abs(np.fft.rfft(j_ac))
+
+    bin_F = n_periods
+    bin_2F = 2 * n_periods
+    if bin_2F >= len(spectrum):
+        return [(
+            "diode_sine_1d: spectrum spans the second harmonic",
+            False,
+            f"n_samples = {n}, samples_per_period = {samples_per_period}",
+        )]
+
+    amp_F = float(spectrum[bin_F])
+    amp_2F = float(spectrum[bin_2F])
+    dominant_bin = int(np.argmax(spectrum[1:]) + 1)
+    checks.append((
+        "FFT peak at fundamental F = 1 MHz",
+        dominant_bin == bin_F,
+        f"dominant_bin = {dominant_bin}, expected = {bin_F}; "
+        f"|I_FFT[F]| = {amp_F:.3e}",
+    ))
+
+    second_ratio = amp_2F / max(amp_F, 1.0e-30)
+    checks.append((
+        "second harmonic <= 50 % of fundamental",
+        second_ratio <= 0.50,
+        f"|I_FFT[2F]| / |I_FFT[F]| = {second_ratio:.3f}",
+    ))
+
+    # Diagnostic: report the DC component.
+    print(
+        f"[diode_sine_1d] mean(J) = {float(np.mean(j_arr)):.4e} A/m^2; "
+        f"|I_FFT[F]| = {amp_F:.3e}; "
+        f"|I_FFT[2F]| = {amp_2F:.3e}; "
+        f"f_resolution = {1.0 / (n * dt_meas):.3e} Hz"
+    )
+
+    return checks
+
+
+def plot_diode_sine_1d(result, out_dir: Path) -> list[Path]:
+    import matplotlib.pyplot as plt
+
+    iv_anode = sorted(
+        (r for r in result.iv if r.get("contact") == "anode"),
+        key=lambda r: r["t"],
+    )
+    t_arr = np.array([r["t"] for r in iv_anode])
+    j_arr = np.array([r["J"] for r in iv_anode])
+    v_arr = np.array([r["V"] for r in iv_anode])
+
+    paths: list[Path] = []
+
+    # Time-domain twin-axis plot.
+    fig, ax_left = plt.subplots(1, 1, figsize=(7.5, 4.5))
+    ax_right = ax_left.twinx()
+    line_j, = ax_left.plot(t_arr * 1.0e6, j_arr, color="tab:blue", lw=1.0,
+                           label="J_anode")
+    line_v, = ax_right.plot(t_arr * 1.0e6, v_arr, color="tab:red", lw=0.8,
+                            ls="--", label="V_anode")
+    ax_left.set_xlabel("t (us)")
+    ax_left.set_ylabel("J_anode (A/m^2)", color="tab:blue")
+    ax_right.set_ylabel("V_anode (V)", color="tab:red")
+    ax_left.grid(True, alpha=0.3)
+    ax_left.legend(handles=[line_j, line_v], loc="best")
+    ax_left.set_title("diode_sine_1d: 1 MHz, 50 mV around V_DC = 0.4 V")
+    fig.tight_layout()
+    p_time = out_dir / "iv_sine_time.png"
+    fig.savefig(p_time, dpi=130)
+    plt.close(fig)
+    paths.append(p_time)
+
+    # Frequency-domain plot.
+    if t_arr[0] == 0.0 and len(t_arr) > 1:
+        t_fft = t_arr[1:]
+        j_fft = j_arr[1:]
+    else:
+        t_fft = t_arr
+        j_fft = j_arr
+    n = len(t_fft)
+    if n >= 16:
+        dt_meas = float(t_fft[1] - t_fft[0])
+        window = np.hanning(n)
+        j_ac = (j_fft - np.mean(j_fft)) * window
+        spectrum = np.abs(np.fft.rfft(j_ac))
+        freqs = np.fft.rfftfreq(n, dt_meas)
+        fig, ax = plt.subplots(1, 1, figsize=(7.5, 4.5))
+        ax.semilogy(freqs * 1.0e-6, spectrum, color="tab:blue", lw=1.0)
+        ax.axvline(1.0, color="gray", ls=":", label="F = 1 MHz")
+        ax.axvline(2.0, color="gray", ls=":", alpha=0.5,
+                   label="2F (second harmonic)")
+        ax.set_xlim(0.0, min(5.0, freqs[-1] * 1.0e-6))
+        ax.set_xlabel("frequency (MHz)")
+        ax.set_ylabel("|I_FFT| (A/m^2, Hann-windowed)")
+        ax.grid(True, which="both", alpha=0.3)
+        ax.legend(loc="best")
+        ax.set_title("diode_sine_1d: I(omega) showing fundamental and harmonics")
+        fig.tight_layout()
+        p_freq = out_dir / "iv_sine_freq.png"
+        fig.savefig(p_freq, dpi=130)
+        plt.close(fig)
+        paths.append(p_freq)
+
+    return paths
+
+
+_PLOTTERS["diode_sine_1d"] = plot_diode_sine_1d
+
+
+# --------------------------------------------------------------------------- #
 # Driver                                                                      #
 # --------------------------------------------------------------------------- #
 

@@ -159,6 +159,21 @@ jobs:
             allow-failure: "true"
           - name: pn_1d_turnon
             args: pn_1d_turnon
+          # M16.7 demonstrator: 1D pn diode switching transient via the
+          # voltage_t.step variant (anode bias steps from 0.0 V to
+          # 0.6 V at t = 5 ns). Lightweight verifier (finiteness,
+          # qualitative turn-on); the V&V gate for voltage_t lives in
+          # audit case 06.
+          - name: pn_1d_pulse
+            args: pn_1d_pulse
+          # M16.7 demonstrator: 1D pn diode under sinusoidal large-
+          # signal forward-bias drive via the voltage_t.table variant
+          # (V_DC = 0.4 V, dV = 50 mV, F = 1 MHz, 4 cycles, 200
+          # samples per cycle). Lightweight verifier (FFT peak at the
+          # fundamental, second-harmonic ratio); the small-signal
+          # AC-vs-FFT V&V gate lives in audit case 06.
+          - name: diode_sine_1d
+            args: diode_sine_1d
           - name: rc_ac_sweep
             args: rc_ac_sweep
           # M16.1 Acceptance test 2: Caughey-Thomas vs constant-mobility
