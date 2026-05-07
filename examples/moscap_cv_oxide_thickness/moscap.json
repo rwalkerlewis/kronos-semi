@@ -1,0 +1,99 @@
+{
+  "schema_version": "2.7.0",
+  "name": "moscap_cv_oxide_thickness",
+  "description": "Practical 2D Cartesian MOSCAP, p-type Si body N_A = 5e16 cm^-3, SiO2 gate oxide t_ox = 5 nm (the anchor), gate voltage swept from -2 V to +2 V at 0.1 V step. The mos_cv runner reports Q_gate(V_gate) at each step; the smoke verifier reruns the configuration at t_ox = 2 nm and t_ox = 10 nm via in-process re-runs that override mesh extents, resolution, region bounds, and the gate facet position. C(V_gate) = dQ/dV is post-processed via numpy.gradient. Geometry mirrors benchmarks/mos_2d structurally (500 nm Si depth, 1 nm uniform vertical cells, 4 lateral cells of 125 nm each); the new axis is oxide thickness.",
+  "dimension": 2,
+  "mesh": {
+    "source": "builtin",
+    "extents": [
+      [0.0, 5.0e-7],
+      [0.0, 5.05e-7]
+    ],
+    "resolution": [4, 505],
+    "regions_by_box": [
+      {
+        "name": "silicon",
+        "tag": 1,
+        "bounds": [
+          [0.0, 5.0e-7],
+          [0.0, 5.0e-7]
+        ]
+      },
+      {
+        "name": "oxide",
+        "tag": 2,
+        "bounds": [
+          [0.0, 5.0e-7],
+          [5.0e-7, 5.05e-7]
+        ]
+      }
+    ],
+    "facets_by_plane": [
+      {"name": "body", "tag": 1, "axis": 1, "value": 0.0},
+      {"name": "gate", "tag": 2, "axis": 1, "value": 5.05e-7}
+    ]
+  },
+  "regions": {
+    "silicon": {
+      "material": "Si",
+      "tag": 1,
+      "role": "semiconductor"
+    },
+    "oxide": {
+      "material": "SiO2",
+      "tag": 2,
+      "role": "insulator"
+    }
+  },
+  "doping": [
+    {
+      "region": "silicon",
+      "profile": {
+        "type": "uniform",
+        "N_D": 0.0,
+        "N_A": 5.0e+16
+      }
+    }
+  ],
+  "contacts": [
+    {
+      "name": "body",
+      "facet": "body",
+      "type": "ohmic",
+      "voltage": 0.0
+    },
+    {
+      "name": "gate",
+      "facet": "gate",
+      "type": "gate",
+      "voltage": 0.0,
+      "workfunction": 0.0,
+      "voltage_sweep": {
+        "start": -2.0,
+        "stop": 2.0,
+        "step": 0.1
+      }
+    }
+  ],
+  "physics": {
+    "temperature": 300.0,
+    "statistics": "boltzmann",
+    "mobility": {
+      "mu_n": 1400.0,
+      "mu_p": 450.0
+    },
+    "recombination": {
+      "srh": false,
+      "tau_n": 1.0e-07,
+      "tau_p": 1.0e-07,
+      "E_t": 0.0
+    }
+  },
+  "solver": {
+    "type": "mos_cv"
+  },
+  "output": {
+    "directory": "./results/moscap_cv_oxide_thickness",
+    "fields": ["potential", "n", "p"]
+  }
+}

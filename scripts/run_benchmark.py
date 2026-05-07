@@ -3645,6 +3645,214 @@ def plot_schottky_iv_temperature(result, out_dir: Path) -> list[Path]:
 _PLOTTERS["schottky_iv_temperature"] = plot_schottky_iv_temperature
 
 
+def _oxide_thickness_overrides(cfg, t_ox_values_m):
+    """Yield (t_ox, cfg_copy) pairs with mesh geometry overridden for a
+    new gate-oxide thickness.
+
+    Mutates a deepcopy of cfg in four places to keep the silicon /
+    oxide interface aligned with a grid line at 1 nm vertical cell
+    size:
+
+      - `mesh.extents[1][1]` = total y extent (Si depth + t_ox).
+      - `mesh.resolution[1]` = cell count consistent with 1 nm cells.
+      - `mesh.regions_by_box[1].bounds[1]` = oxide-region y bounds.
+      - `mesh.facets_by_plane[i].value` for the gate facet = top of
+        oxide.
+
+    Output directory is also redirected to a per-t_ox subdirectory so
+    the companion runs do not stomp on each other. The `name` field
+    is suffixed with the thickness in nm so SNES log-prefixes do not
+    collide.
+    """
+    import copy
+
+    base_out_dir = (
+        cfg.get("output", {}).get("directory") or "./results/_companion"
+    )
+    si_depth_m = float(cfg["mesh"]["regions_by_box"][0]["bounds"][1][1])
+    cell_size_m = 1.0e-9  # 1 nm uniform vertical cells
+    base_name = str(cfg.get("name", "moscap"))
+
+    for t_ox_m in t_ox_values_m:
+        t_ox_nm = int(round(t_ox_m * 1.0e9))
+        cfg_t = copy.deepcopy(cfg)
+        total_y = si_depth_m + t_ox_m
+        cfg_t["mesh"]["extents"][1][1] = total_y
+        cfg_t["mesh"]["resolution"][1] = int(round(total_y / cell_size_m))
+        # silicon region bounds unchanged; oxide region top moves.
+        cfg_t["mesh"]["regions_by_box"][1]["bounds"][1] = [si_depth_m, total_y]
+        for f in cfg_t["mesh"]["facets_by_plane"]:
+            if f.get("name") == "gate":
+                f["value"] = total_y
+        cfg_t.setdefault("output", {})
+        cfg_t["output"] = dict(cfg_t["output"])
+        cfg_t["output"]["directory"] = (
+            f"{base_out_dir.rstrip('/')}/_t_ox_{t_ox_nm}nm"
+        )
+        cfg_t["name"] = f"{base_name}_t_ox_{t_ox_nm}nm"
+        yield t_ox_m, cfg_t
+
+
+@register("moscap_cv_oxide_thickness")
+def verify_moscap_cv_oxide_thickness(result) -> list[tuple[str, bool, str]]:
+    """
+    Smoke verifier for the moscap_cv_oxide_thickness example.
+
+    Anchor run: t_ox = 5 nm. Companion runs: t_ox = 2 nm and t_ox =
+    10 nm, invoked here via in-process semi.run.run() with the mesh
+    geometry overridden by `_oxide_thickness_overrides`. The mos_cv
+    runner records `{V, Q_gate, J: 0}` per bias point; C(V_gate) is
+    derived per run via numpy.gradient(Q, V).
+
+    Checks (smoke only; tight tolerances live under benchmarks/):
+      - All three runs complete without raising and record an iv
+        table.
+      - For each t_ox, the C-V curve is well-formed: every C value
+        is finite, and the curve has at least one extremum (i.e.
+        the swept range covers the depletion / accumulation
+        transition rather than a single monotonic regime).
+      - In strong accumulation (V_gate = -2 V, the most negative
+        sweep extremum), C(2 nm) > C(5 nm) > C(10 nm) strictly
+        (thinner oxide gives larger accumulation capacitance; the
+        ordering must be physically correct).
+    """
+    from semi import run as semi_run
+
+    cfg_anchor = result.cfg
+    iv_anchor = list(result.iv or [])
+    if not iv_anchor:
+        return [(
+            "moscap_cv_oxide_thickness: anchor run recorded iv rows",
+            False, "no iv rows in result",
+        )]
+
+    t_ox_anchor_m = (
+        float(cfg_anchor["mesh"]["extents"][1][1])
+        - float(cfg_anchor["mesh"]["regions_by_box"][0]["bounds"][1][1])
+    )
+    iv_by_t_ox: dict[float, list[dict]] = {t_ox_anchor_m: iv_anchor}
+
+    for t_ox_m, cfg_t in _oxide_thickness_overrides(
+        cfg_anchor, [2.0e-9, 10.0e-9]
+    ):
+        print(
+            f"[moscap_cv_oxide_thickness] running companion sweep at "
+            f"t_ox = {t_ox_m*1e9:.0f} nm...",
+            flush=True,
+        )
+        res = semi_run.run(cfg_t)
+        iv_by_t_ox[t_ox_m] = list(res.iv or [])
+
+    checks: list[tuple[str, bool, str]] = []
+    c_at_acc: dict[float, float] = {}
+
+    for t_ox_m in sorted(iv_by_t_ox):
+        iv = iv_by_t_ox[t_ox_m]
+        if not iv:
+            checks.append((
+                f"moscap_cv_oxide_thickness: t_ox = {t_ox_m*1e9:.0f} nm run "
+                f"recorded iv rows",
+                False, "iv table empty",
+            ))
+            continue
+
+        gate_iv = sorted(iv, key=lambda r: r["V"])
+        v_arr = np.array([r["V"] for r in gate_iv], dtype=float)
+        q_arr = np.array([r["Q_gate"] for r in gate_iv], dtype=float)
+        c_arr = np.gradient(q_arr, v_arr)
+
+        finite = bool(np.all(np.isfinite(c_arr)))
+        checks.append((
+            f"moscap_cv_oxide_thickness: t_ox = {t_ox_m*1e9:.0f} nm C(V) finite",
+            finite,
+            f"non-finite samples: {int((~np.isfinite(c_arr)).sum())} "
+            f"/ {len(c_arr)}",
+        ))
+        if not finite:
+            continue
+
+        # Has at least one interior extremum (the depletion / inversion
+        # transition is non-monotonic in V_gate; a fully monotonic
+        # curve would mean the sweep missed the transition).
+        dC = np.diff(c_arr)
+        sign_change = np.any(dC[:-1] * dC[1:] < 0.0)
+        checks.append((
+            f"moscap_cv_oxide_thickness: t_ox = {t_ox_m*1e9:.0f} nm C(V) has "
+            f"a depletion / accumulation transition",
+            bool(sign_change),
+            "no sign change in dC/dV across the swept range",
+        ))
+
+        c_at_acc[t_ox_m] = float(c_arr[0])
+
+    if all(t in c_at_acc for t in (2.0e-9, 5.0e-9, 10.0e-9)):
+        ordering_ok = (
+            c_at_acc[2.0e-9] > c_at_acc[5.0e-9] > c_at_acc[10.0e-9]
+        )
+        checks.append((
+            "moscap_cv_oxide_thickness: C(2 nm) > C(5 nm) > C(10 nm) at "
+            "V_gate = -2 V (strong accumulation)",
+            ordering_ok,
+            f"C(2 nm) = {c_at_acc[2.0e-9]:.3e}, "
+            f"C(5 nm) = {c_at_acc[5.0e-9]:.3e}, "
+            f"C(10 nm) = {c_at_acc[10.0e-9]:.3e}",
+        ))
+    else:
+        checks.append((
+            "moscap_cv_oxide_thickness: C-V curves derived for all t_ox",
+            False,
+            f"iv tables present for t_ox = "
+            f"{sorted(int(t*1e9) for t in c_at_acc)} nm",
+        ))
+
+    result._moscap_cv_by_t_ox = {
+        t_ox_m: (
+            np.array([r["V"] for r in sorted(iv, key=lambda q: q["V"])],
+                     dtype=float),
+            np.gradient(
+                np.array([r["Q_gate"] for r in sorted(iv, key=lambda q: q["V"])],
+                         dtype=float),
+                np.array([r["V"] for r in sorted(iv, key=lambda q: q["V"])],
+                         dtype=float),
+            ),
+        )
+        for t_ox_m, iv in iv_by_t_ox.items()
+        if iv
+    }
+    return checks
+
+
+def plot_moscap_cv_oxide_thickness(result, out_dir: Path) -> list[Path]:
+    """Three C-V curves overlaid, color-coded by oxide thickness."""
+    cv_by_t_ox = getattr(result, "_moscap_cv_by_t_ox", None)
+    if not cv_by_t_ox:
+        return []
+
+    fig, ax = plt.subplots(1, 1, figsize=(7.5, 5))
+    cmap = plt.get_cmap("viridis")
+    t_oxs_sorted = sorted(cv_by_t_ox)
+    for i, t_ox_m in enumerate(t_oxs_sorted):
+        v_arr, c_arr = cv_by_t_ox[t_ox_m]
+        color = cmap(i / max(len(t_oxs_sorted) - 1, 1))
+        ax.plot(v_arr, c_arr, "o-", markersize=3, color=color,
+                label=f"t_ox = {t_ox_m*1e9:.0f} nm")
+    ax.set_xlabel("V_gate (V)")
+    ax.set_ylabel("C(V_gate) (F/m)")
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="best")
+    ax.set_title(
+        "moscap_cv_oxide_thickness: MOSCAP C-V at t_ox in {2, 5, 10} nm"
+    )
+    fig.tight_layout()
+    p = out_dir / "cv_oxide_thickness.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["moscap_cv_oxide_thickness"] = plot_moscap_cv_oxide_thickness
+
+
 @register("power_diode_reverse_recovery")
 def verify_power_diode_reverse_recovery(result) -> list[tuple[str, bool, str]]:
     """
