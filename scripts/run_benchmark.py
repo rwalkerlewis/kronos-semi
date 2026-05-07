@@ -3311,6 +3311,175 @@ def plot_nmos_idvgs(result, out_dir: Path) -> list[Path]:
 _PLOTTERS["nmos_idvgs"] = plot_nmos_idvgs
 
 
+@register("pmos_idvgs")
+def verify_pmos_idvgs(result) -> list[tuple[str, bool, str]]:
+    """
+    Smoke verifier for the pmos_idvgs example.
+
+    Anchor run: V_DS = -0.05 V (linear regime), V_GS sweep 0 -> -1.8 V
+    from the JSON. Companion run: V_DS = -1.8 V (saturation regime),
+    same V_GS sweep, invoked here via in-process semi.run.run() with
+    the drain voltage overridden.
+
+    Checks (smoke only; tight tolerances live under benchmarks/):
+      - Both runs complete without raising and record an iv table.
+      - I(V_GS) is finite at every V_GS for both V_DS values.
+      - For every V_DS, |J_drain| is monotonically non-decreasing in
+        |V_GS| (the transistor turns on as V_GS goes more negative;
+        small dips below 1 % of the local maximum are tolerated as
+        numerical noise).
+      - I_D at V_GS = -1.8 V, V_DS = -1.8 V is **negative** and finite
+        (PMOS conducts source-to-drain in the negative direction; the
+        sign carries the qualitative gate beyond mere finiteness).
+    """
+    from semi import run as semi_run
+
+    cfg_anchor = result.cfg
+    iv_anchor = list(result.iv or [])
+
+    if not iv_anchor:
+        return [(
+            "pmos_idvgs: anchor run recorded iv rows",
+            False, "no iv rows in result",
+        )]
+
+    v_ds_other = -1.8
+    print(f"[pmos_idvgs] running companion sweep at V_DS = {v_ds_other} V...",
+          flush=True)
+    iv_by_vds: dict[float, list[dict]] = {}
+    iv_by_vds[float(cfg_anchor["contacts"][2]["voltage"])] = iv_anchor
+
+    for v_ds, cfg_v in _drain_voltage_overrides(cfg_anchor, [v_ds_other]):
+        res = semi_run.run(cfg_v)
+        iv_by_vds[v_ds] = list(res.iv or [])
+
+    checks: list[tuple[str, bool, str]] = []
+
+    for v_ds, iv in sorted(iv_by_vds.items()):
+        if not iv:
+            checks.append((
+                f"pmos_idvgs: V_DS = {v_ds:.2f} V run recorded iv rows",
+                False, "iv table empty",
+            ))
+            continue
+
+        gate_iv = sorted(
+            (r for r in iv if r.get("contact") == "gate"),
+            key=lambda r: r["V"],
+        )
+        if not gate_iv or "J_drain" not in gate_iv[0]:
+            checks.append((
+                f"pmos_idvgs: V_DS = {v_ds:.2f} V run recorded J_drain",
+                False,
+                "expected per-step J_drain from the M14.3 bias_sweep extension",
+            ))
+            continue
+
+        # V_GS goes negative; sort by descending |V_GS| so the "running
+        # maximum of |J_drain| as the device turns on" idiom matches the
+        # nmos_idvgs verifier (which sorts ascending V_GS as that device
+        # turns on).
+        gate_iv = sorted(
+            (r for r in iv if r.get("contact") == "gate"),
+            key=lambda r: -r["V"],
+        )
+        j_drain = np.array([r["J_drain"] for r in gate_iv], dtype=float)
+
+        finite = bool(np.all(np.isfinite(j_drain)))
+        checks.append((
+            f"pmos_idvgs: V_DS = {v_ds:.2f} V J_drain finite",
+            finite,
+            f"non-finite samples: {int((~np.isfinite(j_drain)).sum())} "
+            f"/ {len(j_drain)}",
+        ))
+        if not finite:
+            continue
+
+        # Monotonic-non-decreasing in |V_GS|, with a 1 % local-maximum
+        # tolerance for numerical noise (the smoke gate is qualitative).
+        running_max = np.maximum.accumulate(np.abs(j_drain))
+        violations = np.sum(np.abs(j_drain) < running_max * 0.99)
+        checks.append((
+            f"pmos_idvgs: V_DS = {v_ds:.2f} V |J_drain| monotone in |V_GS| "
+            f"(<= 1 % dips tolerated)",
+            int(violations) == 0,
+            f"{int(violations)} / {len(j_drain)} samples below the running max",
+        ))
+
+    iv_sat = iv_by_vds.get(v_ds_other, [])
+    gate_iv_sat = sorted(
+        (r for r in iv_sat if r.get("contact") == "gate"),
+        key=lambda r: r["V"],
+    )
+    j_at_max = None
+    for r in gate_iv_sat:
+        if abs(float(r["V"]) - (-1.8)) < 1.0e-6 and "J_drain" in r:
+            j_at_max = float(r["J_drain"])
+            break
+    if j_at_max is None and gate_iv_sat:
+        first = gate_iv_sat[0]
+        if "J_drain" in first:
+            j_at_max = float(first["J_drain"])
+
+    checks.append((
+        "pmos_idvgs: I_D at V_GS = -1.8 V, V_DS = -1.8 V negative and finite",
+        j_at_max is not None and np.isfinite(j_at_max) and j_at_max < 0.0,
+        f"J_drain = {j_at_max!r}",
+    ))
+
+    result._pmos_curves_by_vds = {
+        v_ds: (
+            np.array([r["V"] for r in sorted(
+                (q for q in iv if q.get("contact") == "gate"),
+                key=lambda q: q["V"],
+            )], dtype=float),
+            np.array([r.get("J_drain", float("nan")) for r in sorted(
+                (q for q in iv if q.get("contact") == "gate"),
+                key=lambda q: q["V"],
+            )], dtype=float),
+        )
+        for v_ds, iv in iv_by_vds.items()
+    }
+    return checks
+
+
+def plot_pmos_idvgs(result, out_dir: Path) -> list[Path]:
+    """Two-panel |I_D| vs |V_GS| overlay (linear and semilog)."""
+    curves = getattr(result, "_pmos_curves_by_vds", None)
+    if not curves:
+        return []
+
+    fig, (ax_lin, ax_log) = plt.subplots(2, 1, figsize=(7.5, 8), sharex=True)
+    for v_ds in sorted(curves):
+        v_gs, j_drain = curves[v_ds]
+        ax_lin.plot(np.abs(v_gs), np.abs(j_drain), "o-", markersize=3,
+                    label=f"V_DS = {v_ds:.2f} V")
+        ax_log.semilogy(np.abs(v_gs),
+                        np.maximum(np.abs(j_drain), 1.0e-30),
+                        "o-", markersize=3,
+                        label=f"V_DS = {v_ds:.2f} V")
+
+    ax_lin.set_ylabel("|J_drain| (A/m)")
+    ax_lin.grid(True, alpha=0.3)
+    ax_lin.legend(loc="best")
+    ax_lin.set_title("pmos_idvgs: linear-y (saturation visible)")
+
+    ax_log.set_xlabel("|V_GS| (V)")
+    ax_log.set_ylabel("|J_drain| (A/m)")
+    ax_log.grid(True, which="both", alpha=0.3)
+    ax_log.legend(loc="best")
+    ax_log.set_title("pmos_idvgs: semilog-y (subthreshold visible)")
+
+    fig.tight_layout()
+    p = out_dir / "id_vgs_overlay.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["pmos_idvgs"] = plot_pmos_idvgs
+
+
 def _temperature_overrides(cfg, temperatures):
     """Yield (T, cfg_copy) pairs with physics.temperature overridden."""
     import copy
