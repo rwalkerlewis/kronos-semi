@@ -26,9 +26,9 @@ the full annotated source of truth is the JSON file.
   contact / mesh / solver fields fail validation rather than being
   silently dropped).
 - Minor/patch skew is accepted silently within a major.
-- Current schema version: **2.6.0** (M16.6 BBT and TAT tunneling
-  dispatch); v2.0.0, v2.1.0, v2.2.0, v2.3.0, v2.4.0, and v2.5.0
-  inputs continue to validate (additive minors).
+- Current schema version: **2.7.0** (M16.7 transient time-varying
+  contact voltage); v2.0.0 through v2.6.0 inputs continue to
+  validate (additive minors).
 
 Schemas are published to
 `https://rwalkerlewis.github.io/kronos-semi/schemas/` on every release
@@ -95,6 +95,17 @@ History:
   is true and `statistics` is `"boltzmann"` (BBT is most accurate
   under Fermi-Dirac at heavy doping). v2.0.0 through v2.5.0 inputs
   continue to validate.
+- **2.7.0** (M16.7): additive time-varying contact voltage
+  `voltage_t` for the transient runner (M16.7). Adds the
+  `contacts[].voltage_t` sub-object with two variants:
+  `{type: "table", times, values}` (linear interpolation between
+  sample points with endpoint clamping) and
+  `{type: "step", t0, v0, v1}` (one transition at `t0`).
+  Mutually exclusive with `voltage_sweep`. The bias_sweep,
+  ac_sweep, equilibrium, mos_cv, mos_cap_ac, and resistor_3d
+  runners reject `voltage_t` at validate time. Configs without
+  `voltage_t` are bit-identical to v0.22.0; v2.0.0 through v2.6.0
+  inputs continue to validate.
 
 ## Top-level fields
 

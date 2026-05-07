@@ -16,8 +16,9 @@
     "schema_version": {
       "type": "string",
       "pattern": "^2\\.\\d+\\.\\d+$",
-      "description": "Schema version in semver form. v2 enforces additionalProperties:false on every object node (typos in input keys fail validation rather than being silently ignored). Engine refuses inputs whose major does not match the engine's supported major. Current schema: 2.6.0; v2.0.0, v2.1.0, v2.2.0, v2.3.0, v2.4.0, and v2.5.0 inputs continue to validate (additive minors for the M16.1 caughey_thomas, M16.2 lombardi mobility, M16.3 Auger recombination, M16.4 Fermi-Dirac statistics, M16.5 Schottky contact, and M16.6 BBT and TAT tunneling dispatches).",
+      "description": "Schema version in semver form. v2 enforces additionalProperties:false on every object node (typos in input keys fail validation rather than being silently ignored). Engine refuses inputs whose major does not match the engine's supported major. Current schema: 2.7.0; v2.0.0 through v2.6.0 inputs continue to validate (additive minors for the M16.1 caughey_thomas, M16.2 lombardi mobility, M16.3 Auger recombination, M16.4 Fermi-Dirac statistics, M16.5 Schottky contact, M16.6 BBT and TAT tunneling, and M16.7 transient time-varying contact voltage dispatches).",
       "examples": [
+        "2.7.0",
         "2.6.0",
         "2.5.0",
         "2.4.0",
@@ -511,6 +512,53 @@
                 "type": "number",
                 "exclusiveMinimum": 0.0,
                 "description": "Initial voltage step size, in volts. The adaptive controller may shrink or grow this during the sweep."
+              }
+            },
+            "additionalProperties": false
+          },
+          "voltage_t": {
+            "type": "object",
+            "title": "Time-varying contact voltage",
+            "description": "Time-varying applied voltage on this contact. Used only by the transient runner; ignored by bias_sweep, ac_sweep, equilibrium, mos_cv, mos_cap_ac, and resistor_3d. Mutually exclusive with `voltage_sweep`. The `table` variant interpolates linearly between (times[i], values[i]) pairs and clamps at the endpoints; the `step` variant returns `v0` for `t < t0` and `v1` for `t >= t0`. (M16.7)",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "table",
+                  "step"
+                ],
+                "description": "Waveform variant. `table`: linear interpolation between (times, values) pairs with endpoint clamping. `step`: piecewise-constant with one transition at t0."
+              },
+              "times": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "description": "For `type='table'`: monotonically increasing sample times in seconds (length >= 2)."
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "description": "For `type='table'`: applied voltage in volts at each `times[i]` (same length as `times`)."
+              },
+              "t0": {
+                "type": "number",
+                "description": "For `type='step'`: transition time in seconds. The contact holds `v0` for `t < t0` and `v1` for `t >= t0`."
+              },
+              "v0": {
+                "type": "number",
+                "description": "For `type='step'`: applied voltage in volts before `t0`."
+              },
+              "v1": {
+                "type": "number",
+                "description": "For `type='step'`: applied voltage in volts at and after `t0`."
               }
             },
             "additionalProperties": false
