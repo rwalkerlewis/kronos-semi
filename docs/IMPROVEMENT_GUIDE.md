@@ -1008,6 +1008,11 @@ The engine is ready for a UI when all of these are green:
 
 ### [Unreleased]
 
+- **2026-05-06**, author M16.7 starter prompt
+  ([M16_7_STARTER_PROMPT.md](M16_7_STARTER_PROMPT.md)) on branch
+  `dev/m16.7-transient-ac`; phases ship per
+  [PR template at the bottom of the prompt](M16_7_STARTER_PROMPT.md).
+
 ### [0.22.0]
 
 - **2026-05-06**, M16.6 BBT and TAT tunneling shipped (v0.22.0):
