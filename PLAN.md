@@ -367,6 +367,14 @@ binding; the owner picks one explicitly when the next task ships.
   pointer is unchanged. Future-examples candidates (NPN BJT,
   NMOS C-V at multiple body biases, SiC Schottky, tunnel diode
   forward I-V) are listed in `examples/README.md`.
+  - **Examples extension (shipped).** Three more configs added
+    on `dev/examples-extension`: `pmos_idvgs` (the natural
+    complement to `nmos_idvgs`), `moscap_cv_oxide_thickness`
+    (first example to exercise the `mos_cv` runner; C-V at
+    three oxide thicknesses), and `diode_reverse_leakage_temperature`
+    (educational complement to `schottky_iv_temperature`; SRH
+    generation T-dependence). No schema bump, no `semi/` source
+    change, no version bump.
 
 ## Roadmap
 

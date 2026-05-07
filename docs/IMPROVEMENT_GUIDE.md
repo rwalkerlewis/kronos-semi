@@ -1024,6 +1024,32 @@ The engine is ready for a UI when all of these are green:
 
 ### [Unreleased]
 
+- **2026-05-06**, examples extension shipped: three more
+  self-contained practical-device configs added on
+  `dev/examples-extension`. `examples/pmos_idvgs/` (the natural
+  PMOS complement to `examples/nmos_idvgs/`; same Caughey-Thomas
+  + Lombardi + FD physics path on opposite-polarity doping;
+  demonstrates the four sign-flips that convert NMOS to PMOS).
+  `examples/moscap_cv_oxide_thickness/` (first example to
+  exercise the `mos_cv` runner; MOSCAP C-V at three oxide
+  thicknesses with verifier-driven mesh-geometry overrides;
+  demonstrates the C-V output mode and the C_ox = eps/t_ox
+  scaling at strong accumulation). `examples/diode_reverse_leakage_temperature/`
+  (educational complement to `examples/schottky_iv_temperature/`;
+  pn diode reverse leakage at three temperatures; SRH
+  generation in the depletion region scales as exp(-E_g/(2 kT)),
+  distinct from the thermionic emission's exp(-q phi_B / kT)).
+  Each ships with a load-bearing README, a smoke verifier and
+  plotter registered in `scripts/run_benchmark.py`, a CI matrix
+  entry under `docker-fem-benchmarks` (no `allow-failure` flag),
+  and a registration-coverage test in
+  `tests/test_examples_register.py`. No schema bump (v2.7.0
+  stays current); no `semi/` source change; every existing
+  benchmark and every example from PR #85 is bit-identical to
+  v0.23.0. Future-examples candidates from PR #85's README
+  (NPN BJT, NMOS C-V at multiple body biases, SiC Schottky,
+  tunnel diode forward I-V) remain in the future-examples list;
+  none was consumed by this PR.
 - **2026-05-06**, author examples extension starter prompt
   ([EXAMPLES_EXTENSION_STARTER_PROMPT.md](EXAMPLES_EXTENSION_STARTER_PROMPT.md))
   on branch `dev/examples-extension`; phases ship per the PR

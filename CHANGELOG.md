@@ -45,6 +45,20 @@ transient time-varying contact voltage `voltage_t`; shipped with
   registration-coverage test in `tests/test_examples_register.py`.
   The `scripts/run_benchmark.py` CLI now falls back to `examples/`
   when a name is not found under `benchmarks/`.
+- **Examples catalogue extension.** Three additional configs added
+  under `examples/`:
+  - `examples/pmos_idvgs/` (Caughey-Thomas + Lombardi + Fermi-Dirac
+    on opposite-polarity doping; the PMOS complement to
+    `nmos_idvgs`).
+  - `examples/moscap_cv_oxide_thickness/` (the first example to
+    exercise the `mos_cv` runner; MOSCAP C-V at oxide thicknesses
+    2 / 5 / 10 nm with verifier-driven mesh-geometry overrides).
+  - `examples/diode_reverse_leakage_temperature/` (pn diode
+    reverse leakage at 250 / 300 / 350 K; the SRH-generation
+    educational complement to `schottky_iv_temperature`).
+  Each example ships under the same load-bearing README / smoke
+  verifier / CI matrix entry / registration test convention as
+  PR #85.
 
 ### Notes
 

@@ -45,6 +45,9 @@ def verifiers():
         "nmos_idvgs",
         "schottky_iv_temperature",
         "power_diode_reverse_recovery",
+        "pmos_idvgs",
+        "moscap_cv_oxide_thickness",
+        "diode_reverse_leakage_temperature",
     ],
 )
 def test_example_verifier_registered(verifiers, example_name):
