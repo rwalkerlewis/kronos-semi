@@ -147,6 +147,7 @@ def run_mos_cv(cfg: dict[str, Any], *, progress_callback=None):
         contacts = resolve_contacts(cfg, facet_tags=facet_tags, voltages=voltages)
         bcs = build_psi_dirichlet_bcs(
             V, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn,
+            regions_cfg=cfg.get("regions"), cell_tags=cell_tags,
         )
         for bc in bcs:
             bc.set(psi.x.array)

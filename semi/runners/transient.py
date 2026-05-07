@@ -380,6 +380,7 @@ def run_transient(
                                     voltages=voltages)
         return build_dd_dirichlet_bcs(
             spaces, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn,
+            regions_cfg=cfg.get("regions"), cell_tags=cell_tags,
         )
 
     def _apply_bc_values(bcs: list):

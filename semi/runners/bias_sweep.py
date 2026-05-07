@@ -102,6 +102,7 @@ def run_bias_sweep(
         bcs_psi_only = build_psi_dirichlet_bcs(
             spaces.V_psi, msh, facet_tags, contacts_eq, sc, ref_mat,
             N_raw_fn,
+            regions_cfg=cfg.get("regions"), cell_tags=cell_tags,
         )
         for bc in bcs_psi_only:
             bc.set(spaces.psi.x.array)
@@ -274,6 +275,7 @@ def run_bias_sweep(
         contacts = resolve_contacts(cfg, facet_tags=facet_tags, voltages=V_by_contact)
         bcs = build_dd_dirichlet_bcs(
             spaces, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn,
+            regions_cfg=cfg.get("regions"), cell_tags=cell_tags,
         )
         space_to_fn = {
             id(spaces.V_psi): spaces.psi,

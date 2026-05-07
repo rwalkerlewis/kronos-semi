@@ -45,7 +45,10 @@ def run_equilibrium(cfg: dict[str, Any], *, progress_callback=None):
 
     psi = fem.Function(V, name="psi_hat")
     contacts = resolve_contacts(cfg, facet_tags=facet_tags)
-    bcs = build_psi_dirichlet_bcs(V, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn)
+    bcs = build_psi_dirichlet_bcs(
+        V, msh, facet_tags, contacts, sc, ref_mat, N_raw_fn,
+        regions_cfg=cfg.get("regions"), cell_tags=cell_tags,
+    )
 
     two_ni = 2.0 * ref_mat.n_i
 

@@ -337,6 +337,7 @@ def run_ac_sweep(cfg: dict[str, Any], *, progress_callback=None):
     contacts_dc = resolve_contacts(cfg, facet_tags=facet_tags, voltages=static_voltages)
     bcs_dc = build_dd_dirichlet_bcs(
         spaces, msh, facet_tags, contacts_dc, sc, ref_mat, N_raw_fn,
+        regions_cfg=cfg.get("regions"), cell_tags=cell_tags,
     )
 
     # Compiled forms for assembly.
