@@ -154,21 +154,28 @@ def test_transient_fft_vs_ac_sweep():
             float(rel_err), "passed" if rel_err < 0.05 else "failed",
         ]],
     )
+    # As in Cases 02 and 05: per-run floats live in the CSV; the
+    # markdown is a stable summary so the CI sync check (`git diff
+    # --exit-code docs/PHYSICS_AUDIT.md`) is reproducible. The MUMPS
+    # LU pivot ordering on the indefinite forward-bias AC block
+    # contributes the same ~1-2% Re(Y) noise floor as Case 05; the
+    # transient FFT inherits it via Y_ac in the rel_err numerator.
     write_markdown(
         CASE,
         "Case 06 - transient (FFT) vs ac_sweep",
-        (
-            f"At V_DC = {V_DC} V, f = {F_HZ:g} Hz, dV = {DV} V on the "
-            f"`rc_ac_sweep` benchmark, the FFT of I(t) under "
-            f"V(t) = V_DC + dV*sin(omega t) (sampled into a "
-            f"`voltage_t` table; M16.7) recovers the AC small-signal "
-            f"admittance Y(omega) within the 5% audit gate "
-            f"(observed: {rel_err:.2%}). "
-            f"Y_ac = {Y_ac.real:.3e} + j*{Y_ac.imag:.3e} S; "
-            f"Y_transient_fft = {Y_transient_fft.real:.3e} + "
-            f"j*{Y_transient_fft.imag:.3e} S. "
-            f"CSV: `/tmp/audit/{CASE}.csv`"
-        ),
+        f"At V_DC = {V_DC} V, f = 1 MHz, dV = 1 mV on the "
+        f"`rc_ac_sweep` benchmark, the FFT of I(t) under "
+        f"V(t) = V_DC + dV*sin(omega t) (sampled into a "
+        f"`voltage_t` table; M16.7) recovers the AC small-signal "
+        f"admittance Y(omega) within the 5% audit gate. Per-run "
+        f"values (Y_ac, Y_transient_fft, rel_err) are written to "
+        f"`/tmp/audit/{CASE}.csv`. The transient runner uses BDF1 "
+        f"over 4 cycles at 200 samples per cycle (800 timesteps, "
+        f"dt = 5 ns) with `bc_ramp_steps = 20` ramping to V_DC "
+        f"before the time loop. A Hann window applied to both V(t) "
+        f"and I(t) before the rfft cancels in the admittance ratio "
+        f"Y(omega) = J_fft[bin] / V_fft[bin].\n\n"
+        f"CSV: `/tmp/audit/{CASE}.csv`",
     )
 
     assert rel_err < 0.05, (

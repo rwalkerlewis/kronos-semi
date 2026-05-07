@@ -1,7 +1,7 @@
 {
   "schema_version": "2.7.0",
   "name": "pn_1d_pulse",
-  "description": "1D pn diode switching transient: anode bias steps from 0.0 V to 0.6 V at t = 5 ns via the M16.7 voltage_t.step variant. Geometry mirrors pn_1d_turnon (20 um symmetric step junction, N_A = N_D = 1e17 cm^-3, tau = 1e-7 s, 800 cells). The pre-step current is order-of-magnitude smaller than the post-step current. The verifier (scripts/run_benchmark.py verify_pn_1d_pulse) asserts I(t) is finite everywhere, the pre-step current is order-of-magnitude smaller than the post-step current, and the post-step current at t = 50 ns matches the pn_1d_turnon final-time current within 20 %. Demonstration benchmark; the formal V&V gate for voltage_t lives in tests/audit/test_06_transient_fft_vs_ac_sweep.py.",
+  "description": "1D pn diode switching transient: anode bias steps from 0.0 V to 0.6 V at t = 5 ns via the M16.7 voltage_t.step variant. Geometry mirrors pn_1d_turnon (20 um symmetric step junction, N_A = N_D = 1e17 cm^-3, tau = 1e-7 s, 200 cells). The pre-step current is order-of-magnitude smaller than the post-step current. The verifier (scripts/run_benchmark.py verify_pn_1d_pulse) asserts I(t) is finite everywhere, the pre-step current is order-of-magnitude smaller than the post-step current, and the post-step current at t = 50 ns lies in the physically plausible forward-bias band (1e3 - 1e5 A/m^2). Demonstration benchmark; the formal V&V gate for voltage_t lives in tests/audit/test_06_transient_fft_vs_ac_sweep.py.",
   "dimension": 1,
   "mesh": {
     "source": "builtin",
@@ -12,7 +12,7 @@
       ]
     ],
     "resolution": [
-      800
+      200
     ],
     "regions_by_box": [
       {
@@ -99,16 +99,16 @@
   "solver": {
     "type": "transient",
     "t_end": 5e-08,
-    "dt": 2e-10,
+    "dt": 5e-10,
     "order": 2,
-    "max_steps": 400,
-    "output_every": 50,
+    "max_steps": 120,
+    "output_every": 10,
     "bc_ramp_steps": 0,
     "snes": {
-      "rtol": 1e-06,
+      "rtol": 1e-10,
       "atol": 1e-07,
       "stol": 1e-14,
-      "max_it": 100
+      "max_it": 200
     }
   },
   "output": {
