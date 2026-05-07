@@ -1024,6 +1024,11 @@ The engine is ready for a UI when all of these are green:
 
 ### [Unreleased]
 
+- **2026-05-06**, author M17 starter prompt
+  ([M17_STARTER_PROMPT.md](M17_STARTER_PROMPT.md)) and ADR 0016
+  ([0016 Heterojunction-aware Slotboom and ohmic equilibrium](adr/0016-heterojunction-slotboom.md))
+  on branch `dev/m17-heterojunction`; phases A through G ship per
+  the PR template at the bottom of the prompt.
 - **2026-05-06**, examples catalogue shipped: three self-contained
   practical-device configs land under a new top-level `examples/`
   directory (`nmos_idvgs`, `schottky_iv_temperature`,
