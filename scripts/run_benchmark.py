@@ -3997,6 +3997,196 @@ def plot_power_diode_reverse_recovery(result, out_dir: Path) -> list[Path]:
 _PLOTTERS["power_diode_reverse_recovery"] = plot_power_diode_reverse_recovery
 
 
+@register("diode_reverse_leakage_temperature")
+def verify_diode_reverse_leakage_temperature(result) -> list[tuple[str, bool, str]]:
+    """
+    Smoke verifier for the diode_reverse_leakage_temperature example.
+
+    Anchor run: T = 300 K. Companion runs: T = 250 K and T = 350 K,
+    invoked here via in-process semi.run.run() with
+    physics.temperature overridden by the shared
+    `_temperature_overrides` helper.
+
+    Checks (smoke only; tight tolerances live under benchmarks/):
+      - All three runs complete without raising and record an iv
+        table.
+      - For each T, the I-V curve is finite at every V_F and is
+        monotonically non-decreasing in |V_F| in the reverse-bias
+        range (depletion widens with reverse bias; leakage grows
+        correspondingly; 1 % local-maximum tolerance for numerical
+        noise).
+      - At V_F = -3 V (mid-sweep), |I_R(350 K)| > |I_R(300 K)| >
+        |I_R(250 K)| strictly (the exp(-E_g/(2 kT)) SRH-generation
+        ordering must be physically correct).
+      - **Resists** the temptation to assert a specific
+        |I_R(350 K)| / |I_R(250 K)| ratio. The Arrhenius extraction
+        is the user's exercise, not the verifier's gate.
+    """
+    from semi import run as semi_run
+
+    cfg_anchor = result.cfg
+    iv_anchor = list(result.iv or [])
+    if not iv_anchor:
+        return [(
+            "diode_reverse_leakage_temperature: anchor run recorded iv rows",
+            False, "no iv rows in result",
+        )]
+
+    iv_by_T: dict[float, list[dict]] = {}
+    iv_by_T[float(cfg_anchor["physics"]["temperature"])] = iv_anchor
+
+    for t_kelvin, cfg_t in _temperature_overrides(cfg_anchor, [250.0, 350.0]):
+        print(
+            f"[diode_reverse_leakage_temperature] running companion "
+            f"sweep at T = {t_kelvin:.0f} K...",
+            flush=True,
+        )
+        res = semi_run.run(cfg_t)
+        iv_by_T[t_kelvin] = list(res.iv or [])
+
+    checks: list[tuple[str, bool, str]] = []
+    j_at_vf_minus3: dict[float, float] = {}
+
+    for t_kelvin in sorted(iv_by_T):
+        iv = iv_by_T[t_kelvin]
+        if not iv:
+            checks.append((
+                f"diode_reverse_leakage_temperature: T = {t_kelvin:.0f} K run "
+                f"recorded iv rows",
+                False, "iv table empty",
+            ))
+            continue
+
+        anode_iv = sorted(
+            (r for r in iv if r.get("contact") == "anode"),
+            key=lambda r: r["V"],
+        )
+        v_f = np.array([r["V"] for r in anode_iv], dtype=float)
+        j_arr = np.array([r["J"] for r in anode_iv], dtype=float)
+
+        finite = bool(np.all(np.isfinite(j_arr)))
+        checks.append((
+            f"diode_reverse_leakage_temperature: T = {t_kelvin:.0f} K I(V_F) "
+            f"finite",
+            finite,
+            f"non-finite samples: {int((~np.isfinite(j_arr)).sum())} "
+            f"/ {len(j_arr)}",
+        ))
+        if not finite:
+            continue
+
+        # Reverse-bias monotonicity in |V_F|: walk the curve from V_F = 0
+        # to the most negative V_F and verify |J| is non-decreasing.
+        # The sweep is start = 0 -> stop = -5 V at step 0.1 V; sorting
+        # by V_F ascending puts the most negative V_F first.
+        rev_mask = v_f <= 0.0
+        if rev_mask.any():
+            j_rev = np.abs(j_arr[rev_mask])
+            v_rev = v_f[rev_mask]
+            # Order by descending V_F (i.e., increasing |V_F|).
+            order = np.argsort(-v_rev)
+            j_rev_ordered = j_rev[order]
+            running_max = np.maximum.accumulate(j_rev_ordered)
+            violations = int(np.sum(j_rev_ordered < running_max * 0.99))
+            checks.append((
+                f"diode_reverse_leakage_temperature: T = {t_kelvin:.0f} K |I| "
+                f"monotone in |V_F| (reverse bias; <= 1 % dips tolerated)",
+                violations == 0,
+                f"{violations} / {len(j_rev_ordered)} samples below the "
+                f"running max",
+            ))
+
+        j_at_vf_minus3[t_kelvin] = float(np.interp(-3.0, v_f, j_arr))
+
+    if all(t in j_at_vf_minus3 for t in (250.0, 300.0, 350.0)):
+        # Reverse-bias current is negative; |I_R(T)| is monotone in T.
+        ordering_ok = (
+            abs(j_at_vf_minus3[350.0]) > abs(j_at_vf_minus3[300.0])
+            > abs(j_at_vf_minus3[250.0])
+        )
+        checks.append((
+            "diode_reverse_leakage_temperature: |I_R(350 K)| > |I_R(300 K)| "
+            "> |I_R(250 K)| at V_F = -3 V",
+            ordering_ok,
+            f"J(250 K) = {j_at_vf_minus3[250.0]:.3e}, "
+            f"J(300 K) = {j_at_vf_minus3[300.0]:.3e}, "
+            f"J(350 K) = {j_at_vf_minus3[350.0]:.3e} A/m^2",
+        ))
+    else:
+        checks.append((
+            "diode_reverse_leakage_temperature: I(V_F = -3 V) interpolated "
+            "for all T",
+            False,
+            f"iv tables present for T = {sorted(j_at_vf_minus3)} K",
+        ))
+
+    result._diode_reverse_leakage_iv_by_T = {
+        t_kelvin: (
+            np.array([r["V"] for r in sorted(
+                (q for q in iv if q.get("contact") == "anode"),
+                key=lambda q: q["V"],
+            )], dtype=float),
+            np.array([r["J"] for r in sorted(
+                (q for q in iv if q.get("contact") == "anode"),
+                key=lambda q: q["V"],
+            )], dtype=float),
+        )
+        for t_kelvin, iv in iv_by_T.items()
+        if iv
+    }
+    result._diode_reverse_leakage_j_at_vf_minus3 = dict(j_at_vf_minus3)
+    return checks
+
+
+def plot_diode_reverse_leakage_temperature(result, out_dir: Path) -> list[Path]:
+    """Two-panel: reverse-bias |I| vs V_F overlay (semilog-y) plus an
+    Arrhenius |I_R| vs 1/T subplot at V_F = -3 V.
+    """
+    iv_by_T = getattr(result, "_diode_reverse_leakage_iv_by_T", None)
+    j_at_minus3 = getattr(result, "_diode_reverse_leakage_j_at_vf_minus3", None)
+    if not iv_by_T:
+        return []
+
+    fig, (ax_iv, ax_arr) = plt.subplots(1, 2, figsize=(11, 5))
+    cmap = plt.get_cmap("coolwarm")
+    temps_sorted = sorted(iv_by_T)
+    for i, t_kelvin in enumerate(temps_sorted):
+        v_arr, j_arr = iv_by_T[t_kelvin]
+        color = cmap(i / max(len(temps_sorted) - 1, 1))
+        ax_iv.semilogy(v_arr, np.maximum(np.abs(j_arr), 1.0e-30),
+                       "o-", markersize=3, color=color,
+                       label=f"T = {t_kelvin:.0f} K")
+    ax_iv.set_xlabel("V_F (V)")
+    ax_iv.set_ylabel("|J_anode| (A/m^2)")
+    ax_iv.grid(True, which="both", alpha=0.3)
+    ax_iv.legend(loc="best")
+    ax_iv.set_title("|J_R| vs V_F")
+
+    if j_at_minus3 and len(j_at_minus3) >= 2:
+        T_arr = np.array(sorted(j_at_minus3), dtype=float)
+        j_abs = np.array([abs(j_at_minus3[t]) for t in T_arr], dtype=float)
+        ax_arr.semilogy(1000.0 / T_arr, j_abs, "ko-", markersize=6)
+        ax_arr.set_xlabel("1000 / T (1/K)")
+        ax_arr.set_ylabel("|J_R(V_F = -3 V)| (A/m^2)")
+        ax_arr.grid(True, which="both", alpha=0.3)
+        ax_arr.set_title("Arrhenius (slope = -E_a / k)")
+
+    fig.suptitle(
+        "diode_reverse_leakage_temperature: pn diode reverse leakage at "
+        "250 / 300 / 350 K"
+    )
+    fig.tight_layout()
+    p = out_dir / "iv_reverse_leakage_temperature.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["diode_reverse_leakage_temperature"] = (
+    plot_diode_reverse_leakage_temperature
+)
+
+
 # --------------------------------------------------------------------------- #
 # Driver                                                                      #
 # --------------------------------------------------------------------------- #

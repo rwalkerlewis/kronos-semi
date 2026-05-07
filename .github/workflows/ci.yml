@@ -237,6 +237,14 @@ jobs:
           # sweeps on a small Cartesian 2D grid; cheap.
           - name: moscap_cv_oxide_thickness
             args: moscap_cv_oxide_thickness
+          # examples extension: pn diode reverse leakage at three
+          # temperatures (250 / 300 / 350 K). Educational complement
+          # to schottky_iv_temperature: SRH generation in the
+          # depletion region scales as exp(-E_g/(2 kT)), distinct from
+          # the thermionic emission's exp(-q phi_B / kT). Three small
+          # 1D 800-cell bias_sweep runs; cheap.
+          - name: diode_reverse_leakage_temperature
+            args: diode_reverse_leakage_temperature
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
