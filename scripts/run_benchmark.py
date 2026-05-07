@@ -3118,6 +3118,200 @@ _PLOTTERS["diode_sine_1d"] = plot_diode_sine_1d
 
 
 # --------------------------------------------------------------------------- #
+# Examples catalogue (v0.23.x)                                                #
+#                                                                             #
+# Smoke verifiers for the practical-device configs under examples/. These     #
+# are illustrative starting points, not V&V gates: each verifier asserts      #
+# only run completion, finiteness of the recorded I-V data, and qualitative   #
+# physical ordering. Tight numerical correctness gates live under             #
+# benchmarks/.                                                                #
+# --------------------------------------------------------------------------- #
+
+
+def _drain_voltage_overrides(cfg, v_ds_values):
+    """Yield (v_ds, cfg_copy) pairs with the drain contact voltage overridden.
+
+    Mutates a deepcopy of cfg so the caller can pass each cfg_copy to
+    semi.run.run() without disturbing the input dict. The output directory
+    is also redirected to a per-V_DS subdirectory under the example's
+    output path so the companion runs do not stomp on each other.
+    """
+    import copy
+
+    base_out_dir = (
+        cfg.get("output", {}).get("directory") or "./results/_companion"
+    )
+    for v_ds in v_ds_values:
+        cfg_v = copy.deepcopy(cfg)
+        for c in cfg_v["contacts"]:
+            if c["name"] == "drain":
+                c["voltage"] = float(v_ds)
+        cfg_v.setdefault("output", {})
+        cfg_v["output"] = dict(cfg_v["output"])
+        cfg_v["output"]["directory"] = (
+            f"{base_out_dir.rstrip('/')}/_vds_{v_ds:.2f}"
+        )
+        yield float(v_ds), cfg_v
+
+
+@register("nmos_idvgs")
+def verify_nmos_idvgs(result) -> list[tuple[str, bool, str]]:
+    """
+    Smoke verifier for the nmos_idvgs example.
+
+    Anchor run: V_DS = 0.05 V (linear regime), V_GS sweep from the JSON.
+    Companion run: V_DS = 1.8 V (saturation regime), same V_GS sweep,
+    invoked here via in-process semi.run.run() with the drain voltage
+    overridden.
+
+    Checks (smoke only; tight tolerances live under benchmarks/):
+      - Both runs complete without raising and record an iv table.
+      - I(V_GS) is finite at every V_GS for both V_DS values.
+      - For every V_DS, J_drain is monotonically non-decreasing in V_GS
+        (transistor sits on the right side of subthreshold; small dips
+        below 1 % of the local maximum are tolerated as numerical noise).
+      - I_D at V_GS = 1.8 V, V_DS = 1.8 V is positive and finite.
+    """
+    from semi import run as semi_run
+
+    cfg_anchor = result.cfg
+    iv_anchor = list(result.iv or [])
+
+    if not iv_anchor:
+        return [(
+            "nmos_idvgs: anchor run recorded iv rows",
+            False, "no iv rows in result",
+        )]
+
+    v_ds_other = 1.8
+    print(f"[nmos_idvgs] running companion sweep at V_DS = {v_ds_other} V...",
+          flush=True)
+    iv_by_vds: dict[float, list[dict]] = {}
+    iv_by_vds[float(cfg_anchor["contacts"][2]["voltage"])] = iv_anchor
+
+    for v_ds, cfg_v in _drain_voltage_overrides(cfg_anchor, [v_ds_other]):
+        res = semi_run.run(cfg_v)
+        iv_by_vds[v_ds] = list(res.iv or [])
+
+    checks: list[tuple[str, bool, str]] = []
+
+    for v_ds, iv in sorted(iv_by_vds.items()):
+        if not iv:
+            checks.append((
+                f"nmos_idvgs: V_DS = {v_ds:.2f} V run recorded iv rows",
+                False, "iv table empty",
+            ))
+            continue
+
+        gate_iv = sorted(
+            (r for r in iv if r.get("contact") == "gate"),
+            key=lambda r: r["V"],
+        )
+        if not gate_iv or "J_drain" not in gate_iv[0]:
+            checks.append((
+                f"nmos_idvgs: V_DS = {v_ds:.2f} V run recorded J_drain",
+                False,
+                "expected per-step J_drain from the M14.3 bias_sweep extension",
+            ))
+            continue
+
+        j_drain = np.array([r["J_drain"] for r in gate_iv], dtype=float)
+
+        finite = bool(np.all(np.isfinite(j_drain)))
+        checks.append((
+            f"nmos_idvgs: V_DS = {v_ds:.2f} V J_drain finite",
+            finite,
+            f"non-finite samples: {int((~np.isfinite(j_drain)).sum())} "
+            f"/ {len(j_drain)}",
+        ))
+        if not finite:
+            continue
+
+        # Monotonic-non-decreasing in V_GS, with a 1 % local-maximum
+        # tolerance for numerical noise (the smoke gate is qualitative).
+        running_max = np.maximum.accumulate(np.abs(j_drain))
+        violations = np.sum(np.abs(j_drain) < running_max * 0.99)
+        checks.append((
+            f"nmos_idvgs: V_DS = {v_ds:.2f} V |J_drain| monotone in V_GS "
+            f"(<= 1 % dips tolerated)",
+            int(violations) == 0,
+            f"{int(violations)} / {len(j_drain)} samples below the running max",
+        ))
+
+    iv_sat = iv_by_vds.get(v_ds_other, [])
+    gate_iv_sat = sorted(
+        (r for r in iv_sat if r.get("contact") == "gate"),
+        key=lambda r: r["V"],
+    )
+    j_at_max = None
+    for r in gate_iv_sat[::-1]:
+        if abs(float(r["V"]) - 1.8) < 1.0e-6 and "J_drain" in r:
+            j_at_max = float(r["J_drain"])
+            break
+    if j_at_max is None and gate_iv_sat:
+        last = gate_iv_sat[-1]
+        if "J_drain" in last:
+            j_at_max = float(last["J_drain"])
+
+    checks.append((
+        "nmos_idvgs: I_D at V_GS = 1.8 V, V_DS = 1.8 V positive and finite",
+        j_at_max is not None and np.isfinite(j_at_max) and j_at_max > 0.0,
+        f"J_drain = {j_at_max!r}",
+    ))
+
+    result._nmos_curves_by_vds = {
+        v_ds: (
+            np.array([r["V"] for r in sorted(
+                (q for q in iv if q.get("contact") == "gate"),
+                key=lambda q: q["V"],
+            )], dtype=float),
+            np.array([r.get("J_drain", float("nan")) for r in sorted(
+                (q for q in iv if q.get("contact") == "gate"),
+                key=lambda q: q["V"],
+            )], dtype=float),
+        )
+        for v_ds, iv in iv_by_vds.items()
+    }
+    return checks
+
+
+def plot_nmos_idvgs(result, out_dir: Path) -> list[Path]:
+    """Two-panel Id-Vgs overlay (linear and semilog)."""
+    curves = getattr(result, "_nmos_curves_by_vds", None)
+    if not curves:
+        return []
+
+    fig, (ax_lin, ax_log) = plt.subplots(2, 1, figsize=(7.5, 8), sharex=True)
+    for v_ds in sorted(curves):
+        v_gs, j_drain = curves[v_ds]
+        ax_lin.plot(v_gs, j_drain, "o-", markersize=3,
+                    label=f"V_DS = {v_ds:.2f} V")
+        ax_log.semilogy(v_gs, np.maximum(np.abs(j_drain), 1.0e-30),
+                        "o-", markersize=3,
+                        label=f"V_DS = {v_ds:.2f} V")
+
+    ax_lin.set_ylabel("J_drain (A/m)")
+    ax_lin.grid(True, alpha=0.3)
+    ax_lin.legend(loc="best")
+    ax_lin.set_title("nmos_idvgs: linear-y (saturation visible)")
+
+    ax_log.set_xlabel("V_GS (V)")
+    ax_log.set_ylabel("|J_drain| (A/m)")
+    ax_log.grid(True, which="both", alpha=0.3)
+    ax_log.legend(loc="best")
+    ax_log.set_title("nmos_idvgs: semilog-y (subthreshold visible)")
+
+    fig.tight_layout()
+    p = out_dir / "id_vgs_overlay.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["nmos_idvgs"] = plot_nmos_idvgs
+
+
+# --------------------------------------------------------------------------- #
 # Driver                                                                      #
 # --------------------------------------------------------------------------- #
 
