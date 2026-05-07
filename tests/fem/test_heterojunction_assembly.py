@@ -225,3 +225,137 @@ def test_chi_ref_hat_returned():
         __import__("pytest").approx(expected_chi_ref_hat, rel=1.0e-12)
     assert fields["n_i_ref_hat"] == \
         __import__("pytest").approx(expected_n_i_ref_hat, rel=1.0e-12)
+
+
+def test_cell_tags_none_collapses_to_first_region_material():
+    """A single-region builtin mesh passes `cell_tags=None`; the helper
+    must collapse every field to the first region's material values
+    so the runner's pre-M17 single-material path stays byte-identical
+    when no MeshTags object is built."""
+    import pytest
+
+    from semi.materials import MATERIALS
+    from semi.physics.heterojunction import build_dg0_material_fields
+
+    L = 1.0e-6
+    msh, _ = _build_single_region_1d_mesh(L=L, N=12)
+    sc = _scaling_for_si(L=L)
+    regions_cfg = {
+        "channel": {"material": "GaAs", "tag": 1, "role": "semiconductor"},
+    }
+    fields = build_dg0_material_fields(msh, None, regions_cfg, sc, T=300.0)
+
+    chi_arr = fields["chi_hat"].x.array
+    expected_chi_hat = MATERIALS["GaAs"].chi / sc.V0
+    assert np.allclose(chi_arr, expected_chi_hat, rtol=0.0, atol=1.0e-12)
+
+    eps_arr = fields["epsilon_r"].x.array
+    assert np.allclose(eps_arr, MATERIALS["GaAs"].epsilon_r, rtol=0.0, atol=1.0e-12)
+
+    # n_i_hat still uses sc.n_i in the cell_tags=None branch (the runner
+    # builds Scaling from the reference material), so the field equals
+    # sc.n_i / sc.C0 everywhere — independent of the resolved material.
+    n_i_arr = fields["n_i_hat"].x.array
+    assert np.allclose(n_i_arr, float(sc.n_i) / sc.C0, rtol=0.0, atol=1.0e-12)
+
+    assert fields["chi_ref_hat"] == pytest.approx(MATERIALS["Si"].chi / sc.V0, rel=1e-12)
+
+
+def test_cell_tags_none_falls_back_to_silicon_when_regions_empty():
+    """If the regions map carries no material entry (degenerate hand-
+    built cfg), the cell_tags=None branch falls back to silicon. The
+    chi field must equal Si.chi / sc.V0 across the entire mesh."""
+    from semi.materials import MATERIALS
+    from semi.physics.heterojunction import build_dg0_material_fields
+
+    L = 1.0e-6
+    msh, _ = _build_single_region_1d_mesh(L=L, N=8)
+    sc = _scaling_for_si(L=L)
+    regions_cfg: dict = {"placeholder": {"role": "semiconductor", "tag": 1}}
+    fields = build_dg0_material_fields(msh, None, regions_cfg, sc, T=300.0)
+
+    chi_arr = fields["chi_hat"].x.array
+    assert np.allclose(chi_arr, MATERIALS["Si"].chi / sc.V0, rtol=0.0, atol=1.0e-12)
+
+
+def test_skips_non_dict_region_entries():
+    """Hand-built cfgs with non-dict noise in the regions map (e.g.
+    a stray comment string) skip those entries instead of raising."""
+    from semi.physics.heterojunction import build_dg0_material_fields
+
+    L = 1.0e-6
+    msh, cell_tags = _build_single_region_1d_mesh(L=L, N=12)
+    sc = _scaling_for_si(L=L)
+    regions_cfg = {
+        "channel": {"material": "Si", "tag": 1, "role": "semiconductor"},
+        "noise": "ignored",
+        "missing_tag": {"material": "GaAs", "role": "semiconductor"},
+    }
+    fields = build_dg0_material_fields(msh, cell_tags, regions_cfg, sc, T=300.0)
+    chi_arr = fields["chi_hat"].x.array
+    # Only the tagged silicon region should populate the field.
+    from semi.materials import MATERIALS
+    assert np.allclose(chi_arr, MATERIALS["Si"].chi / sc.V0, rtol=0.0, atol=1.0e-12)
+
+
+def test_skips_region_with_no_cells_in_mesh():
+    """A region cfg may carry a tag that no cell in the mesh actually
+    uses (e.g. a 3D-only region in a 2D-mesh test fixture); the helper
+    must skip the empty tag instead of indexing into an empty array."""
+    from semi.physics.heterojunction import build_dg0_material_fields
+
+    L = 1.0e-6
+    msh, cell_tags = _build_two_region_1d_mesh(L=L, N=20)
+    sc = _scaling_for_si(L=L)
+    regions_cfg = {
+        "left":  {"material": "Si",   "tag": 1, "role": "semiconductor"},
+        "right": {"material": "GaAs", "tag": 2, "role": "semiconductor"},
+        "ghost": {"material": "AlGaAs_0p3", "tag": 99, "role": "semiconductor"},
+    }
+    fields = build_dg0_material_fields(msh, cell_tags, regions_cfg, sc, T=300.0)
+    # The build does not crash; every cell still has a finite chi value.
+    chi_arr = fields["chi_hat"].x.array
+    assert np.all(np.isfinite(chi_arr))
+    # Only Si and GaAs values appear — the AlGaAs ghost region was skipped.
+    from semi.materials import MATERIALS
+    si_val = MATERIALS["Si"].chi / sc.V0
+    gaas_val = MATERIALS["GaAs"].chi / sc.V0
+    algaas_val = MATERIALS["AlGaAs_0p3"].chi / sc.V0
+    unique = np.unique(np.round(chi_arr, decimals=8))
+    assert len(unique) == 2
+    assert np.any(np.isclose(chi_arr, si_val, atol=1.0e-9))
+    assert np.any(np.isclose(chi_arr, gaas_val, atol=1.0e-9))
+    assert not np.any(np.isclose(chi_arr, algaas_val, atol=1.0e-9))
+
+
+def test_n_i_fallback_when_formula_zero_at_runtime_temperature():
+    """When the runner temperature is not exactly 300 K and a region
+    carries a `material_overrides` entry, the helper consults
+    `Material.n_i_at_T(T)`. For an insulator-style override that zeros
+    the band-edge parameters, the formula returns 0; the helper falls
+    back to the resolved Material's stored `n_i` rather than emitting
+    a zero field that would propagate NaNs into the Slotboom log."""
+    from semi.physics.heterojunction import build_dg0_material_fields
+
+    L = 1.0e-6
+    msh, cell_tags = _build_two_region_1d_mesh(L=L, N=20)
+    sc = _scaling_for_si(L=L)
+    # Override sets Eg high enough that exp(-Eg / 2 V_t) underflows on
+    # the right region; n_i_at_T returns 0 and the fallback path runs.
+    regions_cfg = {
+        "left":  {"material": "Si",   "tag": 1, "role": "semiconductor"},
+        "right": {
+            "material": "GaAs",
+            "tag": 2,
+            "role": "semiconductor",
+            "material_overrides": {"Eg_eV": 50.0},
+        },
+    }
+    # Run at 310 K so the no-override fast path is bypassed even on Left.
+    fields = build_dg0_material_fields(msh, cell_tags, regions_cfg, sc, T=310.0)
+    n_i_arr = fields["n_i_hat"].x.array
+    # The right-region n_i was recomputed by `_resolve_region_material`
+    # to the closed-form value with Eg=50 eV at 300 K (essentially 0).
+    # The helper falls back to that stored value when n_i_at_T(310)
+    # also underflows. The field is finite (no NaN) on every cell.
+    assert np.all(np.isfinite(n_i_arr))

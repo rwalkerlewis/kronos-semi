@@ -14,7 +14,12 @@ import pytest
 
 from semi.constants import cm3_to_m3, thermal_voltage
 from semi.materials import MATERIALS, Material, get_material
-from semi.physics.heterojunction import _resolve_region_material
+from semi.physics.heterojunction import (
+    _resolve_reference_chi_eV,
+    _resolve_region_material,
+    cfg_uses_heterojunction,
+)
+from semi.scaling import Scaling
 
 
 def test_resolve_no_overrides_returns_database_material():
@@ -237,3 +242,96 @@ def test_unknown_override_field_silently_ignored():
     }
     resolved = _resolve_region_material(region)
     assert resolved.chi == pytest.approx(4.05)
+
+
+def test_cfg_uses_heterojunction_rejects_non_dict_input():
+    """Hand-built cfgs that bypass schema.validate may pass a list or
+    None to the heterojunction-detection helper; the gate returns False
+    rather than raising so the runners' fast-path branch stays selected.
+    """
+    assert cfg_uses_heterojunction(None) is False
+    assert cfg_uses_heterojunction([]) is False
+    assert cfg_uses_heterojunction("oops") is False
+
+
+def test_cfg_uses_heterojunction_skips_non_dict_region_entries():
+    """Iteration over a regions map that mixes dict and non-dict values
+    skips the non-dict entries instead of raising. Single-material
+    config with a stray non-dict entry still reports False."""
+    cfg = {"left": {"material": "Si"}, "noise": "ignored"}
+    assert cfg_uses_heterojunction(cfg) is False
+
+
+def test_cfg_uses_heterojunction_returns_true_on_overrides():
+    cfg = {
+        "left": {"material": "Si"},
+        "right": {"material": "GaAs", "material_overrides": {"chi_eV": 3.5}},
+    }
+    assert cfg_uses_heterojunction(cfg) is True
+
+
+def test_cfg_uses_heterojunction_returns_true_on_explicit_flag():
+    cfg = {
+        "left": {"material": "Si", "heterojunction": True},
+        "right": {"material": "GaAs"},
+    }
+    assert cfg_uses_heterojunction(cfg) is True
+
+
+def test_cfg_uses_heterojunction_returns_false_on_empty_overrides():
+    """An explicit `material_overrides: {}` is functionally a no-op and
+    keeps the byte-identity branch active."""
+    cfg = {"left": {"material": "Si", "material_overrides": {}}}
+    assert cfg_uses_heterojunction(cfg) is False
+
+
+def _scaling_for_material(mat: Material) -> Scaling:
+    return Scaling(
+        L0=1.0e-6,
+        C0=1.0e23,
+        T=300.0,
+        mu0=mat.mu_n,
+        n_i=mat.n_i,
+        N_C=mat.Nc,
+        N_V=mat.Nv,
+        m_n_star=mat.m_n_star,
+        m_p_star=mat.m_p_star,
+        E_g=mat.Eg,
+    )
+
+
+def test_resolve_reference_chi_picks_first_semiconductor_region():
+    """_resolve_reference_chi_eV walks the regions map in insertion order
+    and returns chi (eV) for the first entry whose role is semiconductor
+    with a positive chi. Insulators are skipped."""
+    sc = _scaling_for_material(MATERIALS["Si"])
+    cfg = {
+        "oxide": {"material": "SiO2", "role": "insulator"},
+        "channel": {"material": "GaAs", "role": "semiconductor"},
+    }
+    chi = _resolve_reference_chi_eV(cfg, sc)
+    assert chi == pytest.approx(MATERIALS["GaAs"].chi)
+
+
+def test_resolve_reference_chi_skips_non_dict_region_entries():
+    """Non-dict entries in the region map (hand-built cfgs) are skipped
+    rather than raising."""
+    sc = _scaling_for_material(MATERIALS["Si"])
+    cfg = {
+        "garbage": "not-a-dict",
+        "channel": {"material": "Si", "role": "semiconductor"},
+    }
+    chi = _resolve_reference_chi_eV(cfg, sc)
+    assert chi == pytest.approx(MATERIALS["Si"].chi)
+
+
+def test_resolve_reference_chi_falls_back_to_silicon_when_all_insulator():
+    """When no semiconductor region exists in the cfg, the helper falls
+    back to Si.chi so downstream BC math still has a sane reference."""
+    sc = _scaling_for_material(MATERIALS["Si"])
+    cfg = {
+        "oxide_top": {"material": "SiO2", "role": "insulator"},
+        "oxide_bot": {"material": "SiO2", "role": "insulator"},
+    }
+    chi = _resolve_reference_chi_eV(cfg, sc)
+    assert chi == pytest.approx(MATERIALS["Si"].chi)

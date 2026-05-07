@@ -126,21 +126,6 @@ def _resolve_region_material(region_cfg: dict[str, Any]) -> Material:
     return resolved
 
 
-def _per_region_value(
-    region_cfg: dict[str, Any], getter, T: float, *, fallback: float = 0.0
-) -> float:
-    """Resolve the region's material (with overrides) and apply `getter`.
-
-    `getter(material)` returns the physical-units value for the cell.
-    Insulators with zero band-edge parameters return `fallback`.
-    """
-    mat = _resolve_region_material(region_cfg)
-    val = getter(mat)
-    if val is None or (isinstance(val, float) and math.isnan(val)):
-        return fallback
-    return float(val)
-
-
 def build_dg0_material_fields(
     mesh,
     cell_tags,
@@ -251,8 +236,6 @@ def build_dg0_material_fields(
     def _make_field(value_for_tag, default: float = 0.0):
         fn = dfem.Function(V_DG0)
         fn.x.array[:] = PETSc.ScalarType(default)
-        if cell_tags is None:
-            return fn
         for tag, mat in tag_to_mat.items():
             cells = cell_tags.find(tag)
             if cells.size == 0:
