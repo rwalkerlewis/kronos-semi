@@ -3476,6 +3476,150 @@ def plot_schottky_iv_temperature(result, out_dir: Path) -> list[Path]:
 _PLOTTERS["schottky_iv_temperature"] = plot_schottky_iv_temperature
 
 
+@register("power_diode_reverse_recovery")
+def verify_power_diode_reverse_recovery(result) -> list[tuple[str, bool, str]]:
+    """
+    Smoke verifier for the power_diode_reverse_recovery example.
+
+    Single transient run: 1D long-base pn diode driven through a
+    forward-conduction segment (t in [0, 50] ns at +0.7 V), a 10 ns
+    linear voltage-reversal transition (t in [50, 60] ns), and a
+    reverse-blocking segment (t in [60, 200] ns at -2.0 V).
+
+    Checks (smoke only; tight tolerances live under benchmarks/):
+      - Run completed (transient iv table populated).
+      - I(t) is finite and non-NaN at every recorded timestep.
+      - max(I(t) for t < 50 ns) > 0 (forward conduction is positive).
+      - min(I(t) for t > 60 ns) < 0 (reverse-recovery dip negative).
+      - I(t = t_end) > min(I(t)) (the diode is settling toward
+        reverse-blocking; the final-time current is closer to zero
+        than the recovery minimum).
+    """
+    iv = list(result.iv or [])
+    if not iv:
+        return [(
+            "power_diode_reverse_recovery: transient recorded iv rows",
+            False, "no iv rows in result",
+        )]
+
+    iv_anode = sorted(
+        (r for r in iv if r.get("contact") == "anode"),
+        key=lambda r: r["t"],
+    )
+    if len(iv_anode) < 20:
+        return [(
+            "power_diode_reverse_recovery: at least 20 iv samples on anode",
+            False, f"got {len(iv_anode)}",
+        )]
+
+    t_arr = np.array([r["t"] for r in iv_anode], dtype=float)
+    j_arr = np.array([r["J"] for r in iv_anode], dtype=float)
+
+    checks: list[tuple[str, bool, str]] = []
+
+    finite = bool(np.all(np.isfinite(j_arr)))
+    checks.append((
+        "power_diode_reverse_recovery: I(t) finite everywhere",
+        finite,
+        f"non-finite samples: {int((~np.isfinite(j_arr)).sum())} "
+        f"/ {len(j_arr)}",
+    ))
+    if not finite:
+        return checks
+
+    pre_mask = t_arr < 50.0e-9
+    post_mask = t_arr > 60.0e-9
+    if not pre_mask.any() or not post_mask.any():
+        return [(
+            "power_diode_reverse_recovery: pre- and post-transition samples "
+            "present",
+            False,
+            f"pre={int(pre_mask.sum())}, post={int(post_mask.sum())}",
+        )]
+
+    j_pre_max = float(np.max(j_arr[pre_mask]))
+    j_post_min = float(np.min(j_arr[post_mask]))
+    j_final = float(j_arr[-1])
+    t_recovery_min = float(t_arr[post_mask][int(np.argmin(j_arr[post_mask]))])
+
+    checks.append((
+        "power_diode_reverse_recovery: forward conduction positive "
+        "(max J in t < 50 ns > 0)",
+        j_pre_max > 0.0,
+        f"max(J) = {j_pre_max:.3e} A/m^2",
+    ))
+
+    checks.append((
+        "power_diode_reverse_recovery: reverse-recovery dip negative "
+        "(min J in t > 60 ns < 0)",
+        j_post_min < 0.0,
+        f"min(J) = {j_post_min:.3e} A/m^2 at t = {t_recovery_min*1e9:.1f} ns",
+    ))
+
+    checks.append((
+        "power_diode_reverse_recovery: J(t_end) settling toward zero "
+        "(J_final > min J in recovery)",
+        j_final > j_post_min,
+        f"J(t={t_arr[-1]*1e9:.1f} ns) = {j_final:.3e} A/m^2; "
+        f"min(J) = {j_post_min:.3e} A/m^2",
+    ))
+
+    return checks
+
+
+def plot_power_diode_reverse_recovery(result, out_dir: Path) -> list[Path]:
+    """I(t) and V(t) on twin y-axes, time on x-axis, regions annotated."""
+    iv_anode = sorted(
+        (r for r in result.iv if r.get("contact") == "anode"),
+        key=lambda r: r["t"],
+    )
+    t_ns = np.array([r["t"] for r in iv_anode]) * 1.0e9
+    j_arr = np.array([r["J"] for r in iv_anode], dtype=float)
+    v_arr = np.array([r["V"] for r in iv_anode], dtype=float)
+
+    fig, ax_left = plt.subplots(1, 1, figsize=(8.5, 5))
+    ax_right = ax_left.twinx()
+
+    line_j, = ax_left.plot(t_ns, j_arr, color="tab:blue", lw=1.4,
+                           label="J_anode")
+    line_v, = ax_right.plot(t_ns, v_arr, color="tab:red", lw=1.0,
+                            ls="--", label="V_anode")
+
+    ax_left.set_xlabel("t (ns)")
+    ax_left.set_ylabel("J_anode (A/m^2)", color="tab:blue")
+    ax_left.tick_params(axis="y", labelcolor="tab:blue")
+    ax_right.set_ylabel("V_anode (V)", color="tab:red")
+    ax_right.tick_params(axis="y", labelcolor="tab:red")
+    ax_left.grid(True, alpha=0.3)
+
+    # Region shading
+    ax_left.axvspan(0.0, 50.0, alpha=0.10, color="tab:green",
+                    label="conduction")
+    ax_left.axvspan(50.0, 60.0, alpha=0.10, color="tab:orange",
+                    label="transition")
+    ax_left.axvspan(60.0, 100.0, alpha=0.10, color="tab:red",
+                    label="recovery")
+    ax_left.axvspan(100.0, max(200.0, float(t_ns[-1])), alpha=0.10,
+                    color="tab:purple", label="settled")
+
+    handles, labels = ax_left.get_legend_handles_labels()
+    handles += [line_j, line_v]
+    labels += ["J_anode", "V_anode"]
+    ax_left.legend(handles=handles, labels=labels, loc="best", fontsize=8)
+    ax_left.set_title(
+        "power_diode_reverse_recovery: rectifier turn-off transient via "
+        "voltage_t.table"
+    )
+    fig.tight_layout()
+    p = out_dir / "iv_recovery.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["power_diode_reverse_recovery"] = plot_power_diode_reverse_recovery
+
+
 # --------------------------------------------------------------------------- #
 # Driver                                                                      #
 # --------------------------------------------------------------------------- #
