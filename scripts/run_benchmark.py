@@ -3528,9 +3528,26 @@ def verify_schottky_iv_temperature(result) -> list[tuple[str, bool, str]]:
             ))
             continue
 
-        anode_iv = sorted(iv, key=lambda r: r["V"])
-        v_f = np.array([r["V"] for r in anode_iv], dtype=float)
-        j_arr = np.array([r["J"] for r in anode_iv], dtype=float)
+        rows_sorted = sorted(iv, key=lambda r: r["V"])
+        v_f = np.array([r["V"] for r in rows_sorted], dtype=float)
+        # The sweep contact is the schottky anode; its `J` is evaluated
+        # through the thermionic-emission Robin BC, whose nonlinear
+        # residual contributes a finite numerical floor at low forward
+        # bias and dominates over the small physical anode current
+        # there. The ohmic cathode's `J_cathode` is the device current
+        # to the external circuit and is monotone in V_F to far better
+        # than 1 %, so use it for the smoke monotonicity check. The
+        # I(0.3 V) ordering check is well past the noise regime; either
+        # contact would do, but we keep using the cathode for symmetry.
+        j_anode = np.array([r.get("J", float("nan")) for r in rows_sorted],
+                           dtype=float)
+        j_cathode = np.array(
+            [r.get("J_cathode", float("nan")) for r in rows_sorted],
+            dtype=float,
+        )
+        j_arr = np.where(
+            np.isfinite(j_cathode), np.abs(j_cathode), np.abs(j_anode),
+        )
 
         finite = bool(np.all(np.isfinite(j_arr)))
         checks.append((
@@ -3542,8 +3559,8 @@ def verify_schottky_iv_temperature(result) -> list[tuple[str, bool, str]]:
         if not finite:
             continue
 
-        running_max = np.maximum.accumulate(np.abs(j_arr))
-        violations = int(np.sum(np.abs(j_arr) < running_max * 0.99))
+        running_max = np.maximum.accumulate(j_arr)
+        violations = int(np.sum(j_arr < running_max * 0.99))
         checks.append((
             f"schottky_iv_temperature: T = {t_kelvin:.0f} K I(V_F) monotone "
             f"in V_F (<= 1 % dips tolerated)",
@@ -3572,18 +3589,21 @@ def verify_schottky_iv_temperature(result) -> list[tuple[str, bool, str]]:
             f"iv tables present for T = {sorted(j_at_vf03)} K",
         ))
 
-    result._schottky_iv_by_T = {
-        t_kelvin: (
-            np.array([r["V"] for r in sorted(
-                (q for q in iv if q.get("contact") == "anode"),
-                key=lambda q: q["V"],
-            )], dtype=float),
-            np.array([r["J"] for r in sorted(
-                (q for q in iv if q.get("contact") == "anode"),
-                key=lambda q: q["V"],
-            )], dtype=float),
+    def _vj(rows: list[dict]) -> tuple[np.ndarray, np.ndarray]:
+        ordered = sorted(rows, key=lambda r: r["V"])
+        v_arr = np.array([r["V"] for r in ordered], dtype=float)
+        j_cath = np.array(
+            [r.get("J_cathode", float("nan")) for r in ordered], dtype=float,
         )
-        for t_kelvin, iv in iv_by_T.items()
+        j_anode = np.array(
+            [r.get("J", float("nan")) for r in ordered], dtype=float,
+        )
+        return v_arr, np.where(
+            np.isfinite(j_cath), np.abs(j_cath), np.abs(j_anode),
+        )
+
+    result._schottky_iv_by_T = {
+        t_kelvin: _vj(iv) for t_kelvin, iv in iv_by_T.items()
     }
     return checks
 
