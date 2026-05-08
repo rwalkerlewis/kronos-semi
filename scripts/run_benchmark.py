@@ -3528,10 +3528,7 @@ def verify_schottky_iv_temperature(result) -> list[tuple[str, bool, str]]:
             ))
             continue
 
-        anode_iv = sorted(
-            (r for r in iv if r.get("contact") == "anode"),
-            key=lambda r: r["V"],
-        )
+        anode_iv = sorted(iv, key=lambda r: r["V"])
         v_f = np.array([r["V"] for r in anode_iv], dtype=float)
         j_arr = np.array([r["J"] for r in anode_iv], dtype=float)
 
