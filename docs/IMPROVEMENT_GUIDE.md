@@ -1045,6 +1045,12 @@ The engine is ready for a UI when all of these are green:
 
 ### [Unreleased]
 
+- **2026-05-09**, author M18 starter prompt
+  ([M18_STARTER_PROMPT.md](M18_STARTER_PROMPT.md)) on branch
+  `dev/m18-adaptive-dt-transient`; phases 0 through F ship the
+  adaptive-dt controller for the transient runner and retire the
+  `power_diode_reverse_recovery` CI allow-failure carve-out.
+
 ### [0.24.0]
 
 - **2026-05-06**, M17 heterojunction / position-dependent band
