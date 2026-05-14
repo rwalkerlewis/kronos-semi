@@ -8,6 +8,7 @@ Regenerate this file with:
 
 ---
 
+
 ## Case 01 - bias_sweep vs transient (deep steady state)
 
 Compares `run_bias_sweep` and `run_transient` (relaxed to deep steady state) on the pn_1d_turnon device at multiple forward biases. M13.1's close-out claim: agreement at 1e-4 relative.
