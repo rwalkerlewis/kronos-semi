@@ -689,22 +689,10 @@ def run_transient(
             # (history seeding); BDF2 takes over once two history
             # points exist.
             if order == 2 and len(n_hist) >= 2 and dt_prev is not None:
-                omega_candidate = dt_current / dt_prev
-                # When adaptive retries halve dt repeatedly after a failed
-                # step, omega can become very small. In that regime variable-
-                # step BDF2 is less robust than backward Euler at breakpoint
-                # transitions (for example sharp voltage_t waveform changes).
-                # Fall back to BDF1 for this step when omega is too small, and
-                # resume BDF2 automatically once dt recovers.
-                if omega_candidate >= 0.25:
-                    effective_order = 2
-                    omega = omega_candidate
-                    a0, a1, a2 = BDFCoefficients.variable_bdf2(omega)
-                    step_coeffs = (a0, a1, a2)
-                else:
-                    effective_order = 1
-                    omega = omega_candidate
-                    step_coeffs = (1.0, -1.0)
+                effective_order = 2
+                omega = dt_current / dt_prev
+                a0, a1, a2 = BDFCoefficients.variable_bdf2(omega)
+                step_coeffs = (a0, a1, a2)
             else:
                 effective_order = 1
                 omega = 1.0  # informational only
