@@ -45,3 +45,17 @@ jobs:
           if ratio < 5.0:
               sys.exit(f"A2 acceptance failed: speedup {ratio:.2f}x < 5x")
           PY
+
+      - name: Regenerate the ~500k-DOF 3D MOSFET GPU mesh
+        run: |
+          python benchmarks/mosfet_3d/generate_mesh.py \
+            --cl 1e-8 \
+            --out benchmarks/mosfet_3d/fixtures/mosfet3d_fine.msh \
+            --binary
+
+      - name: Run M19 3D MOSFET GPU acceptance (psi finite + >=5x speedup)
+        run: |
+          # verify_mosfet_3d_gpu runs the gpu-amgx config and an internal
+          # cpu-mumps baseline, then gates the CPU/GPU wall-clock ratio at
+          # >= 5x and asserts psi is finite.
+          python scripts/run_benchmark.py mosfet_3d_gpu

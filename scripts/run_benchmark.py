@@ -1667,6 +1667,85 @@ def plot_mosfet_3d(result, out_dir: Path) -> list[Path]:
 _PLOTTERS["mosfet_3d"] = plot_mosfet_3d
 
 
+def _resolved_backend(result) -> str:
+    """Best-effort resolved backend string from a SimulationResult."""
+    info = getattr(result, "solver_info", None) or {}
+    return str(info.get("backend_resolved") or info.get("backend") or "cpu-mumps")
+
+
+def _psi_all_finite(result) -> bool:
+    psi = getattr(result, "psi_phys", None)
+    if psi is None:
+        return False
+    return bool(np.all(np.isfinite(np.asarray(psi))))
+
+
+@register("mosfet_3d_gpu")
+def verify_mosfet_3d_gpu(result) -> list[tuple[str, bool, str]]:
+    """
+    GPU acceptance verifier for the ~500k-DOF 3D MOSFET (M19, Phase D).
+
+    On a CPU-only host the driver's GPU preflight short-circuits to SKIP
+    before this verifier is reached, so if we get here with a non-GPU
+    resolved backend we still report SKIP (no hard failure). When a GPU
+    backend actually resolved, the checks are:
+
+      - `psi` is finite and non-NaN everywhere.
+      - the CPU/GPU linear-solve wall-clock ratio is >= 5x. The GPU time
+        is the driver-measured run wall-clock (`result._solve_time`,
+        dominated by the linear solves at ~500k DOFs); the CPU baseline
+        is obtained by re-running the same config with the backend forced
+        to cpu-mumps via the KRONOS_BACKEND override.
+    """
+    checks: list[tuple[str, bool, str]] = []
+
+    backend = _resolved_backend(result)
+    if not backend.startswith("gpu-"):
+        checks.append((
+            "mosfet_3d_gpu: GPU acceptance",
+            True,
+            f"SKIP (no GPU): resolved backend = {backend!r}; GPU timing gate "
+            f"is exercised only on the nightly GPU runner",
+        ))
+        return checks
+
+    checks.append((
+        "mosfet_3d_gpu: psi field finite and non-NaN",
+        _psi_all_finite(result),
+        f"resolved backend = {backend!r}",
+    ))
+
+    gpu_time = float(getattr(result, "_solve_time", 0.0) or 0.0)
+
+    # CPU-MUMPS baseline on the identical config. KRONOS_BACKEND pins the
+    # auto-resolution to cpu-mumps even on the GPU host.
+    import os
+    gpu_json = BENCHMARKS_DIR / "mosfet_3d" / "mosfet_3d_gpu.json"
+    prev = os.environ.get("KRONOS_BACKEND")
+    os.environ["KRONOS_BACKEND"] = "cpu-mumps"
+    try:
+        from semi import run as semi_run
+        from semi import schema as _schema
+        cpu_cfg = _schema.load(str(gpu_json))
+        cpu_cfg.setdefault("solver", {})["backend"] = "auto"  # honor KRONOS_BACKEND
+        t0 = time.perf_counter()
+        semi_run.run(cpu_cfg)
+        cpu_time = time.perf_counter() - t0
+    finally:
+        if prev is None:
+            os.environ.pop("KRONOS_BACKEND", None)
+        else:
+            os.environ["KRONOS_BACKEND"] = prev
+
+    ratio = cpu_time / gpu_time if gpu_time > 0.0 else float("nan")
+    checks.append((
+        "mosfet_3d_gpu: CPU/GPU linear-solve wall-clock ratio >= 5x",
+        bool(np.isfinite(ratio)) and ratio >= 5.0,
+        f"cpu-mumps = {cpu_time:.2f} s, gpu = {gpu_time:.2f} s, ratio = {ratio:.2f}x",
+    ))
+    return checks
+
+
 # --------------------------------------------------------------------------- #
 # resistor_3d verifier and plotter                                            #
 # --------------------------------------------------------------------------- #
@@ -4197,6 +4276,24 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = schema.load(str(json_path))
 
+    # GPU preflight: a config requesting a GPU backend on a host without
+    # one would raise ConfigError deep in the solve. Detect it up front so
+    # `run_benchmark.py <gpu-config>` reports SKIP and exits 0 on CPU-only
+    # runners (the M19 mosfet_3d_gpu acceptance test), rather than failing
+    # or requiring the large fine mesh to be present.
+    requested_backend = (cfg.get("solver", {}) or {}).get("backend", "cpu-mumps")
+    if str(requested_backend).startswith("gpu-"):
+        from semi.compute import available_backends
+        if requested_backend not in available_backends():
+            print(
+                f"[run_benchmark] SKIP: benchmark {name!r} requests "
+                f"solver.backend={requested_backend!r} but no GPU backend is "
+                f"available on this host (available: {available_backends()}). "
+                f"GPU acceptance is gated to the nightly GPU runner.",
+            )
+            print("[run_benchmark] OK (SKIP, no GPU)")
+            return 0
+
     t0 = time.perf_counter()
     try:
         result = semi_run.run(cfg)
@@ -4205,6 +4302,10 @@ def main(argv: list[str] | None = None) -> int:
         traceback.print_exc()
         return 3
     dt = time.perf_counter() - t0
+    try:
+        result._solve_time = dt
+    except Exception:  # noqa: BLE001
+        pass
 
     # AcSweepResult exposes `frequencies`/`Y`/`Z`/`C`/`G` and `meta` but
     # no `solver_info`. Branch first so the transient block does not

@@ -1,0 +1,141 @@
+{
+  "schema_version": "2.10.0",
+  "name": "mosfet_3d_gpu",
+  "description": "M19 capstone (GPU acceptance): same 3D n-channel MOSFET device as mosfet_3d, biased in the linear regime (V_DS = 0.05 V, V_GS sweep 0 to 2.0 V at 0.2 V step), but on a refined ~500k-DOF tetrahedral mesh (fixtures/mosfet3d_fine.msh, regenerate with generate_mesh.py --cl 1e-8 --binary) and solved on the GPU AMGX backend (solver.backend = gpu-amgx). Exercises the M15 GPU linear-solver path on a real device. The fine mesh is not committed (per the repo's per-benchmark .msh gitignore convention); the nightly GPU workflow regenerates it before running. On a CPU-only host run_benchmark.py reports SKIP (no GPU) and exits 0.",
+  "dimension": 3,
+  "mesh": {
+    "source": "file",
+    "path": "fixtures/mosfet3d_fine.msh",
+    "format": "gmsh"
+  },
+  "regions": {
+    "silicon": {
+      "material": "Si",
+      "tag": 1,
+      "role": "semiconductor"
+    },
+    "oxide": {
+      "material": "SiO2",
+      "tag": 2,
+      "role": "insulator"
+    }
+  },
+  "doping": [
+    {
+      "region": "silicon",
+      "profile": {
+        "type": "uniform",
+        "N_D": 0.0,
+        "N_A": 1e+16
+      }
+    },
+    {
+      "region": "silicon",
+      "profile": {
+        "type": "gaussian",
+        "center": [
+          0.0,
+          5e-07,
+          2e-07
+        ],
+        "sigma": [
+          9e-08,
+          1e-05,
+          1.5e-07
+        ],
+        "peak": 5e+19,
+        "dopant": "donor"
+      }
+    },
+    {
+      "region": "silicon",
+      "profile": {
+        "type": "gaussian",
+        "center": [
+          1e-06,
+          5e-07,
+          2e-07
+        ],
+        "sigma": [
+          9e-08,
+          1e-05,
+          1.5e-07
+        ],
+        "peak": 5e+19,
+        "dopant": "donor"
+      }
+    }
+  ],
+  "contacts": [
+    {
+      "name": "body",
+      "facet": 13,
+      "type": "ohmic",
+      "voltage": 0.0
+    },
+    {
+      "name": "source",
+      "facet": 10,
+      "type": "ohmic",
+      "voltage": 0.0
+    },
+    {
+      "name": "drain",
+      "facet": 11,
+      "type": "ohmic",
+      "voltage": 0.05
+    },
+    {
+      "name": "gate",
+      "facet": 12,
+      "type": "gate",
+      "voltage": 0.0,
+      "workfunction": 0.0,
+      "voltage_sweep": {
+        "start": 0.0,
+        "stop": 2.0,
+        "step": 0.2
+      }
+    }
+  ],
+  "physics": {
+    "temperature": 300.0,
+    "statistics": "fermi_dirac",
+    "mobility": {
+      "model": "lombardi",
+      "bulk_model": "caughey_thomas",
+      "mu_n": 1400.0,
+      "mu_p": 450.0,
+      "interface_facet_tag": 12
+    },
+    "recombination": {
+      "srh": true,
+      "tau_n": 1e-07,
+      "tau_p": 1e-07,
+      "E_t": 0.0
+    }
+  },
+  "solver": {
+    "type": "bias_sweep",
+    "backend": "gpu-amgx",
+    "continuation": {
+      "min_step": 1e-05,
+      "max_halvings": 10,
+      "easy_iter_threshold": 4,
+      "grow_factor": 1.5
+    },
+    "compute": {
+      "device": "cuda",
+      "linear_solver": "gmres",
+      "preconditioner": "amgx"
+    }
+  },
+  "output": {
+    "directory": "./results/mosfet_3d_gpu",
+    "fields": [
+      "potential",
+      "n",
+      "p"
+    ]
+  }
+}
