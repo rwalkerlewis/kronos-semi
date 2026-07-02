@@ -169,7 +169,14 @@ ENGINE_SUPPORTED_SCHEMA_MAJOR = max(ENGINE_SUPPORTED_SCHEMA_MAJORS)
 #                validate time so users see the failure before the FEM
 #                path. v2.0.0 through v2.8.0 inputs continue to
 #                validate.
-SCHEMA_SUPPORTED_MINOR = 9
+#   M19 (2.10.0): no new field. The M19 3D MOSFET capstone config
+#                pairs solver.backend (M15) with solver.type ==
+#                "bias_sweep" on a gmsh file mesh; both already
+#                validate under v2.9.0, so this is a documentation-only
+#                minor bump that advertises the tested 3D-MOSFET
+#                combination. v2.0.0 through v2.9.0 inputs continue to
+#                validate; behavior is bit-identical to v0.25.0.
+SCHEMA_SUPPORTED_MINOR = 10
 
 
 @lru_cache(maxsize=8)
