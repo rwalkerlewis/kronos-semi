@@ -30,7 +30,73 @@ transient time-varying contact voltage `voltage_t`; shipped with
 and `regions[].heterojunction`; shipped with `[0.24.0]` below),
 and **2.9.0** (additive minor; M18 adaptive time-step controller
 `solver.adaptive` for the transient runner; shipped with
-`[0.25.0]` below).
+`[0.25.0]` below), and **2.10.0** (documentation-only additive
+minor; M19 3D MOSFET capstone config pairing `solver.backend`
+with the `bias_sweep` runner on a gmsh file mesh, no new field;
+shipped with `[0.26.0]` below).
+
+## [0.26.0] - 2026-07-02
+
+### Added
+
+- **M19 3D MOSFET capstone benchmark.** A 3D n-channel MOSFET on a
+  gmsh-sourced unstructured tetrahedral mesh
+  (`benchmarks/mosfet_3d/`), exercising the M15 GPU linear-solver
+  path, the M16.1 Caughey-Thomas + M16.2 Lombardi mobility, and the
+  M16.4 Fermi-Dirac statistics on a real device. Device: channel
+  length L = 250 nm, width W = 1 um, 5 nm SiO2 gate oxide, p-type
+  body N_A = 1e16 cm^-3, Gaussian n+ source/drain (peak 5e19 cm^-3).
+  Schema additive minor bump v2.9.0 -> v2.10.0 (documentation-only:
+  advertises the tested `solver.backend` + `bias_sweep` + gmsh
+  file-mesh combination; no new field). Package version 0.25.0 ->
+  0.26.0.
+  - **Geometry / mesh (`benchmarks/mosfet_3d/mosfet3d.geo`,
+    `generate_mesh.py`, `fixtures/mosfet3d.msh`).** OpenCASCADE
+    geometry built in micrometers (nanometre-scale solids fall below
+    the OCC linear tolerance) and rescaled to meters on output via
+    `Mesh.ScalingFactor`. Physical volumes `silicon` (tag 1) /
+    `oxide` (tag 2); physical surfaces `source` (10), `drain` (11),
+    `gate` (12), `body` (13). The committed cl = 20 nm fixture
+    (~26k nodes / ~75k coupled DOFs) loads through
+    `semi.mesh._build_from_file` with correct cell / facet tags;
+    `generate_mesh.py --cl` regenerates the ~200k and ~500k-DOF
+    variants.
+  - **Analytical references (`semi/diode_analytical.py`).**
+    `mosfet_3d_paosah_iv` (Pao-Sah linear-regime drain current with
+    a velocity-saturation mobility correction) and
+    `mosfet_3d_saturation_iv` (velocity-saturation-limited I_DSAT).
+    Pure-Python; four assertions in `tests/test_mosfet_3d_verifier.py`.
+  - **Verifiers (`scripts/run_benchmark.py`).** `verify_mosfet_3d`
+    gates the linear-regime drain current within 25% of the Pao-Sah
+    reference over [V_T + 0.2, V_T + 0.8] V and monotonicity above
+    threshold, and additionally runs the saturation config;
+    `verify_mosfet_3d_sat` gates I_DSAT within 30% over
+    [V_T + 0.4, V_T + 1.6] V; `verify_mosfet_3d_gpu` gates a finite
+    psi field and a >= 5x CPU/GPU linear-solve wall-clock ratio at
+    ~500k DOFs, reporting `SKIP (no GPU)` on CPU-only hosts. The
+    driver resolves `mosfet_3d_sat` / `mosfet_3d_gpu` to their
+    sibling JSONs and short-circuits a GPU-backend request on a
+    CPU-only host to an exit-0 SKIP.
+  - **GPU acceptance (`benchmarks/mosfet_3d/mosfet_3d_gpu.json`,
+    `.github/workflows/gpu-nightly.yml`).** A ~500k-DOF `gpu-amgx`
+    config; the nightly GPU workflow regenerates the fine mesh and
+    runs the >= 5x speedup gate (gated on
+    `vars.GPU_RUNNER_AVAILABLE`).
+  - **Scope / known limitation.** The 3D equilibrium (Poisson,
+    multi-region + gate + Gaussian implants) solve converges cleanly
+    (~1.6 s on a coarse mesh, correct p-body / n+ potentials). The
+    coupled drift-diffusion **bias sweep** across the MOSFET
+    inversion onset under Fermi-Dirac statistics stagnates in the
+    current `bias_sweep` SNES driver, the same line-search-
+    stabilization gap that keeps `mosfet_2d` and `nmos_idvgs` on
+    `allow-failure`. The `mosfet_3d` / `mosfet_3d_sat` benchmark
+    matrix entries and the opt-in `tests/fem/test_mosfet_3d.py`
+    coarsened smoke test therefore carry the same non-blocking
+    treatment; retiring these flags is the bias-sweep SNES
+    stabilization work named as M19's next task, not part of M19.
+    Every existing benchmark is bit-identical to v0.25.0 (pn_1d_bias
+    anchor: J(V=0.6 V) = 1.635e+03 A/m^2; all other anchors
+    unchanged).
 
 ## [0.25.0] - 2026-05-09
 

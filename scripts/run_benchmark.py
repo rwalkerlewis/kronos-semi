@@ -1326,6 +1326,427 @@ _PLOTTERS["mosfet_2d"] = plot_mosfet_2d
 
 
 # --------------------------------------------------------------------------- #
+# mosfet_3d verifier (M19: 3D MOSFET capstone, Pao-Sah reference)             #
+# --------------------------------------------------------------------------- #
+
+# Fixed device geometry from benchmarks/mosfet_3d/mosfet3d.geo. The gmsh
+# file mesh carries no `regions_by_box` block, so unlike the 2D verifier
+# these are read from the committed geometry rather than the JSON.
+_MOSFET_3D_L_CHANNEL = 250.0e-9   # metallurgical channel length (m)
+_MOSFET_3D_W = 1.0e-6             # channel width (m)
+_MOSFET_3D_H_SI = 200.0e-9       # silicon body thickness (m)
+_MOSFET_3D_T_OX = 5.0e-9         # gate oxide thickness (m)
+
+
+def _mosfet_3d_device_params(cfg) -> dict:
+    """MOSFET geometry, oxide, and threshold parameters for the 3D device.
+
+    V_T is computed with `semi.cv.analytical_moscap_params` against the
+    uniform p-type body doping in the kronos intrinsic-Fermi BC
+    convention (V_T_kronos = V_T_textbook - phi_F), matching the 2D
+    `_mosfet_device_params` helper. Channel L / width W / oxide t_ox come
+    from the committed `.geo` geometry (the file mesh has no box-region
+    metadata). The effective channel mobility mu_eff is the JSON low-field
+    mu_n and vsat is the Caughey-Thomas saturation velocity (JSON
+    `vsat_n`, default 1e7 cm/s).
+    """
+    from semi.constants import cm3_to_m3
+    from semi.cv import analytical_moscap_params
+    from semi.materials import get_material
+
+    mat = get_material(cfg["regions"]["silicon"]["material"])
+
+    body = next(
+        d for d in cfg["doping"]
+        if d.get("region") == "silicon" and d["profile"].get("type") == "uniform"
+    )
+    N_A_cm3 = float(body["profile"].get("N_A", 0.0))
+
+    ox_region = next(
+        r for r in cfg["regions"].values() if r.get("role") == "insulator"
+    )
+    ox_mat = get_material(ox_region["material"])
+
+    mob = cfg.get("physics", {}).get("mobility", {})
+    mu_n_SI = float(mob.get("mu_n", 1400.0)) * 1.0e-4          # cm^2/Vs -> m^2/Vs
+    vsat_SI = float(mob.get("vsat_n", 1.0e7)) * 1.0e-2         # cm/s -> m/s
+
+    drain = next(c for c in cfg["contacts"] if c["name"] == "drain")
+    V_DS = float(drain.get("voltage", 0.0))
+
+    gate = next(c for c in cfg["contacts"] if c["type"] == "gate")
+    phi_ms = float(gate.get("workfunction", 0.0) or 0.0)
+
+    T = float(cfg.get("physics", {}).get("temperature", 300.0))
+    moscap = analytical_moscap_params(
+        body_dopant="p",
+        N_body_cm3=N_A_cm3,
+        T_ox_m=_MOSFET_3D_T_OX,
+        phi_ms=phi_ms,
+        Q_f_per_area=0.0,
+        T=T,
+        n_i_cm3=mat.n_i / cm3_to_m3(1.0),
+        eps_r_semi=mat.epsilon_r,
+        eps_r_ox=ox_mat.epsilon_r,
+    )
+    phi_F = moscap.phi_B
+    V_T = moscap.V_t - phi_F
+    V_FB = moscap.V_fb - phi_F
+
+    return dict(
+        V_T=V_T, V_FB=V_FB, phi_F=phi_F,
+        C_ox=moscap.C_ox_per_area,
+        L=_MOSFET_3D_L_CHANNEL, W=_MOSFET_3D_W,
+        H_si=_MOSFET_3D_H_SI, t_ox=_MOSFET_3D_T_OX,
+        A_drain=_MOSFET_3D_W * _MOSFET_3D_H_SI,   # drain facet area (m^2)
+        mu_eff=mu_n_SI, vsat=vsat_SI,
+        V_DS=V_DS, N_A_cm3=N_A_cm3,
+    )
+
+
+def _mosfet_3d_extract_id(result, dp) -> tuple[np.ndarray, np.ndarray]:
+    """Return (V_GS, I_D) sorted by V_GS from the drain-contact IV.
+
+    The bias_sweep runner records the facet-averaged drain current
+    density `J_drain` (A/m^2) at every V_GS step; the total drain current
+    is `I_D = |J_drain| * A_drain`.
+    """
+    iv = result.iv or []
+    V_GS = np.array([r["V"] for r in iv], dtype=float)
+    if not all("J_drain" in r for r in iv):
+        raise KeyError("J_drain missing on at least one iv row")
+    J_drain = np.array([abs(float(r["J_drain"])) for r in iv], dtype=float)
+    order = np.argsort(V_GS)
+    return V_GS[order], (J_drain * dp["A_drain"])[order]
+
+
+def _mosfet_3d_linear_checks(result, dp) -> list[tuple[str, bool, str]]:
+    """Pao-Sah linear-regime checks on an already-run linear result."""
+    from semi.diode_analytical import mosfet_3d_paosah_iv
+
+    iv = result.iv or []
+    if not iv:
+        return [("mosfet_3d: linear iv table non-empty", False, "no iv rows")]
+    if not all("J_drain" in r for r in iv):
+        return [(
+            "mosfet_3d: bias_sweep recorded J_drain at every step",
+            False, "J_drain missing on at least one iv row",
+        )]
+
+    V_GS, I_D_sim = _mosfet_3d_extract_id(result, dp)
+    I_D_th = mosfet_3d_paosah_iv(
+        V_GS, dp["V_DS"], dp["mu_eff"], dp["C_ox"],
+        dp["L"], dp["W"], dp["V_T"], dp["vsat"],
+    )
+
+    lo, hi = dp["V_T"] + 0.2, dp["V_T"] + 0.8
+    mask = (V_GS >= lo - 1.0e-9) & (V_GS <= hi + 1.0e-9) & (I_D_th > 0.0)
+
+    checks: list[tuple[str, bool, str]] = []
+    checks.append((
+        f"mosfet_3d (linear): sweep covers V_T = {dp['V_T']:+.3f} V "
+        f"through V_T + 0.8 = {hi:.3f} V",
+        bool(V_GS.min() <= dp["V_T"] - 0.1) and bool(V_GS.max() >= hi - 1.0e-9),
+        f"V_GS in [{V_GS.min():+.3f}, {V_GS.max():+.3f}] V",
+    ))
+
+    n_window = int(mask.sum())
+    checks.append((
+        f"mosfet_3d (linear): window [V_T+0.2, V_T+0.8] = [{lo:.3f}, {hi:.3f}] V "
+        f"has >=3 samples",
+        n_window >= 3,
+        f"{n_window} samples in window",
+    ))
+
+    if n_window >= 1:
+        rel = np.abs(I_D_sim[mask] - I_D_th[mask]) / np.maximum(I_D_th[mask], 1.0e-30)
+        w = int(np.argmax(rel))
+        checks.append((
+            "mosfet_3d (linear): |I_D_sim - I_D_PaoSah| / I_D_PaoSah < 25% "
+            f"in [{lo:.3f}, {hi:.3f}] V",
+            bool(rel.max() < 0.25),
+            f"worst {rel.max()*100:.1f}% at V_GS = {V_GS[mask][w]:+.3f} V "
+            f"(I_D_sim = {I_D_sim[mask][w]*1e6:.3f} uA, "
+            f"I_D_PaoSah = {I_D_th[mask][w]*1e6:.3f} uA, "
+            f"V_DS = {dp['V_DS']:.3f} V, L = {dp['L']*1e9:.0f} nm, "
+            f"mu_eff = {dp['mu_eff']*1e4:.0f} cm^2/Vs)",
+        ))
+
+    # Monotone I_D increase above threshold.
+    above = V_GS >= dp["V_T"]
+    I_above = I_D_sim[above]
+    mono = bool(np.all(np.diff(I_above) >= -1.0e-15)) if I_above.size >= 2 else True
+    checks.append((
+        "mosfet_3d (linear): I_D increases monotonically with V_GS above V_T",
+        mono,
+        f"{int(above.sum())} samples above V_T; "
+        f"I_D range [{I_above.min()*1e6:.3f}, {I_above.max()*1e6:.3f}] uA"
+        if I_above.size else "no samples above V_T",
+    ))
+
+    result._mosfet_3d_linear = dict(V_GS=V_GS, I_D_sim=I_D_sim, I_D_th=I_D_th,
+                                    window=(lo, hi), dp=dp)
+    return checks
+
+
+def _run_benchmark_config(json_path: Path):
+    """Load, validate, and run a benchmark JSON; return the result with
+    `cfg` attached (mirrors the attach done in `main`)."""
+    from semi import run as semi_run
+    from semi import schema
+
+    cfg = schema.load(str(json_path))
+    result = semi_run.run(cfg)
+    try:
+        result.cfg = cfg
+    except Exception:  # noqa: BLE001
+        pass
+    return result
+
+
+def _mosfet_3d_saturation_checks(result, dp) -> list[tuple[str, bool, str]]:
+    """Velocity-saturation I_DSAT checks on an already-run sat result."""
+    from semi.diode_analytical import mosfet_3d_saturation_iv
+
+    iv = result.iv or []
+    if not iv:
+        return [("mosfet_3d (sat): iv table non-empty", False, "no iv rows")]
+    if not all("J_drain" in r for r in iv):
+        return [(
+            "mosfet_3d (sat): bias_sweep recorded J_drain at every step",
+            False, "J_drain missing on at least one iv row",
+        )]
+
+    V_GS, I_D_sim = _mosfet_3d_extract_id(result, dp)
+    I_DSAT_th = mosfet_3d_saturation_iv(
+        V_GS, dp["mu_eff"], dp["C_ox"], dp["L"], dp["W"], dp["V_T"], dp["vsat"],
+    )
+
+    lo, hi = dp["V_T"] + 0.4, dp["V_T"] + 1.6
+    mask = (V_GS >= lo - 1.0e-9) & (V_GS <= hi + 1.0e-9) & (I_DSAT_th > 0.0)
+
+    checks: list[tuple[str, bool, str]] = []
+    n_window = int(mask.sum())
+    checks.append((
+        f"mosfet_3d (sat): window [V_T+0.4, V_T+1.6] = [{lo:.3f}, {hi:.3f}] V "
+        f"has >=3 samples",
+        n_window >= 3,
+        f"{n_window} samples in window (V_DS = {dp['V_DS']:.2f} V)",
+    ))
+    if n_window >= 1:
+        rel = np.abs(I_D_sim[mask] - I_DSAT_th[mask]) / np.maximum(I_DSAT_th[mask], 1.0e-30)
+        w = int(np.argmax(rel))
+        checks.append((
+            "mosfet_3d (sat): |I_DSAT_sim - I_DSAT_ref| / I_DSAT_ref < 30% "
+            f"in [{lo:.3f}, {hi:.3f}] V",
+            bool(rel.max() < 0.30),
+            f"worst {rel.max()*100:.1f}% at V_GS = {V_GS[mask][w]:+.3f} V "
+            f"(I_DSAT_sim = {I_D_sim[mask][w]*1e6:.2f} uA, "
+            f"I_DSAT_ref = {I_DSAT_th[mask][w]*1e6:.2f} uA)",
+        ))
+
+    above = V_GS >= dp["V_T"]
+    I_above = I_D_sim[above]
+    mono = bool(np.all(np.diff(I_above) >= -1.0e-15)) if I_above.size >= 2 else True
+    checks.append((
+        "mosfet_3d (sat): I_DSAT increases monotonically with V_GS above V_T",
+        mono,
+        f"{int(above.sum())} samples above V_T",
+    ))
+
+    result._mosfet_3d_sat = dict(V_GS=V_GS, I_D_sim=I_D_sim, I_DSAT_th=I_DSAT_th,
+                                 window=(lo, hi), dp=dp)
+    return checks
+
+
+@register("mosfet_3d")
+def verify_mosfet_3d(result) -> list[tuple[str, bool, str]]:
+    """
+    3D MOSFET capstone verifier (M19).
+
+    Checks the linear-regime drain current of the driver-run
+    `mosfet_3d.json` against the Pao-Sah long-channel reference
+    (`semi.diode_analytical.mosfet_3d_paosah_iv`) within 25% over
+    [V_T + 0.2, V_T + 0.8] V, and asserts I_D(V_GS) is monotone above
+    threshold. Additionally runs the saturation-regime config
+    `mosfet_3d_sat.json` and checks I_DSAT within 30% of the
+    velocity-saturation reference (Phase C). The saturation run is
+    isolated in a try/except so a solver failure there surfaces as a
+    single failed check rather than masking the linear-regime result.
+    """
+    dp = _mosfet_3d_device_params(result.cfg)
+    checks = _mosfet_3d_linear_checks(result, dp)
+
+    sat_path = BENCHMARKS_DIR / "mosfet_3d" / "mosfet_3d_sat.json"
+    try:
+        sat_result = _run_benchmark_config(sat_path)
+        dp_sat = _mosfet_3d_device_params(sat_result.cfg)
+        checks.extend(_mosfet_3d_saturation_checks(sat_result, dp_sat))
+    except Exception as exc:  # noqa: BLE001
+        checks.append((
+            "mosfet_3d: saturation-regime config runs (mosfet_3d_sat.json)",
+            False, f"saturation run raised: {type(exc).__name__}: {exc}",
+        ))
+    return checks
+
+
+@register("mosfet_3d_sat")
+def verify_mosfet_3d_sat(result) -> list[tuple[str, bool, str]]:
+    """Standalone saturation-regime verifier for `mosfet_3d_sat.json`.
+
+    Shares the I_DSAT logic with `verify_mosfet_3d`; used when the
+    saturation config is run directly (`run_benchmark.py mosfet_3d_sat`)
+    and by the M19 CI matrix.
+    """
+    dp = _mosfet_3d_device_params(result.cfg)
+    return _mosfet_3d_saturation_checks(result, dp)
+
+
+def plot_mosfet_3d_sat(result, out_dir: Path) -> list[Path]:
+    """I_DSAT vs V_GS against the velocity-saturation reference."""
+    curves = getattr(result, "_mosfet_3d_sat", None)
+    if curves is None:
+        return []
+    V_GS = curves["V_GS"]
+    I_sim = curves["I_D_sim"]
+    I_th = curves["I_DSAT_th"]
+    lo, hi = curves["window"]
+    dp = curves["dp"]
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(V_GS, I_sim * 1e6, "o-", markersize=3, label="simulation")
+    finite = I_th > 0.0
+    ax.plot(V_GS[finite], I_th[finite] * 1e6, "k--",
+            label="velocity-saturation reference")
+    ax.axvline(dp["V_T"], color="grey", linestyle=":", alpha=0.6, label=r"$V_T$")
+    ax.axvspan(lo, hi, alpha=0.15, color="green", label="verifier window")
+    ax.set_xlabel(r"$V_{GS}$ (V)")
+    ax.set_ylabel(r"$I_{DSAT}$ ($\mu$A)")
+    ax.set_title(rf"MOSFET 3D: $I_{{DSAT}}(V_{{GS}})$ at $V_{{DS}}={dp['V_DS']:.2f}$ V")
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    p = out_dir / "id_vgs_saturation.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["mosfet_3d_sat"] = plot_mosfet_3d_sat
+
+
+def plot_mosfet_3d(result, out_dir: Path) -> list[Path]:
+    """I_D vs V_GS against the Pao-Sah linear reference (if available)."""
+    curves = getattr(result, "_mosfet_3d_linear", None)
+    if curves is None:
+        return []
+    V_GS = curves["V_GS"]
+    I_sim = curves["I_D_sim"]
+    I_th = curves["I_D_th"]
+    lo, hi = curves["window"]
+    dp = curves["dp"]
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(V_GS, I_sim * 1e6, "o-", markersize=3, label="simulation")
+    finite = I_th > 0.0
+    ax.plot(V_GS[finite], I_th[finite] * 1e6, "k--", label="Pao-Sah linear")
+    ax.axvline(dp["V_T"], color="grey", linestyle=":", alpha=0.6, label=r"$V_T$")
+    ax.axvspan(lo, hi, alpha=0.15, color="green", label="verifier window")
+    ax.set_xlabel(r"$V_{GS}$ (V)")
+    ax.set_ylabel(r"$I_D$ ($\mu$A)")
+    ax.set_title(rf"MOSFET 3D: $I_D(V_{{GS}})$ at $V_{{DS}}={dp['V_DS']:.3f}$ V (linear)")
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    p = out_dir / "id_vgs_linear.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["mosfet_3d"] = plot_mosfet_3d
+
+
+def _resolved_backend(result) -> str:
+    """Best-effort resolved backend string from a SimulationResult."""
+    info = getattr(result, "solver_info", None) or {}
+    return str(info.get("backend_resolved") or info.get("backend") or "cpu-mumps")
+
+
+def _psi_all_finite(result) -> bool:
+    psi = getattr(result, "psi_phys", None)
+    if psi is None:
+        return False
+    return bool(np.all(np.isfinite(np.asarray(psi))))
+
+
+@register("mosfet_3d_gpu")
+def verify_mosfet_3d_gpu(result) -> list[tuple[str, bool, str]]:
+    """
+    GPU acceptance verifier for the ~500k-DOF 3D MOSFET (M19, Phase D).
+
+    On a CPU-only host the driver's GPU preflight short-circuits to SKIP
+    before this verifier is reached, so if we get here with a non-GPU
+    resolved backend we still report SKIP (no hard failure). When a GPU
+    backend actually resolved, the checks are:
+
+      - `psi` is finite and non-NaN everywhere.
+      - the CPU/GPU linear-solve wall-clock ratio is >= 5x. The GPU time
+        is the driver-measured run wall-clock (`result._solve_time`,
+        dominated by the linear solves at ~500k DOFs); the CPU baseline
+        is obtained by re-running the same config with the backend forced
+        to cpu-mumps via the KRONOS_BACKEND override.
+    """
+    checks: list[tuple[str, bool, str]] = []
+
+    backend = _resolved_backend(result)
+    if not backend.startswith("gpu-"):
+        checks.append((
+            "mosfet_3d_gpu: GPU acceptance",
+            True,
+            f"SKIP (no GPU): resolved backend = {backend!r}; GPU timing gate "
+            f"is exercised only on the nightly GPU runner",
+        ))
+        return checks
+
+    checks.append((
+        "mosfet_3d_gpu: psi field finite and non-NaN",
+        _psi_all_finite(result),
+        f"resolved backend = {backend!r}",
+    ))
+
+    gpu_time = float(getattr(result, "_solve_time", 0.0) or 0.0)
+
+    # CPU-MUMPS baseline on the identical config. KRONOS_BACKEND pins the
+    # auto-resolution to cpu-mumps even on the GPU host.
+    import os
+    gpu_json = BENCHMARKS_DIR / "mosfet_3d" / "mosfet_3d_gpu.json"
+    prev = os.environ.get("KRONOS_BACKEND")
+    os.environ["KRONOS_BACKEND"] = "cpu-mumps"
+    try:
+        from semi import run as semi_run
+        from semi import schema as _schema
+        cpu_cfg = _schema.load(str(gpu_json))
+        cpu_cfg.setdefault("solver", {})["backend"] = "auto"  # honor KRONOS_BACKEND
+        t0 = time.perf_counter()
+        semi_run.run(cpu_cfg)
+        cpu_time = time.perf_counter() - t0
+    finally:
+        if prev is None:
+            os.environ.pop("KRONOS_BACKEND", None)
+        else:
+            os.environ["KRONOS_BACKEND"] = prev
+
+    ratio = cpu_time / gpu_time if gpu_time > 0.0 else float("nan")
+    checks.append((
+        "mosfet_3d_gpu: CPU/GPU linear-solve wall-clock ratio >= 5x",
+        bool(np.isfinite(ratio)) and ratio >= 5.0,
+        f"cpu-mumps = {cpu_time:.2f} s, gpu = {gpu_time:.2f} s, ratio = {ratio:.2f}x",
+    ))
+    return checks
+
+
+# --------------------------------------------------------------------------- #
 # resistor_3d verifier and plotter                                            #
 # --------------------------------------------------------------------------- #
 
@@ -3814,20 +4235,34 @@ def main(argv: list[str] | None = None) -> int:
 
     name = args.name
     bench_dir = BENCHMARKS_DIR / name
+    sibling_json: Path | None = None
     if not bench_dir.is_dir():
         example_dir = EXAMPLES_DIR / name
         if example_dir.is_dir():
             bench_dir = example_dir
         else:
-            print(
-                f"ERROR: benchmark directory not found: {bench_dir} "
-                f"(also checked {example_dir})",
-                file=sys.stderr,
-            )
-            return 2
+            # Fall back to a <name>.json living inside another benchmark
+            # directory (e.g. the M19 mosfet_3d_sat / mosfet_3d_gpu configs
+            # that share the benchmarks/mosfet_3d/ mesh fixture).
+            matches = sorted(glob.glob(str(BENCHMARKS_DIR / "*" / f"{name}.json")))
+            if len(matches) == 1:
+                sibling_json = Path(matches[0])
+                bench_dir = sibling_json.parent
+            else:
+                print(
+                    f"ERROR: benchmark directory not found: {bench_dir} "
+                    f"(also checked {example_dir})",
+                    file=sys.stderr,
+                )
+                return 2
 
     try:
-        json_path = Path(args.input) if args.input else find_json(bench_dir, name)
+        if args.input:
+            json_path = Path(args.input)
+        elif sibling_json is not None:
+            json_path = sibling_json
+        else:
+            json_path = find_json(bench_dir, name)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
@@ -3841,6 +4276,24 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = schema.load(str(json_path))
 
+    # GPU preflight: a config requesting a GPU backend on a host without
+    # one would raise ConfigError deep in the solve. Detect it up front so
+    # `run_benchmark.py <gpu-config>` reports SKIP and exits 0 on CPU-only
+    # runners (the M19 mosfet_3d_gpu acceptance test), rather than failing
+    # or requiring the large fine mesh to be present.
+    requested_backend = (cfg.get("solver", {}) or {}).get("backend", "cpu-mumps")
+    if str(requested_backend).startswith("gpu-"):
+        from semi.compute import available_backends
+        if requested_backend not in available_backends():
+            print(
+                f"[run_benchmark] SKIP: benchmark {name!r} requests "
+                f"solver.backend={requested_backend!r} but no GPU backend is "
+                f"available on this host (available: {available_backends()}). "
+                f"GPU acceptance is gated to the nightly GPU runner.",
+            )
+            print("[run_benchmark] OK (SKIP, no GPU)")
+            return 0
+
     t0 = time.perf_counter()
     try:
         result = semi_run.run(cfg)
@@ -3849,6 +4302,10 @@ def main(argv: list[str] | None = None) -> int:
         traceback.print_exc()
         return 3
     dt = time.perf_counter() - t0
+    try:
+        result._solve_time = dt
+    except Exception:  # noqa: BLE001
+        pass
 
     # AcSweepResult exposes `frequencies`/`Y`/`Z`/`C`/`G` and `meta` but
     # no `solver_info`. Branch first so the transient block does not
