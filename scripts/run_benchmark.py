@@ -1489,21 +1489,150 @@ def _mosfet_3d_linear_checks(result, dp) -> list[tuple[str, bool, str]]:
     return checks
 
 
+def _run_benchmark_config(json_path: Path):
+    """Load, validate, and run a benchmark JSON; return the result with
+    `cfg` attached (mirrors the attach done in `main`)."""
+    from semi import run as semi_run
+    from semi import schema
+
+    cfg = schema.load(str(json_path))
+    result = semi_run.run(cfg)
+    try:
+        result.cfg = cfg
+    except Exception:  # noqa: BLE001
+        pass
+    return result
+
+
+def _mosfet_3d_saturation_checks(result, dp) -> list[tuple[str, bool, str]]:
+    """Velocity-saturation I_DSAT checks on an already-run sat result."""
+    from semi.diode_analytical import mosfet_3d_saturation_iv
+
+    iv = result.iv or []
+    if not iv:
+        return [("mosfet_3d (sat): iv table non-empty", False, "no iv rows")]
+    if not all("J_drain" in r for r in iv):
+        return [(
+            "mosfet_3d (sat): bias_sweep recorded J_drain at every step",
+            False, "J_drain missing on at least one iv row",
+        )]
+
+    V_GS, I_D_sim = _mosfet_3d_extract_id(result, dp)
+    I_DSAT_th = mosfet_3d_saturation_iv(
+        V_GS, dp["mu_eff"], dp["C_ox"], dp["L"], dp["W"], dp["V_T"], dp["vsat"],
+    )
+
+    lo, hi = dp["V_T"] + 0.4, dp["V_T"] + 1.6
+    mask = (V_GS >= lo - 1.0e-9) & (V_GS <= hi + 1.0e-9) & (I_DSAT_th > 0.0)
+
+    checks: list[tuple[str, bool, str]] = []
+    n_window = int(mask.sum())
+    checks.append((
+        f"mosfet_3d (sat): window [V_T+0.4, V_T+1.6] = [{lo:.3f}, {hi:.3f}] V "
+        f"has >=3 samples",
+        n_window >= 3,
+        f"{n_window} samples in window (V_DS = {dp['V_DS']:.2f} V)",
+    ))
+    if n_window >= 1:
+        rel = np.abs(I_D_sim[mask] - I_DSAT_th[mask]) / np.maximum(I_DSAT_th[mask], 1.0e-30)
+        w = int(np.argmax(rel))
+        checks.append((
+            "mosfet_3d (sat): |I_DSAT_sim - I_DSAT_ref| / I_DSAT_ref < 30% "
+            f"in [{lo:.3f}, {hi:.3f}] V",
+            bool(rel.max() < 0.30),
+            f"worst {rel.max()*100:.1f}% at V_GS = {V_GS[mask][w]:+.3f} V "
+            f"(I_DSAT_sim = {I_D_sim[mask][w]*1e6:.2f} uA, "
+            f"I_DSAT_ref = {I_DSAT_th[mask][w]*1e6:.2f} uA)",
+        ))
+
+    above = V_GS >= dp["V_T"]
+    I_above = I_D_sim[above]
+    mono = bool(np.all(np.diff(I_above) >= -1.0e-15)) if I_above.size >= 2 else True
+    checks.append((
+        "mosfet_3d (sat): I_DSAT increases monotonically with V_GS above V_T",
+        mono,
+        f"{int(above.sum())} samples above V_T",
+    ))
+
+    result._mosfet_3d_sat = dict(V_GS=V_GS, I_D_sim=I_D_sim, I_DSAT_th=I_DSAT_th,
+                                 window=(lo, hi), dp=dp)
+    return checks
+
+
 @register("mosfet_3d")
 def verify_mosfet_3d(result) -> list[tuple[str, bool, str]]:
     """
     3D MOSFET capstone verifier (M19).
 
-    Phase B checks the linear-regime drain current of the driver-run
+    Checks the linear-regime drain current of the driver-run
     `mosfet_3d.json` against the Pao-Sah long-channel reference
     (`semi.diode_analytical.mosfet_3d_paosah_iv`) within 25% over
     [V_T + 0.2, V_T + 0.8] V, and asserts I_D(V_GS) is monotone above
-    threshold. Phase C extends this to additionally run the
-    saturation-regime config `mosfet_3d_sat.json` and check I_DSAT.
+    threshold. Additionally runs the saturation-regime config
+    `mosfet_3d_sat.json` and checks I_DSAT within 30% of the
+    velocity-saturation reference (Phase C). The saturation run is
+    isolated in a try/except so a solver failure there surfaces as a
+    single failed check rather than masking the linear-regime result.
     """
     dp = _mosfet_3d_device_params(result.cfg)
     checks = _mosfet_3d_linear_checks(result, dp)
+
+    sat_path = BENCHMARKS_DIR / "mosfet_3d" / "mosfet_3d_sat.json"
+    try:
+        sat_result = _run_benchmark_config(sat_path)
+        dp_sat = _mosfet_3d_device_params(sat_result.cfg)
+        checks.extend(_mosfet_3d_saturation_checks(sat_result, dp_sat))
+    except Exception as exc:  # noqa: BLE001
+        checks.append((
+            "mosfet_3d: saturation-regime config runs (mosfet_3d_sat.json)",
+            False, f"saturation run raised: {type(exc).__name__}: {exc}",
+        ))
     return checks
+
+
+@register("mosfet_3d_sat")
+def verify_mosfet_3d_sat(result) -> list[tuple[str, bool, str]]:
+    """Standalone saturation-regime verifier for `mosfet_3d_sat.json`.
+
+    Shares the I_DSAT logic with `verify_mosfet_3d`; used when the
+    saturation config is run directly (`run_benchmark.py mosfet_3d_sat`)
+    and by the M19 CI matrix.
+    """
+    dp = _mosfet_3d_device_params(result.cfg)
+    return _mosfet_3d_saturation_checks(result, dp)
+
+
+def plot_mosfet_3d_sat(result, out_dir: Path) -> list[Path]:
+    """I_DSAT vs V_GS against the velocity-saturation reference."""
+    curves = getattr(result, "_mosfet_3d_sat", None)
+    if curves is None:
+        return []
+    V_GS = curves["V_GS"]
+    I_sim = curves["I_D_sim"]
+    I_th = curves["I_DSAT_th"]
+    lo, hi = curves["window"]
+    dp = curves["dp"]
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(V_GS, I_sim * 1e6, "o-", markersize=3, label="simulation")
+    finite = I_th > 0.0
+    ax.plot(V_GS[finite], I_th[finite] * 1e6, "k--",
+            label="velocity-saturation reference")
+    ax.axvline(dp["V_T"], color="grey", linestyle=":", alpha=0.6, label=r"$V_T$")
+    ax.axvspan(lo, hi, alpha=0.15, color="green", label="verifier window")
+    ax.set_xlabel(r"$V_{GS}$ (V)")
+    ax.set_ylabel(r"$I_{DSAT}$ ($\mu$A)")
+    ax.set_title(rf"MOSFET 3D: $I_{{DSAT}}(V_{{GS}})$ at $V_{{DS}}={dp['V_DS']:.2f}$ V")
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    p = out_dir / "id_vgs_saturation.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["mosfet_3d_sat"] = plot_mosfet_3d_sat
 
 
 def plot_mosfet_3d(result, out_dir: Path) -> list[Path]:
@@ -4027,20 +4156,34 @@ def main(argv: list[str] | None = None) -> int:
 
     name = args.name
     bench_dir = BENCHMARKS_DIR / name
+    sibling_json: Path | None = None
     if not bench_dir.is_dir():
         example_dir = EXAMPLES_DIR / name
         if example_dir.is_dir():
             bench_dir = example_dir
         else:
-            print(
-                f"ERROR: benchmark directory not found: {bench_dir} "
-                f"(also checked {example_dir})",
-                file=sys.stderr,
-            )
-            return 2
+            # Fall back to a <name>.json living inside another benchmark
+            # directory (e.g. the M19 mosfet_3d_sat / mosfet_3d_gpu configs
+            # that share the benchmarks/mosfet_3d/ mesh fixture).
+            matches = sorted(glob.glob(str(BENCHMARKS_DIR / "*" / f"{name}.json")))
+            if len(matches) == 1:
+                sibling_json = Path(matches[0])
+                bench_dir = sibling_json.parent
+            else:
+                print(
+                    f"ERROR: benchmark directory not found: {bench_dir} "
+                    f"(also checked {example_dir})",
+                    file=sys.stderr,
+                )
+                return 2
 
     try:
-        json_path = Path(args.input) if args.input else find_json(bench_dir, name)
+        if args.input:
+            json_path = Path(args.input)
+        elif sibling_json is not None:
+            json_path = sibling_json
+        else:
+            json_path = find_json(bench_dir, name)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
