@@ -489,3 +489,96 @@ def vbi_fermi_dirac(
     psi_n_bulk_scaled = eta_n - eta_offset_n
     psi_p_bulk_scaled = -(eta_p - eta_offset_p)
     return float(V_t * (psi_n_bulk_scaled - psi_p_bulk_scaled))
+
+
+# ---------------------------------------------------------------------------
+# M19 3D MOSFET Pao-Sah long-channel drain-current references.
+# ---------------------------------------------------------------------------
+
+
+def mosfet_3d_paosah_iv(
+    V_GS_arr, V_DS: float,
+    mu_eff: float, C_ox: float,
+    L: float, W: float, V_T: float,
+    vsat: float,
+) -> np.ndarray:
+    """
+    Pao-Sah linear-regime drain current for a long-channel MOSFET, with
+    a first-order velocity-saturation correction to the channel
+    mobility.
+
+    The square-law linear (triode) current at small `V_DS` is
+
+        I_D = (W / L) * mu_eff * C_ox * max(V_GS - V_T, 0) * V_DS
+
+    (Hu, *Modern Semiconductor Devices for Integrated Circuits*, Eq.
+    6.3.3 in the `V_DS << V_GS - V_T` limit). Lateral-field velocity
+    saturation lowers the effective channel mobility by the standard
+    Caughey-Thomas / Sabnis-Clemens denominator
+
+        mu_eff -> mu_eff / (1 + mu_eff * V_DS / (vsat * L)),
+
+    so the returned current is
+
+        I_D = (W / L) * C_ox * max(V_GS - V_T, 0) * V_DS
+              * mu_eff / (1 + mu_eff * V_DS / (vsat * L)).
+
+    Parameters
+    ----------
+    V_GS_arr : float | array-like
+        Gate-source voltage(s) in volts.
+    V_DS : float
+        Drain-source voltage in volts (linear regime, small).
+    mu_eff : float
+        Effective low-field channel mobility in m^2/(V s).
+    C_ox : float
+        Gate-oxide capacitance per unit area in F/m^2 (eps_ox / t_ox).
+    L, W : float
+        Channel length and width in meters.
+    V_T : float
+        Threshold voltage in volts (kronos intrinsic-Fermi convention).
+    vsat : float
+        Saturation velocity in m/s (Si electrons ~1e5 m/s).
+
+    Returns
+    -------
+    numpy.ndarray
+        Total drain current I_D in amperes. Zero at and below threshold.
+
+    Pure-Python; no dolfinx. M19.
+    """
+    V_GS = np.asarray(V_GS_arr, dtype=float)
+    V_ov = np.maximum(V_GS - float(V_T), 0.0)
+    mu_corr = float(mu_eff) / (1.0 + float(mu_eff) * float(V_DS) / (float(vsat) * float(L)))
+    return (float(W) / float(L)) * mu_corr * float(C_ox) * V_ov * float(V_DS)
+
+
+def mosfet_3d_saturation_iv(
+    V_GS_arr,
+    mu_eff: float, C_ox: float,
+    L: float, W: float, V_T: float,
+    vsat: float,
+) -> np.ndarray:
+    """
+    Velocity-saturation-limited saturation drain current I_DSAT for a
+    long-channel MOSFET.
+
+    The classical square-law saturation current
+    `(W / 2L) mu_eff C_ox (V_GS - V_T)^2` is reduced by the
+    velocity-saturation denominator, giving the Sabnis-Clemens form
+
+        I_DSAT = (W / (2 L)) * mu_eff * C_ox * (V_GS - V_T)^2
+                 / (1 + (V_GS - V_T) / (2 * vsat * L / mu_eff)).
+
+    As `V_GS - V_T` grows the denominator linearizes the quadratic
+    dependence toward the velocity-saturation-limited
+    `I ~ W C_ox vsat (V_GS - V_T)` regime. Units mirror
+    :func:`mosfet_3d_paosah_iv`; returns total I_DSAT in amperes, zero
+    at and below threshold.
+
+    Pure-Python; no dolfinx. M19.
+    """
+    V_GS = np.asarray(V_GS_arr, dtype=float)
+    V_ov = np.maximum(V_GS - float(V_T), 0.0)
+    denom = 1.0 + V_ov / (2.0 * float(vsat) * float(L) / float(mu_eff))
+    return (float(W) / (2.0 * float(L))) * float(mu_eff) * float(C_ox) * V_ov ** 2 / denom

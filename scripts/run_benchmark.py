@@ -1326,6 +1326,219 @@ _PLOTTERS["mosfet_2d"] = plot_mosfet_2d
 
 
 # --------------------------------------------------------------------------- #
+# mosfet_3d verifier (M19: 3D MOSFET capstone, Pao-Sah reference)             #
+# --------------------------------------------------------------------------- #
+
+# Fixed device geometry from benchmarks/mosfet_3d/mosfet3d.geo. The gmsh
+# file mesh carries no `regions_by_box` block, so unlike the 2D verifier
+# these are read from the committed geometry rather than the JSON.
+_MOSFET_3D_L_CHANNEL = 250.0e-9   # metallurgical channel length (m)
+_MOSFET_3D_W = 1.0e-6             # channel width (m)
+_MOSFET_3D_H_SI = 200.0e-9       # silicon body thickness (m)
+_MOSFET_3D_T_OX = 5.0e-9         # gate oxide thickness (m)
+
+
+def _mosfet_3d_device_params(cfg) -> dict:
+    """MOSFET geometry, oxide, and threshold parameters for the 3D device.
+
+    V_T is computed with `semi.cv.analytical_moscap_params` against the
+    uniform p-type body doping in the kronos intrinsic-Fermi BC
+    convention (V_T_kronos = V_T_textbook - phi_F), matching the 2D
+    `_mosfet_device_params` helper. Channel L / width W / oxide t_ox come
+    from the committed `.geo` geometry (the file mesh has no box-region
+    metadata). The effective channel mobility mu_eff is the JSON low-field
+    mu_n and vsat is the Caughey-Thomas saturation velocity (JSON
+    `vsat_n`, default 1e7 cm/s).
+    """
+    from semi.constants import cm3_to_m3
+    from semi.cv import analytical_moscap_params
+    from semi.materials import get_material
+
+    mat = get_material(cfg["regions"]["silicon"]["material"])
+
+    body = next(
+        d for d in cfg["doping"]
+        if d.get("region") == "silicon" and d["profile"].get("type") == "uniform"
+    )
+    N_A_cm3 = float(body["profile"].get("N_A", 0.0))
+
+    ox_region = next(
+        r for r in cfg["regions"].values() if r.get("role") == "insulator"
+    )
+    ox_mat = get_material(ox_region["material"])
+
+    mob = cfg.get("physics", {}).get("mobility", {})
+    mu_n_SI = float(mob.get("mu_n", 1400.0)) * 1.0e-4          # cm^2/Vs -> m^2/Vs
+    vsat_SI = float(mob.get("vsat_n", 1.0e7)) * 1.0e-2         # cm/s -> m/s
+
+    drain = next(c for c in cfg["contacts"] if c["name"] == "drain")
+    V_DS = float(drain.get("voltage", 0.0))
+
+    gate = next(c for c in cfg["contacts"] if c["type"] == "gate")
+    phi_ms = float(gate.get("workfunction", 0.0) or 0.0)
+
+    T = float(cfg.get("physics", {}).get("temperature", 300.0))
+    moscap = analytical_moscap_params(
+        body_dopant="p",
+        N_body_cm3=N_A_cm3,
+        T_ox_m=_MOSFET_3D_T_OX,
+        phi_ms=phi_ms,
+        Q_f_per_area=0.0,
+        T=T,
+        n_i_cm3=mat.n_i / cm3_to_m3(1.0),
+        eps_r_semi=mat.epsilon_r,
+        eps_r_ox=ox_mat.epsilon_r,
+    )
+    phi_F = moscap.phi_B
+    V_T = moscap.V_t - phi_F
+    V_FB = moscap.V_fb - phi_F
+
+    return dict(
+        V_T=V_T, V_FB=V_FB, phi_F=phi_F,
+        C_ox=moscap.C_ox_per_area,
+        L=_MOSFET_3D_L_CHANNEL, W=_MOSFET_3D_W,
+        H_si=_MOSFET_3D_H_SI, t_ox=_MOSFET_3D_T_OX,
+        A_drain=_MOSFET_3D_W * _MOSFET_3D_H_SI,   # drain facet area (m^2)
+        mu_eff=mu_n_SI, vsat=vsat_SI,
+        V_DS=V_DS, N_A_cm3=N_A_cm3,
+    )
+
+
+def _mosfet_3d_extract_id(result, dp) -> tuple[np.ndarray, np.ndarray]:
+    """Return (V_GS, I_D) sorted by V_GS from the drain-contact IV.
+
+    The bias_sweep runner records the facet-averaged drain current
+    density `J_drain` (A/m^2) at every V_GS step; the total drain current
+    is `I_D = |J_drain| * A_drain`.
+    """
+    iv = result.iv or []
+    V_GS = np.array([r["V"] for r in iv], dtype=float)
+    if not all("J_drain" in r for r in iv):
+        raise KeyError("J_drain missing on at least one iv row")
+    J_drain = np.array([abs(float(r["J_drain"])) for r in iv], dtype=float)
+    order = np.argsort(V_GS)
+    return V_GS[order], (J_drain * dp["A_drain"])[order]
+
+
+def _mosfet_3d_linear_checks(result, dp) -> list[tuple[str, bool, str]]:
+    """Pao-Sah linear-regime checks on an already-run linear result."""
+    from semi.diode_analytical import mosfet_3d_paosah_iv
+
+    iv = result.iv or []
+    if not iv:
+        return [("mosfet_3d: linear iv table non-empty", False, "no iv rows")]
+    if not all("J_drain" in r for r in iv):
+        return [(
+            "mosfet_3d: bias_sweep recorded J_drain at every step",
+            False, "J_drain missing on at least one iv row",
+        )]
+
+    V_GS, I_D_sim = _mosfet_3d_extract_id(result, dp)
+    I_D_th = mosfet_3d_paosah_iv(
+        V_GS, dp["V_DS"], dp["mu_eff"], dp["C_ox"],
+        dp["L"], dp["W"], dp["V_T"], dp["vsat"],
+    )
+
+    lo, hi = dp["V_T"] + 0.2, dp["V_T"] + 0.8
+    mask = (V_GS >= lo - 1.0e-9) & (V_GS <= hi + 1.0e-9) & (I_D_th > 0.0)
+
+    checks: list[tuple[str, bool, str]] = []
+    checks.append((
+        f"mosfet_3d (linear): sweep covers V_T = {dp['V_T']:+.3f} V "
+        f"through V_T + 0.8 = {hi:.3f} V",
+        bool(V_GS.min() <= dp["V_T"] - 0.1) and bool(V_GS.max() >= hi - 1.0e-9),
+        f"V_GS in [{V_GS.min():+.3f}, {V_GS.max():+.3f}] V",
+    ))
+
+    n_window = int(mask.sum())
+    checks.append((
+        f"mosfet_3d (linear): window [V_T+0.2, V_T+0.8] = [{lo:.3f}, {hi:.3f}] V "
+        f"has >=3 samples",
+        n_window >= 3,
+        f"{n_window} samples in window",
+    ))
+
+    if n_window >= 1:
+        rel = np.abs(I_D_sim[mask] - I_D_th[mask]) / np.maximum(I_D_th[mask], 1.0e-30)
+        w = int(np.argmax(rel))
+        checks.append((
+            "mosfet_3d (linear): |I_D_sim - I_D_PaoSah| / I_D_PaoSah < 25% "
+            f"in [{lo:.3f}, {hi:.3f}] V",
+            bool(rel.max() < 0.25),
+            f"worst {rel.max()*100:.1f}% at V_GS = {V_GS[mask][w]:+.3f} V "
+            f"(I_D_sim = {I_D_sim[mask][w]*1e6:.3f} uA, "
+            f"I_D_PaoSah = {I_D_th[mask][w]*1e6:.3f} uA, "
+            f"V_DS = {dp['V_DS']:.3f} V, L = {dp['L']*1e9:.0f} nm, "
+            f"mu_eff = {dp['mu_eff']*1e4:.0f} cm^2/Vs)",
+        ))
+
+    # Monotone I_D increase above threshold.
+    above = V_GS >= dp["V_T"]
+    I_above = I_D_sim[above]
+    mono = bool(np.all(np.diff(I_above) >= -1.0e-15)) if I_above.size >= 2 else True
+    checks.append((
+        "mosfet_3d (linear): I_D increases monotonically with V_GS above V_T",
+        mono,
+        f"{int(above.sum())} samples above V_T; "
+        f"I_D range [{I_above.min()*1e6:.3f}, {I_above.max()*1e6:.3f}] uA"
+        if I_above.size else "no samples above V_T",
+    ))
+
+    result._mosfet_3d_linear = dict(V_GS=V_GS, I_D_sim=I_D_sim, I_D_th=I_D_th,
+                                    window=(lo, hi), dp=dp)
+    return checks
+
+
+@register("mosfet_3d")
+def verify_mosfet_3d(result) -> list[tuple[str, bool, str]]:
+    """
+    3D MOSFET capstone verifier (M19).
+
+    Phase B checks the linear-regime drain current of the driver-run
+    `mosfet_3d.json` against the Pao-Sah long-channel reference
+    (`semi.diode_analytical.mosfet_3d_paosah_iv`) within 25% over
+    [V_T + 0.2, V_T + 0.8] V, and asserts I_D(V_GS) is monotone above
+    threshold. Phase C extends this to additionally run the
+    saturation-regime config `mosfet_3d_sat.json` and check I_DSAT.
+    """
+    dp = _mosfet_3d_device_params(result.cfg)
+    checks = _mosfet_3d_linear_checks(result, dp)
+    return checks
+
+
+def plot_mosfet_3d(result, out_dir: Path) -> list[Path]:
+    """I_D vs V_GS against the Pao-Sah linear reference (if available)."""
+    curves = getattr(result, "_mosfet_3d_linear", None)
+    if curves is None:
+        return []
+    V_GS = curves["V_GS"]
+    I_sim = curves["I_D_sim"]
+    I_th = curves["I_D_th"]
+    lo, hi = curves["window"]
+    dp = curves["dp"]
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(V_GS, I_sim * 1e6, "o-", markersize=3, label="simulation")
+    finite = I_th > 0.0
+    ax.plot(V_GS[finite], I_th[finite] * 1e6, "k--", label="Pao-Sah linear")
+    ax.axvline(dp["V_T"], color="grey", linestyle=":", alpha=0.6, label=r"$V_T$")
+    ax.axvspan(lo, hi, alpha=0.15, color="green", label="verifier window")
+    ax.set_xlabel(r"$V_{GS}$ (V)")
+    ax.set_ylabel(r"$I_D$ ($\mu$A)")
+    ax.set_title(rf"MOSFET 3D: $I_D(V_{{GS}})$ at $V_{{DS}}={dp['V_DS']:.3f}$ V (linear)")
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    p = out_dir / "id_vgs_linear.png"
+    fig.savefig(p, dpi=130)
+    plt.close(fig)
+    return [p]
+
+
+_PLOTTERS["mosfet_3d"] = plot_mosfet_3d
+
+
+# --------------------------------------------------------------------------- #
 # resistor_3d verifier and plotter                                            #
 # --------------------------------------------------------------------------- #
 
