@@ -228,12 +228,15 @@ def test_compute_default_values_present_in_schema():
 def test_all_existing_benchmarks_still_validate():
     """Every legacy benchmark JSON validates unchanged against schema
     1.4.0 and keeps the cpu-mumps default with no compute block. The
-    M15 GPU benchmark `poisson_3d_gpu` is the deliberate exception: it
-    explicitly opts in to a GPU backend and is excluded here."""
+    GPU-capable benchmarks are the deliberate exceptions: `poisson_3d_gpu`
+    (M15) and the M19 3D MOSFET capstone configs (`mosfet_3d`,
+    `mosfet_3d_sat` use solver.backend='auto'; `mosfet_3d_gpu` uses
+    'gpu-amgx' with a compute block) all explicitly opt in to a
+    non-default backend and are excluded here."""
     paths = sorted(glob.glob(str(BENCHMARKS_DIR / "*" / "*.json")))
     assert paths, "no benchmark JSONs found under benchmarks/*/*.json"
     for p in paths:
-        if "poisson_3d_gpu" in p:
+        if "poisson_3d_gpu" in p or "mosfet_3d" in p:
             continue
         cfg = json.loads(Path(p).read_text())
         result = schema.validate(cfg)

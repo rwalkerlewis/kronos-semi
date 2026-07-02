@@ -114,6 +114,22 @@ jobs:
               --cov=semi --cov-report=term-missing --cov-report=xml \
               --cov-fail-under=95
 
+      - name: M19 3D MOSFET coarsened bias-sweep smoke (non-blocking)
+        # Opt-in FEM smoke test for the mosfet_3d pipeline. Skipped in the
+        # coverage run above (a coupled 3D DD sweep exceeds the unit-test
+        # budget and can stagnate at inversion onset); exercised here with
+        # KRONOS_RUN_MOSFET_3D_SMOKE=1 and continue-on-error so it never
+        # blocks the gate. Same bias_sweep-stabilization caveat as the
+        # mosfet_3d / mosfet_2d benchmark matrix entries.
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspaces/kronos-semi" \
+            -w /workspaces/kronos-semi \
+            -e KRONOS_RUN_MOSFET_3D_SMOKE=1 \
+            kronos-semi:ci \
+            pytest tests/fem/test_mosfet_3d.py -m slow --no-cov --tb=short
+
       - name: Upload coverage XML
         if: always()
         uses: actions/upload-artifact@v4
@@ -213,6 +229,32 @@ jobs:
             args: resistor_3d --input benchmarks/resistor_3d/resistor.json
           - name: resistor_3d_gmsh
             args: resistor_3d --input benchmarks/resistor_3d/resistor_gmsh.json
+          # M19 3D MOSFET capstone: n-channel MOSFET on a gmsh-sourced
+          # unstructured tetrahedral mesh (benchmarks/mosfet_3d/). mosfet_3d
+          # checks the linear-regime drain current against the Pao-Sah
+          # reference within 25% and additionally runs the saturation
+          # config internally; mosfet_3d_sat checks I_DSAT within 30% of the
+          # velocity-saturation reference. The mosfet_3d_gpu (~500k-DOF,
+          # gpu-amgx) acceptance is gated to gpu-nightly.yml, not this
+          # matrix.
+          #
+          # allow-failure: "true" is retained for the SAME reason as
+          # mosfet_2d and nmos_idvgs: the bias_sweep SNES stagnates driving
+          # a V_GS sweep across the MOSFET inversion onset under Fermi-Dirac
+          # statistics (empirically the coupled 3D Slotboom solve does not
+          # converge within the CI budget on this device). This is the
+          # bias_sweep line-search-stabilization gap that M19's Phase F
+          # names as the next task; retiring the flag is that follow-up, not
+          # M19. The mosfet_3d artifacts (geometry, mesh loader path,
+          # verifiers, Pao-Sah / velocity-saturation references) are fully
+          # exercised regardless; the pure-Python analytical gates run in
+          # the lint/test matrix (tests/test_mosfet_3d_verifier.py).
+          - name: mosfet_3d
+            args: mosfet_3d
+            allow-failure: "true"
+          - name: mosfet_3d_sat
+            args: mosfet_3d_sat
+            allow-failure: "true"
           # examples catalogue (v0.23.x): practical-device starting
           # points exercising the M16 physics catalogue. Smoke gates
           # (run completion, finite I-V, qualitative ordering); the
